@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ivory: #F8F7F2;
+  --color-paper: #F0F2EB;
+  --color-forest: #145A3D;
+  --color-botanic: #347A55;
+  --color-sage: #DDEADF;
+  --color-sage-soft: #EEF4EE;
+  --color-ink: #1B201C;
+  --color-muted: #657068;
+  --color-line: #D6DDD4;
+  --color-terracotta: #BF532E;
+  --color-cherry: #A83D36;
+  --color-analytic: #547B91;
+  --color-blush: #FBEDE7;
+  --font-serif: "Source Serif 4 Variable", "Source Serif 4", Georgia, serif;
+  --font-sans: "Inter Variable", "Inter", system-ui, sans-serif;
+}
+
+:root { color-scheme: light; }
+html, body { background-color: #F4F2EA; color: var(--color-ink); }
+/* Papier : grain très fin + halos végétal (haut gauche) et terre cuite (bas droite) */
+body {
+  background-image:
+    radial-gradient(1100px 620px at 12% -8%, rgba(52, 122, 85, 0.085), transparent 62%),
+    radial-gradient(900px 560px at 104% 108%, rgba(191, 83, 46, 0.06), transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .32 0 0 0 0 .30 0 0 0 0 .22 0 0 0 .055 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-attachment: fixed;
+}
+body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; font-feature-settings: "cv11", "ss01"; }
+.tnum { font-variant-numeric: tabular-nums; }
+.font-serif { font-optical-sizing: auto; }
+.eyebrow { font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; font-weight: 500; color: var(--color-ink); }
+.panel {
+  background: linear-gradient(180deg, #FDFCF8 0%, #FAF8F2 100%);
+  border: 1px solid #D3DACD; border-radius: 7px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(27, 32, 28, 0.05), 0 10px 26px -18px rgba(20, 90, 61, 0.28);
+}
+.focus-ring:focus-visible, button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--color-botanic); outline-offset: 2px;
+}
+.skeleton { background: linear-gradient(90deg, #ECEFE8 0%, #F5F6F1 50%, #ECEFE8 100%); background-size: 200% 100%; animation: sk 1.4s ease-in-out infinite; border-radius: 4px; }
+@keyframes sk { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+
+input[type=number]::-webkit-inner-spin-button { opacity: 1; }
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+  .print-page { break-inside: avoid; }
+  @page { size: A4; margin: 16mm; }
+}
+
+/* Les enfants de grilles peuvent se rétrécir sous la largeur de leur contenu (graphiques, tableaux) */
+.grid > * { min-width: 0; }
