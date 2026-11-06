@@ -11,6 +11,8 @@ sont marquées « APP » et ne changent aucun nombre quand les valeurs par défa
           modèle (mêmes valeurs par défaut que les constantes de Females_Agent).
   APP 3 : compteurs cumulés de pontes fertiles / stériles (lecture seule, aucun tirage),
           pour l'indicateur « proportion de piqûres non viables ».
+  APP 4 : CropParameters.final_harvest remplace le test `crop.name == "cherry"` (même comportement).
+  APP 5 : constantes biologiques fixes nommées (EGGS_POISSON_MEAN, LARVAL_MORTALITY…), mêmes valeurs.
 """
 from __future__ import annotations
 
@@ -19,7 +21,7 @@ from dataclasses import dataclass, asdict
 
 import modelly
 
-ENGINE_VERSION = "1.0.0"          # version de l'extraction (ce module)
+ENGINE_VERSION = "1.1.0"          # version de l'extraction (ce module)
 NOTEBOOK_REFERENCE = "Notebook_ABM_TIS_Optimise_Modelly.ipynb"
 ECHELLE = 30
 
@@ -38,6 +40,7 @@ class CropParameters:
     natural_lifespan_max: int
     harvest_frequency: int
     prophylaxis_frequency: int
+    final_harvest: bool = False   # APP 4 : récolte au dernier jour (cerise) ; remplace le test crop.name == "cherry"
 
     def to_dict(self):
         return asdict(self)
@@ -52,6 +55,7 @@ CHERRY = CropParameters(
     name="cherry", season_length=25, total_fruits=3000 * ECHELLE, initial_fruits=3000 * ECHELLE,
     daily_fruit_production=0, maturation_min=10, maturation_max=15,
     natural_lifespan_min=20, natural_lifespan_max=50, harvest_frequency=0, prophylaxis_frequency=0,
+    final_harvest=True,
 )
 CROPS = {"strawberry": STRAWBERRY, "cherry": CHERRY}
 
@@ -71,6 +75,21 @@ def sample_lifespan(group, rng, means=LIFESPAN_MEANS, cvs=LIFESPAN_CV):
     while lifespan < 1:
         lifespan = rng.gauss(mean, sd)
     return max(1, round(lifespan))
+
+
+# ---------------------------------------------------------------- constantes biologiques fixes (cellule 3)
+# APP 5 : valeurs écrites en dur dans le code du notebook, regroupées ici pour être la source unique
+# de vérité (code ET documentation affichée). Mêmes valeurs, même ordre de tirage.
+EGGS_POISSON_MEAN = 6            # Females_Agent.mean_eggs_per_day
+EGGS_MAX_PER_DAY = 6             # min(Poisson, 6)
+FRUITS_PER_CLUTCH_MAX = 6        # randint(1, 6) fruits visés par ponte
+RF_FERTILE = (3, 13)             # (min, max) du notebook ; tirage randint(min, max - 1)
+RF_STERILE = (4, 11)
+LARVAL_EMERGENCE = (6, 11)       # randint(6, 11) jours, bornes incluses
+LARVAL_MORTALITY = (             # tirages séquentiels : (probabilité, (jour min, jour max))
+    (0.132, (1, 1)), (0.087, (2, 2)), (0.048, (3, 3)), (0.100, (4, 5)), (0.056, (7, 11)),
+)
+SEX_RATIO = 0.5                  # probabilité qu'une larve émergente soit un mâle
 
 
 def _poisson(rng, lam):
@@ -122,20 +141,18 @@ class Larvae_Agent(modelly.Agent):
         self.creation_date = model.time
         self.sperm_selection = sperm_selection
         self.fruit = fruit
-        self.sex_ratio = 0.5
+        self.sex_ratio = SEX_RATIO
         self.in_fruit = False
         self.death_date = self.mortality()
-        self.emergence_date = model.time + model.random.randint(6, 11)
+        self.emergence_date = model.time + model.random.randint(*LARVAL_EMERGENCE)
         model.pop_larvae += 1
         model.cumulative_larvae_born += 1
 
     def mortality(self):
         r, t = self.model.random, self.model.time
-        if r.random() < 0.132: return t + 1
-        if r.random() < 0.087: return t + 2
-        if r.random() < 0.048: return t + 3
-        if r.random() < 0.100: return t + r.randint(4, 5)
-        if r.random() < 0.056: return t + r.randint(7, 11)
+        for p, (a, b) in LARVAL_MORTALITY:
+            if r.random() < p:
+                return t + a if a == b else t + r.randint(a, b)
         return None
 
     def kill(self):
@@ -178,9 +195,9 @@ class Females_Agent(modelly.Agent):
             self.first_mating, self.last_mating = None, None
         self.eggs_laid = 0
         # APP 2 : 0.8 / 0.59 / 6 dans le notebook ; lus sur le modèle (mêmes défauts)
-        self.eta, self.eta_sperm_choice, self.mean_eggs_per_day = model.eta, model.eta_sperm_choice, 6
-        self.RF_fertilized_min, self.RF_fertilized_max = 3, 13
-        self.RF_sterilized_min, self.RF_sterilized_max = 4, 11
+        self.eta, self.eta_sperm_choice, self.mean_eggs_per_day = model.eta, model.eta_sperm_choice, EGGS_POISSON_MEAN
+        self.RF_fertilized_min, self.RF_fertilized_max = RF_FERTILE
+        self.RF_sterilized_min, self.RF_sterilized_max = RF_STERILE
         self.sperm_selection = sperm_selection
         model.pop_females += 1
 
@@ -197,11 +214,11 @@ class Females_Agent(modelly.Agent):
 
     def egglaying(self):
         rng = self.model.random
-        number_eggs_laid = min(_poisson(rng, self.mean_eggs_per_day), 6)
+        number_eggs_laid = min(_poisson(rng, self.mean_eggs_per_day), EGGS_MAX_PER_DAY)
         if number_eggs_laid <= 0: return
         pool = self.model.fruits_with_space
         if not pool: return
-        n_fruits = min(rng.randint(1, 6), number_eggs_laid, len(pool))
+        n_fruits = min(rng.randint(1, FRUITS_PER_CLUTCH_MAX), number_eggs_laid, len(pool))
         selected_fruits = rng.sample(pool, n_fruits)
         eggs_per_fruit = [1] * n_fruits
         for _ in range(number_eggs_laid - n_fruits):
@@ -496,7 +513,7 @@ class RematingModel(modelly.Model):
 
         for f in self.fruits: f.check_status()
         if self.crop.harvest_frequency > 0 and self.time > 0 and self.time % self.crop.harvest_frequency == 0: self.harvest()
-        if self.crop.name == "cherry" and self.time == self.crop.season_length - 1: self.harvest()
+        if self.crop.final_harvest and self.time == self.crop.season_length - 1: self.harvest()
         if self.crop.prophylaxis_frequency > 0 and self.time > 0 and self.time % self.crop.prophylaxis_frequency == 0: self.prophylaxis()
 
         if self.fruits_removed:

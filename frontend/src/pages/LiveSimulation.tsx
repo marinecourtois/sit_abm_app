@@ -103,7 +103,7 @@ export function LiveSimulation() {
       {/* barre de progression */}
       {(status === "running" || status === "queued") && (
         <div className="mt-4" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((live?.progress ?? 0) * 100)} aria-label="Progression du calcul">
-          <div className="h-1.5 overflow-hidden rounded-full bg-line"><div className="h-full bg-botanic transition-[width] duration-300" style={{ width: `${(live?.progress ?? 0) * 100}%` }} /></div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-line"><div className="m-shimmer h-full bg-botanic transition-[width] duration-500 ease-out" style={{ width: `${(live?.progress ?? 0) * 100}%` }} /></div>
           <div className="mt-1 text-[12px] text-muted tnum">{live?.done ?? 0} / {live?.total ?? "…"} saisons terminées</div>
         </div>
       )}
@@ -117,7 +117,7 @@ export function LiveSimulation() {
             <div>
               <h2 className="font-serif text-[21px] font-semibold">Évolution temporelle des populations</h2>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-muted">
-                {sc ? <UncertaintyLegend n={exp.config.replicates} /> : <Badge tone="blue">Flux en direct · répétition 1, valeurs brutes</Badge>}
+                {sc ? <UncertaintyLegend n={exp.config.replicates} /> : <Badge tone="blue"><span aria-hidden className="m-pulse mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-analytic" />Flux en direct · répétition 1, valeurs brutes</Badge>}
                 <span>Unités : {units.join(" · ") || "—"}</span>
               </div>
             </div>

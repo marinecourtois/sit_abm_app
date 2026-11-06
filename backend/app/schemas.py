@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from tis_engine.model import CROPS
 from tis_engine.parameters import BIOLOGY_PARAMS, INVASION_PRESETS, STRATEGY_META, biology_defaults
-from tis_engine.runner import REMATING_MODES, build_schedule
+from tis_engine.runner import REMATING_MODES, STRATEGY_PRESETS, build_schedule
 
 
 class StrategySpec(BaseModel):
@@ -57,14 +57,14 @@ def strategy_id(s: StrategySpec) -> str:
 def strategy_label(s: StrategySpec) -> str:
     if s.label:
         return s.label
-    if s.key in STRATEGY_META and all(v is None for v in (s.interval, s.first_day, s.initial_fraction, s.maintenance_interval)):
+    overrides = {k: v for k, v in s.model_dump(exclude={"key", "label"}).items() if v is not None}
+    if s.key in STRATEGY_META and not overrides:
         return STRATEGY_META[s.key]["label"]
-    if s.key in ("periodic", "every_3", "every_7"):
-        iv = s.interval or (7 if s.key == "every_7" else 3)
-        return f"J+{iv}" + (f" (dès J{s.first_day})" if s.first_day else "")
-    if s.key in ("front_loaded", "front_70", "front_100"):
-        fr = s.initial_fraction if s.initial_fraction is not None else (1.0 if s.key == "front_100" else 0.7)
-        mi = s.maintenance_interval if s.maintenance_interval is not None else (0 if s.key == "front_100" else 7)
+    p = {**STRATEGY_PRESETS[s.key], **overrides}   # valeurs effectives (presets du moteur)
+    if p["kind"] == "periodic":
+        return f"J+{p['interval']}" + (f" (dès J{p['first_day']})" if p["first_day"] else "")
+    if p["kind"] == "front_loaded":
+        fr, mi = p["initial_fraction"], p["maintenance_interval"]
         return f"{round(fr * 100)} % initial" + (f" + maint. {mi} j" if fr < 1 and mi else "")
     return STRATEGY_META.get(s.key, {}).get("label", s.key)
 
@@ -73,7 +73,17 @@ def config_hash(cfg: ExperimentConfig) -> str:
     return hashlib.sha256(json.dumps(cfg.model_dump(), sort_keys=True).encode()).hexdigest()[:16]
 
 
-def validate_config(cfg: ExperimentConfig) -> dict:
+def crop_label(crop: str) -> str:
+    from tis_engine.parameters import CROP_META
+    return CROP_META.get(crop, {}).get("label", crop)
+
+
+def count_seasons(cfg: ExperimentConfig) -> int:
+    n_strat = len(cfg.strategies) + (1 if cfg.include_control and not any(s.key == "no_tis" for s in cfg.strategies) else 0)
+    return len(cfg.crops) * n_strat * cfg.replicates
+
+
+def validate_config(cfg: ExperimentConfig, history: list[dict] | None = None) -> dict:
     """Vérifie unités, bornes, compatibilités. Ne corrige jamais silencieusement."""
     errors, warnings = [], []
     for c in cfg.crops:
@@ -139,18 +149,23 @@ def validate_config(cfg: ExperimentConfig) -> dict:
                     warnings.append(f"{strategy_label(s)} : budget nul, aucun lâcher (équivaut au témoin).")
                 if s.key != "no_tis" and 0 < cfg.budget < len(sched):
                     warnings.append(f"{strategy_label(s)} ({crop}) : budget inférieur au nombre de jours de lâcher, certains jours reçoivent 0 stérile.")
+                if s.key != "no_tis" and 0 < n_days <= 4:
+                    days = ", ".join(f"J{d}" for d in sorted(int(k) for k, v in sched.items() if v))
+                    warnings.append(f"{crop_label(crop)} · {strategy_label(s)} : seulement {n_days} lâcher{'s' if n_days > 1 else ''} "
+                                    f"sur une saison de {L} jours ({days}).")
                 scenarios.append({"crop": crop, "strategy": strategy_label(s), "strategy_key": s.key, "release_days": n_days,
                                   "total_released": sum(sched.values()), "season_length": L,
                                   "schedule": {str(k): v for k, v in sched.items() if v}})
-    if "cherry" in cfg.crops and any(s.key == "every_7" for s in cfg.strategies):
-        warnings.append("Cerise : la saison dure 25 jours ; J+7 ne donne que 4 lâchers (J0, J7, J14, J21).")
 
-    n_scen = len(cfg.crops) * (len(cfg.strategies) + (1 if cfg.include_control and not any(s.key == "no_tis" for s in cfg.strategies) else 0))
-    seasons = n_scen * cfg.replicates
-    pop = (cfg.invasion.wild + cfg.invasion.females) / 600
-    per = sum(0.6 if c == "strawberry" else 0.5 for c in cfg.crops) / max(1, len(cfg.crops))
-    workers = 8
-    est = seasons * per * max(0.5, pop) / min(workers, max(1, seasons)) + 1.0
+    seasons = count_seasons(cfg)
+    estimate = {"seasons": seasons, "seconds": None,
+                "basis": "Aucune exécution terminée sur ce serveur : pas d'estimation mesurée."}
+    runs = [h for h in (history or []) if h["seasons"] and h["duration_s"]]
+    if runs:
+        # durée murale par saison mesurée sur ce serveur (même parallélisme), pondérée par le nombre de saisons
+        rate = sum(h["duration_s"] for h in runs) / sum(h["seasons"] for h in runs)
+        estimate = {"seasons": seasons, "seconds": round(seasons * rate, 1),
+                    "basis": f"Mesuré : {rate:.2f}".replace(".", ",") + f" s par saison en moyenne sur {len(runs)} exécution{'s' if len(runs) > 1 else ''} "
+                             f"terminée{'s' if len(runs) > 1 else ''} de ce serveur. La durée réelle dépend de la culture et des effectifs."}
     return {"ok": not errors, "errors": errors, "warnings": warnings, "scenarios": scenarios,
-            "estimate": {"seasons": seasons, "seconds": round(est, 1),
-                         "basis": "≈0,5 s par saison et par cœur à invasion Moyenne (mesure locale), 8 processus"}}
+            "estimate": estimate}

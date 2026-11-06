@@ -1,0 +1,14 @@
+{
+  "name": "modelly-tis-research",
+  "private": true,
+  "description": "Racine du dépôt : outillage de tests (SmartTest) pour le frontend (Vitest) et le backend (pytest).",
+  "scripts": {
+    "test": "smarttest run",
+    "test:all": "smarttest run --all",
+    "test:staged": "smarttest run --staged",
+    "test:explain": "smarttest explain"
+  },
+  "devDependencies": {
+    "@tkmremi/smarttest": "1.1.1"
+  }
+}

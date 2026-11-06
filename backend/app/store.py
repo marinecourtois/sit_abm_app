@@ -40,6 +40,9 @@ def init():
             engine_version TEXT, params_version TEXT, schema_version INTEGER,
             seed INTEGER, created_at TEXT, started_at TEXT, finished_at TEXT,
             error TEXT, parent_id TEXT, tags TEXT, duration_s REAL)""")
+        cols = {r[1] for r in c.execute("PRAGMA table_info(experiments)")}
+        if "runtime" not in cols:   # migration : versions complètes de l'environnement d'exécution
+            c.execute("ALTER TABLE experiments ADD COLUMN runtime TEXT")
         # Une exécution interrompue par un arrêt du serveur ne doit pas rester « en cours »
         c.execute("UPDATE experiments SET status='cancelled', error='Interrompue par un redémarrage du serveur', finished_at=? "
                   "WHERE status IN ('queued','running')", (now(),))
@@ -49,6 +52,7 @@ def _row(r) -> dict:
     d = dict(r)
     d["config"] = json.loads(d["config"])
     d["tags"] = json.loads(d["tags"] or "[]")
+    d["runtime"] = json.loads(d["runtime"]) if d.get("runtime") else None
     d["has_results"] = (RESULTS / f"{d['id']}.json.gz").exists()
     return d
 
@@ -58,11 +62,11 @@ def create(name, project, description, config, config_hash, versions, parent_id=
     short = "TIS-" + eid[:8].upper()
     with _lock, _conn() as c:
         c.execute("INSERT INTO experiments (id, short_id, name, project, description, config, config_hash, status, "
-                  "engine_version, params_version, schema_version, seed, created_at, parent_id, tags) "
-                  "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                  "engine_version, params_version, schema_version, seed, created_at, parent_id, tags, runtime) "
+                  "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                   (eid, short, name, project, description, json.dumps(config), config_hash, "ready",
                    versions["engine_version"], versions["params_version"], versions["schema_version"],
-                   config["seed"], now(), parent_id, json.dumps(list(tags))))
+                   config["seed"], now(), parent_id, json.dumps(list(tags)), json.dumps(versions)))
     return get(eid)
 
 

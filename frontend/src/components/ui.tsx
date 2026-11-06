@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as RSelect from "@radix-ui/react-select";
 import * as RTooltip from "@radix-ui/react-tooltip";
 import * as RCollapsible from "@radix-ui/react-collapsible";
@@ -18,7 +18,7 @@ export function Button({ variant = "outline", size = "md", icon, className = "",
   }[variant];
   const s = { sm: "h-8 px-3 text-[13px] gap-1.5", md: "h-10 px-4 text-[14px] gap-2", lg: "h-[46px] px-6 text-[15px] gap-2.5" }[size];
   return (
-    <button type="button" className={`inline-flex items-center justify-center rounded-[5px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${v} ${s} ${className}`} {...rest}>
+    <button type="button" className={`press inline-flex items-center justify-center rounded-[5px] font-medium disabled:opacity-50 disabled:cursor-not-allowed ${v} ${s} ${className}`} {...rest}>
       {icon}{children}
     </button>
   );
@@ -57,18 +57,33 @@ export function Select({ value, onChange, options, label, icon, id, className = 
 export function Segmented<T extends string>({ value, onChange, options, label, size = "md" }: {
   value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; label: string; size?: "sm" | "md";
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [thumb, setThumb] = useState<{ left: number; width: number } | null>(null);
+  // Le curseur coulissant suit la position réelle du bouton actif (largeurs inégales possibles)
+  useLayoutEffect(() => {
+    const measure = () => {
+      const b = ref.current?.querySelector<HTMLElement>('[aria-checked="true"]');
+      setThumb(b ? { left: b.offsetLeft, width: b.offsetWidth } : null);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (ref.current) ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, [value, options.length]);
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex w-full rounded-[5px] border border-line bg-white p-[3px]"
+    <div ref={ref} role="radiogroup" aria-label={label} className="relative inline-flex w-full rounded-[5px] border border-line bg-white p-[3px]"
       onKeyDown={(e) => {
         const i = options.findIndex((o) => o.value === value);
         if (e.key === "ArrowRight") onChange(options[(i + 1) % options.length].value);
         if (e.key === "ArrowLeft") onChange(options[(i - 1 + options.length) % options.length].value);
       }}>
+      <span aria-hidden className="seg-thumb pointer-events-none absolute inset-y-[3px] left-0 rounded-[4px] bg-botanic shadow-sm"
+        style={{ width: thumb?.width ?? 0, transform: `translateX(${thumb?.left ?? 0}px)`, opacity: thumb ? 1 : 0 }} />
       {options.map((o) => {
         const on = o.value === value;
         return (
           <button key={o.value} type="button" role="radio" aria-checked={on} tabIndex={on ? 0 : -1} onClick={() => onChange(o.value)}
-            className={`flex-1 rounded-[4px] ${size === "sm" ? "h-7 text-[12.5px]" : "h-8 text-[13px]"} px-2 transition-colors ${on ? "bg-botanic text-white shadow-sm" : "text-ink hover:bg-sage-soft"}`}>
+            className={`relative z-[1] flex-1 whitespace-nowrap rounded-[4px] ${size === "sm" ? "h-7 text-[12.5px]" : "h-8 text-[13px]"} px-2 transition-colors duration-200 ${on ? "text-white" : "text-ink hover:bg-sage-soft"}`}>
             {o.label}
           </button>
         );
@@ -216,7 +231,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="fixed bottom-4 right-4 z-[60] flex flex-col gap-2 no-print" role="region" aria-live="polite" aria-label="Notifications">
         {toasts.map((t) => (
-          <div key={t.id} className={`flex max-w-sm items-start gap-2 rounded-md border bg-white px-3.5 py-2.5 text-[13px] shadow-lg ${t.tone === "error" ? "border-cherry/40" : t.tone === "success" ? "border-botanic/40" : "border-line"}`}>
+          <div key={t.id} className={`m-toast flex max-w-sm items-start gap-2 rounded-md border bg-white px-3.5 py-2.5 text-[13px] shadow-lg ${t.tone === "error" ? "border-cherry/40" : t.tone === "success" ? "border-botanic/40" : "border-line"}`}>
             <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${t.tone === "error" ? "bg-cherry" : t.tone === "success" ? "bg-botanic" : "bg-analytic"}`} />
             <span className="flex-1">{t.msg}</span>
             <button aria-label="Fermer" onClick={() => setToasts((x) => x.filter((y) => y.id !== t.id))} className="text-muted hover:text-ink"><X size={13} /></button>

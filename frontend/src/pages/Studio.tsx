@@ -118,7 +118,7 @@ export function SimulationConfigurator() {
 
   useEffect(() => {
     if (!cfg) return;
-    const t = setTimeout(() => api.validate(cfg).then(setVal).catch((e) => setVal({ ok: false, errors: [e.message], warnings: [], scenarios: [], estimate: { seasons: 0, seconds: 0, basis: "" } })), 250);
+    const t = setTimeout(() => api.validate(cfg).then(setVal).catch((e) => setVal({ ok: false, errors: [e.message], warnings: [], scenarios: [], estimate: { seasons: 0, seconds: null, basis: "" } })), 250);
     return () => clearTimeout(t);
   }, [cfg]);
 
@@ -281,7 +281,7 @@ export function SimulationConfigurator() {
             {val?.errors.map((e) => <li key={e} className="flex gap-1.5 text-cherry"><CircleX size={13} className="mt-0.5 shrink-0" />{e}</li>)}
             {val?.warnings.map((w) => <li key={w} className="flex gap-1.5 text-[#6B4E16]"><AlertTriangle size={13} className="mt-0.5 shrink-0" />{w}</li>)}
           </ul>
-          {val?.ok && <p className="mt-3 text-[12px] text-muted">Charge estimée : <strong className="text-ink tnum">{val.estimate.seasons}</strong> saisons, ≈ <strong className="text-ink tnum">{fmt(val.estimate.seconds, 0)} s</strong>. <span className="block text-[11px]">({val.estimate.basis})</span></p>}
+          {val?.ok && <p className="mt-3 text-[12px] text-muted">Charge : <strong className="text-ink tnum">{val.estimate.seasons}</strong> saisons{val.estimate.seconds != null ? <>, ≈ <strong className="text-ink tnum">{fmt(val.estimate.seconds, 0)} s</strong></> : null}. <span className="block text-[11px]">({val.estimate.basis})</span></p>}
           <Button variant="primary" size="lg" className="mt-4 w-full" disabled={!val?.ok || busy} onClick={() => submit(true)} icon={<Play size={16} fill="currentColor" />}>Lancer la simulation</Button>
           <Button className="mt-2 w-full" disabled={!val?.ok || busy} onClick={() => submit(false)} icon={<Save size={15} />}>Enregistrer sans lancer</Button>
           <div className="mt-3 flex gap-2">

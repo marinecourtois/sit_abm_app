@@ -16,6 +16,7 @@ export interface Experiment {
   engine_version: string; params_version: string; schema_version: number; seed: number;
   created_at: string; started_at?: string; finished_at?: string; error?: string | null;
   parent_id?: string | null; tags: string[]; duration_s?: number | null; has_results: boolean;
+  runtime?: Record<string, string | number> | null;
 }
 export interface Stat { mean: number; sd: number; min: number; max: number; n: number; values: number[] }
 export interface Band { mean: number[]; sd: number[] }
@@ -32,15 +33,18 @@ export interface BiologyParam { name: string; symbol: string; unit: string; defa
 export interface Meta {
   engine_version: string; params_version: string; schema_version: number;
   crops: Record<CropKey, { label: string; latin: string; summary: string; params: Record<string, number | string> }>;
-  strategies: Record<string, { label: string; short: string; nb: string; description: string }>;
+  strategies: Record<string, { label: string; short: string; nb: string; description: string; params: Record<string, number> }>;
   remating: Record<string, { label: string; description: string }>;
   invasions: Record<string, { label: string; wild: number; females: number }>;
   budget_presets: number[]; biology: BiologyParam[]; biology_defaults: Record<string, number>;
   fixed_constants: { name: string; symbol: string; value: string; unit: string; source: string }[];
+  model_constants: { eggs_poisson_mean: number; eggs_max_per_day: number; fruits_per_clutch_max: number; refractory_fertile: [number, number];
+    refractory_sterile: [number, number]; larval_emergence: [number, number]; larval_mortality: { p: number; days: [number, number] }[]; sex_ratio: number; scale: number };
   limits: Record<string, [number, number]>;
   versions: Record<string, string | number>; workers: number;
+  reference_plan: { crops: number; invasions: string[]; budgets: number[]; remating: string[]; strategies: number; replicates: number; seasons: number; sha256: string };
 }
-export interface Validation { ok: boolean; errors: string[]; warnings: string[]; scenarios: { crop: CropKey; strategy: string; strategy_key: StrategyKey; release_days: number; total_released: number; season_length: number; schedule: Record<string, number> }[]; estimate: { seasons: number; seconds: number; basis: string } }
+export interface Validation { ok: boolean; errors: string[]; warnings: string[]; scenarios: { crop: CropKey; strategy: string; strategy_key: StrategyKey; release_days: number; total_released: number; season_length: number; schedule: Record<string, number> }[]; estimate: { seasons: number; seconds: number | null; basis: string } }
 export interface LiveState { status: Status; progress: number; done?: number; total?: number; live: Record<string, { day: number; rows: Record<string, number>[] }>; log: { t: string; msg: string }[]; plan: { key: string; crop: CropKey; strategy_label: string; is_control: boolean; budget: number }[] }
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {

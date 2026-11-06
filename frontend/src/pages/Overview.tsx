@@ -52,6 +52,12 @@ export function Overview() {
   const [launching, setLaunching] = useState(false);
 
   const res: Results | null = ov.data?.results ?? null;
+  // Valeurs initiales du panneau = configuration réelle de l'étude de référence
+  const initDone = useRef(false);
+  useEffect(() => {
+    const c = ov.data?.experiment?.config;
+    if (c && !initDone.current) { initDone.current = true; setBudget(c.budget); if (c.invasion.preset) setInvasion(c.invasion.preset); }
+  }, [ov.data]);
   const exp = ov.data?.experiment ?? null;
   const cfg = exp?.config;
   const find = (c: string, s: string): Scenario | undefined => res?.scenarios.find((x) => x.crop === c && x.strategy_key === s);
@@ -132,7 +138,7 @@ export function Overview() {
           <div className="absolute inset-0">
           {res ? (
             <TimeSeriesChart ref={chartRef} series={series} height={Math.max(236, chartH)} xLabel="Jours après intervention" yLabel="Population relative"
-              yFormat={(v) => fmt(v, 1)} valueFormat={(v) => fmt(v, 3)} annotations={annotations} areaFill ariaLabel="Population relative d'adultes sauvages en fonction du temps, fraise et cerise"
+              yFormat={(v) => fmt(v, 1)} valueFormat={(v) => fmt(v, 3)} annotations={annotations} ariaLabel="Population relative d'adultes sauvages en fonction du temps, fraise et cerise"
               yDomain={[0, 1]} uncertaintyLabel={`Moyenne ± écart-type, ${nRep} répétitions · (W+F) scénario / (W+F) témoin, même jour et même graine`} />
           ) : <ChartLoading exp={exp} />}
           </div>

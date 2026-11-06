@@ -37,6 +37,7 @@ export function Analytics() {
   const hmRef = useRef<SVGSVGElement>(null), drRef = useRef<SVGSVGElement>(null), paRef = useRef<SVGSVGElement>(null), stRef = useRef<SVGSVGElement>(null);
 
   const rows = ref.data?.rows ?? [];
+  const nRep = new Set(rows.map((r) => r.Replicate)).size;   // répétitions réellement présentes dans le fichier
   const invasions = useMemo(() => Array.from(new Set(rows.map((r) => String(r.Invasion)))).sort((a, b) => parseInt(a.split("(")[1]) - parseInt(b.split("(")[1])), [rows]);
   const inv = invasion || invasions[1] || "";
   const budgets = useMemo(() => Array.from(new Set(rows.map((r) => Number(r.Budget)))).sort((a, b) => a - b), [rows]);
@@ -99,12 +100,12 @@ export function Analytics() {
       <Panel className="sticky top-0 z-20 mt-4 px-5 py-3 lg:top-2">{hdr}</Panel>
       {ref.loading ? <Skeleton className="mt-4 h-96" /> : (<>
         <Panel className="mt-4 px-5 py-4">
-          <PanelTitle sub={`${CROP_LABEL[crop]} · régime ${remating} · moyenne ± écart-type (n = 3 répétitions par case) · témoin : budget 0`}
-            right={<ChartExportMenu getSvg={() => hmRef.current} meta={{ title: `Matrice décisionnelle — ${m.label} (${CROP_LABEL[crop]})`, filename: `heatmap-${crop}-${metric}`, caption: `Plan factoriel du notebook, régime ${remating}, moyenne de 3 répétitions. ${m.unit}.` }} />}>
+          <PanelTitle sub={`${CROP_LABEL[crop]} · régime ${remating} · moyenne ± écart-type (n = ${nRep} répétitions par case) · témoin : budget 0`}
+            right={<ChartExportMenu getSvg={() => hmRef.current} meta={{ title: `Matrice décisionnelle — ${m.label} (${CROP_LABEL[crop]})`, filename: `heatmap-${crop}-${metric}`, caption: `Plan factoriel du notebook, régime ${remating}, moyenne de ${nRep} répétitions. ${m.unit}.` }} />}>
             Heatmap : invasion × budget × stratégie</PanelTitle>
           <div className="mt-3"><Heatmap ref={hmRef} rows={hmRows.map(({ i, b }) => `${i.split(" (")[0]} · ${fmtInt(b)}`)} cols={["Témoin", ...strategies.map((k) => meta?.strategies[k].short ?? k)]}
             values={hm.map((r) => r.map((c) => (c.n ? c.mean : null)))} sd={hm.map((r) => r.map((c) => (c.n ? c.sd : null)))}
-            domain={[0, Math.max(m.max === 300000 ? Math.max(...hm.flat().map((c) => c.mean || 0)) : m.max, 1)]} palette={m.palette} unit={m.unit.replace("% des fruits", "%")}
+            domain={[0, Math.max(m.unit.startsWith("%") ? Math.min(100, Math.ceil(Math.max(...hm.flat().map((c) => c.mean || 0)) / 5) * 5) : Math.max(...hm.flat().map((c) => c.mean || 0)), 1)]} palette={m.palette} unit={m.unit.replace("% des fruits", "%")}
             ariaLabel={`Heatmap ${m.label}`} colGroupLabel="Stratégie de distribution (budget identique par ligne)" /></div>
         </Panel>
 
@@ -112,7 +113,7 @@ export function Analytics() {
           <Panel className="px-5 py-4">
             <PanelTitle sub="Intensité de l'intervention (mâles stériles / saison) → réponse modélisée · barres : ± écart-type"
               right={<div className="flex items-center gap-2"><div className="w-40"><Select label="Invasion" value={inv} onChange={setInvasion} options={invasions.map((i) => ({ value: i, label: i.split(" (")[0] }))} /></div>
-                <ChartExportMenu getSvg={() => drRef.current} meta={{ title: `Dose-réponse — ${m.label} (${CROP_LABEL[crop]}, invasion ${inv.split(" (")[0]})`, filename: `dose-reponse-${crop}`, caption: `Budget 0 = témoin sans TIS, commun à toutes les stratégies. Moyenne ± écart-type, 3 répétitions, régime ${remating}.` }} /></div>}>
+                <ChartExportMenu getSvg={() => drRef.current} meta={{ title: `Dose-réponse — ${m.label} (${CROP_LABEL[crop]}, invasion ${inv.split(" (")[0]})`, filename: `dose-reponse-${crop}`, caption: `Budget 0 = témoin sans TIS, commun à toutes les stratégies. Moyenne ± écart-type, ${nRep} répétitions, régime ${remating}.` }} /></div>}>
               Courbes dose-réponse</PanelTitle>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px]">{dose.map((d) => <span key={d.id} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: d.color }} />{d.label}</span>)}</div>
             <TimeSeriesChart ref={drRef} series={dose} height={320} xLabel="Budget (mâles stériles par saison)" yLabel={`${m.label} (${m.unit})`} errorBars showMarkers curve="linear" showBands={false} zoomable={false}
@@ -137,7 +138,7 @@ export function Analytics() {
                 <ChartExportMenu getSvg={() => stRef.current} meta={{ title: `Distribution des répétitions — ${m.label}`, filename: `repetitions-${crop}` }} /></div>}>
               Incertitude entre répétitions</PanelTitle>
             <StripPlot ref={stRef} data={strip.map((s) => ({ label: s.k === "no_tis" ? "Témoin" : meta?.strategies[s.k].short ?? s.k, color: STRATEGY_COLOR[s.k], values: s.vals }))} unit={m.unit} />
-            <p className="text-[11.5px] text-muted">Avec 3 répétitions, ni quartiles ni intervalles de confiance ne sont calculés : les valeurs individuelles sont affichées.</p>
+            <p className="text-[11.5px] text-muted">Avec {nRep} répétitions, ni quartiles ni intervalles de confiance ne sont calculés : les valeurs individuelles sont affichées.</p>
           </Panel>
           <Panel className="px-5 py-4">
             <PanelTitle sub={`Effet du mode d'utilisation du sperme · ${CROP_LABEL[crop]}, invasion ${inv.split(" (")[0]}, budget ${fmtInt(budget)}`}>Sensibilité au réaccouplement</PanelTitle>
@@ -147,7 +148,7 @@ export function Analytics() {
                 <tr key={s.k} className="border-b border-line/60"><td className="py-1.5">{label(s.k)}</td><td className="py-1.5 text-right tnum">{fmt(s.pref, 1)}</td><td className="py-1.5 text-right tnum">{fmt(s.first, 1)}</td>
                   <td className="py-1.5 text-right tnum"><span className="inline-flex items-center gap-2"><span className="inline-block h-2 rounded-sm" style={{ width: Math.min(80, Math.abs(s.pref - s.first) * 6), background: s.pref - s.first < 0 ? "#BF532E" : "#347A55" }} />{fmt(s.pref - s.first, 1)}</span></td></tr>))}</tbody>
             </table>
-            <p className="mt-2 text-[11.5px] text-muted">{m.unit}. Différence des moyennes (3 répétitions par régime), sans test statistique.</p>
+            <p className="mt-2 text-[11.5px] text-muted">{m.unit}. Différence des moyennes ({nRep} répétitions par régime), sans test statistique.</p>
             <div className="mt-4 rounded-md border border-dashed border-line bg-white/60 px-4 py-3 text-[12px] text-muted">
               <strong className="text-ink">Sensibilité paramétrique (η, durées de vie, taux de pourrissement).</strong> Le plan factoriel du notebook ne fait pas varier ces paramètres : aucune analyse n’est affichée.
               Créez des variantes en Mode Avancé du <Link className="text-forest underline" to="/simulation">Studio</Link> puis comparez-les dans le <Link className="text-forest underline" to="/comparaison">Comparison Lab</Link>.
@@ -161,7 +162,7 @@ export function Analytics() {
             <li>Moyenne arithmétique et écart-type corrigé (n − 1) entre répétitions indépendantes, pour chaque scénario.</li>
             <li>Variation relative au témoin appariée par répétition (même graine) dans les expériences de l’application.</li>
             <li>Front de Pareto : dominance stricte sur deux critères à minimiser, calculée sur les moyennes.</li>
-            <li>Aucun test d’hypothèse, p-value, intervalle de confiance ni corrélation n’est calculé : avec n = 3, ces quantités ne seraient pas fiables. <ScientificTooltip content="Le notebook indique un écart-type entre réplicats d'environ 0,65 point sur la récolte saine à l'échelle 1 ; il ne réalise pas de test statistique." /></li>
+            <li>Aucun test d’hypothèse, p-value, intervalle de confiance ni corrélation n’est calculé : avec n = {nRep}, ces quantités ne seraient pas fiables. <ScientificTooltip content="Le notebook indique un écart-type entre réplicats d'environ 0,65 point sur la récolte saine à l'échelle 1 ; il ne réalise pas de test statistique." /></li>
           </ul>
         </Panel>
       </>)}

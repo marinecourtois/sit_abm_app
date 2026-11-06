@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { BarChart3, CalendarDays, Leaf } from "../icons";
 import { CherryBranch, NoOffspring, StrawberryPlant, SterileMaleFly, WildFemaleFly } from "../illustrations";
 import type { Meta } from "../lib/api";
+import { useMeta } from "../lib/meta";
 import { fmtInt } from "../lib/format";
 import { Panel, Tex } from "./ui";
 
@@ -9,20 +10,22 @@ import { Panel, Tex } from "./ui";
 export function BotanicalSpeciesCard({ crop, meta }: { crop: "strawberry" | "cherry"; meta: Meta | null }) {
   const m = meta?.crops[crop];
   const p = m?.params as Record<string, number> | undefined;
-  const presets = meta?.invasions;
-  const invRange = presets ? `${fmtInt(presets.faible.wild + presets.faible.females)} à ${fmtInt(presets.forte.wild + presets.forte.females)} adultes` : "—";
-  const inv = invRange;
-  const feats: { icon: ReactNode; text: ReactNode }[] = crop === "strawberry"
-    ? [
-        { icon: <CalendarDays size={19} strokeWidth={1.4} />, text: <span title={`Récolte de ${Math.round((meta?.biology_defaults.harvest_fraction ?? 0.9) * 100)} % des fruits mûrs tous les ${p?.harvest_frequency ?? "—"} jours ; ${fmtInt(p?.daily_fruit_production)} fruits produits par jour`}>Récolte continue<br /><span className="text-muted">({p?.season_length ?? "—"} jours simulés)</span></span> },
-        { icon: <Leaf size={19} strokeWidth={1.4} />, text: <span title="Production continue : de nouveaux fruits, réceptifs aux pontes, apparaissent chaque jour de la saison">Culture sensible<br /><span className="text-muted">aux infestations</span></span> },
-        { icon: <BarChart3 size={19} strokeWidth={1.4} />, text: <span title={`Préréglages du notebook : ${inv}`}>Pression d’invasion :<br /><span className="text-muted">faible à élevée</span></span> },
-      ]
-    : [
-        { icon: <CalendarDays size={19} strokeWidth={1.4} />, text: <span title={`Stock fermé de ${fmtInt(p?.initial_fruits)} fruits à J0, récolte unique à J${(p?.season_length ?? 1) - 1}`}>Récolte courte<br /><span className="text-muted">({p?.season_length ?? "—"} jours simulés)</span></span> },
-        { icon: <Leaf size={19} strokeWidth={1.4} />, text: <span title="Tous les fruits sont présents dès J0 : les lâchers doivent agir avant la maturation">Fenêtre d’intervention<br /><span className="text-muted">plus restreinte</span></span> },
-        { icon: <BarChart3 size={19} strokeWidth={1.4} />, text: <span title={`Préréglages du notebook : ${inv}`}>Pression d’invasion :<br /><span className="text-muted">faible à élevée</span></span> },
-      ];
+  const bio = meta?.biology_defaults;
+  const pct = (x?: number) => (x == null ? "—" : `${Math.round(x * 100)} %`);
+  const two = (a: ReactNode, b: ReactNode, title: string) => <span title={title}>{a}<br /><span className="text-muted">{b}</span></span>;
+  // Toutes les lignes sont générées depuis CropParameters / biology_defaults (aucun texte qualitatif écrit à la main)
+  const closedStock = !!p && p.initial_fruits > 0 && !p.daily_fruit_production;
+  const feats: { icon: ReactNode; text: ReactNode }[] = !p ? [] : [
+    { icon: <CalendarDays size={19} strokeWidth={1.4} />, text: p.harvest_frequency
+      ? two(`Récolte tous les ${p.harvest_frequency} j`, `(${pct(bio?.harvest_fraction)} des fruits mûrs)`, "CropParameters.harvest_frequency · harvest_fraction")
+      : two(`Récolte unique à J${p.season_length - 1}`, `(saison de ${p.season_length} jours)`, "CropParameters.final_harvest · season_length") },
+    { icon: <Leaf size={19} strokeWidth={1.4} />, text: closedStock
+      ? two("Stock fermé", `(${fmtInt(p.initial_fruits)} fruits à J0)`, "CropParameters.initial_fruits")
+      : two("Production continue", `(${fmtInt(p.daily_fruit_production)} fruits / jour, ${p.season_length} j)`, "CropParameters.daily_fruit_production · season_length") },
+    { icon: <BarChart3 size={19} strokeWidth={1.4} />, text: p.prophylaxis_frequency
+      ? two(`Prophylaxie tous les ${p.prophylaxis_frequency} j`, `(${pct(bio?.prophylaxis_fraction)} des fruits pourris)`, "CropParameters.prophylaxis_frequency · prophylaxis_fraction")
+      : two(`Maturation en ${p.maturation_min}–${p.maturation_max} j`, `(sénescence ${p.natural_lifespan_min}–${p.natural_lifespan_max} j)`, "CropParameters.maturation_* · natural_lifespan_*") },
+  ];
   const Illu = crop === "strawberry" ? StrawberryPlant : CherryBranch;
   return (
     <Panel className="flex h-full min-h-[184px] items-stretch overflow-hidden">
@@ -45,6 +48,7 @@ export function BotanicalSpeciesCard({ crop, meta }: { crop: "strawberry" | "che
 /** Schéma : mâle stérile + femelle sauvage → accouplement stérile, pontes non viables.
  *  Mise en page pilotée par la largeur du conteneur (container queries) : horizontale si ≥ 20rem, sinon empilée. */
 export function ScientificProcessDiagram({ compact = false, bare = false }: { compact?: boolean; bare?: boolean }) {
+  const meta = useMeta();
   const cap = "font-serif text-[13px] leading-tight text-muted @max-xs:text-[12px]";
   const Male = <figure className="flex flex-col items-center"><SterileMaleFly className="h-auto w-full max-w-[104px]" /><figcaption className={cap}>Mâle stérile<br />(lâché)</figcaption></figure>;
   const Female = <figure className="flex flex-col items-center"><WildFemaleFly className="h-auto w-full max-w-[104px]" /><figcaption className={cap}>Femelle sauvage<br />(terrain)</figcaption></figure>;
@@ -59,7 +63,7 @@ export function ScientificProcessDiagram({ compact = false, bare = false }: { co
         {Male}
         <span aria-hidden className="pb-7 text-[24px] font-light text-ink">+</span>
         {Female}
-        <span aria-hidden className="pb-7 text-[26px] font-light leading-none text-ink">⟶</span>
+        <span aria-hidden className="pb-7 text-[26px] font-light leading-none text-ink"><span className="m-nudge">⟶</span></span>
         <figure className="flex flex-col items-center">
           <NoOffspring className="h-auto w-[58px]" />
           <figcaption className={`mt-1 ${cap}`}>Pas de<br />descendance</figcaption>
@@ -78,7 +82,7 @@ export function ScientificProcessDiagram({ compact = false, bare = false }: { co
       </div>
       {!compact && (
         <p className="mt-auto pt-1 text-[11.5px] text-muted">
-          Accouplement fertile avec probabilité <Tex>{"\\dfrac{W}{W+\\eta S}"}</Tex>, <Tex>{"\\eta = 0{,}8"}</Tex>
+          Accouplement fertile avec probabilité <Tex>{"\\dfrac{W}{W+\\eta S}"}</Tex>, <Tex>{`\\eta = ${String(meta?.biology_defaults.eta ?? "").replace(".", "{,}")}`}</Tex>
         </p>
       )}
     </div>

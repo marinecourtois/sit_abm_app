@@ -34,7 +34,9 @@ vue d'ensemble (2 cultures × 5 stratégies + témoin, invasion Moyenne, 9 000 s
 | `make serve` | Build du frontend + serveur unique sur le port 8765 |
 | `make dev` | Développement : API avec rechargement (8765) + Vite (5173, proxy `/api`) |
 | `make build` | Build du frontend seul (`frontend/dist/`) |
-| `make test` | Tests de non-régression scientifique et tests de l'API |
+| `make test-smart` | Uniquement les tests affectés par vos modifications ([SmartTest](https://github.com/RemiPelloux/SmarttyTest)) |
+| `make test-all` | Tous les tests (pytest + Vitest) via SmartTest, rapport HTML |
+| `make test` | Tous les tests, directement (pytest puis Vitest) |
 
 Arrêter le serveur : `Ctrl+C`, ou `pkill -f "uvicorn app.main:app"` s'il tourne en arrière-plan.
 

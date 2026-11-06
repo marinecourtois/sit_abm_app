@@ -27,6 +27,24 @@ nombre** avec les valeurs par défaut :
 | APP 1 | Durées de vie moyennes et CV portées par le modèle (au lieu de variables globales) | Modifiables par expérience, sans effet de bord entre processus |
 | APP 2 | `eta` et `eta_sperm_choice` lus sur le modèle | Paramètre « compétitivité des stériles » exposé |
 | APP 3 | Compteurs cumulés de pontes fertiles / stériles | Indicateur « piqûres stériles » ; lecture seule |
+| APP 4 | `CropParameters.final_harvest` remplace le test `crop.name == "cherry"` | Comportement identique, généralisable à d'autres cultures |
+| APP 5 | Constantes fixes nommées (`EGGS_POISSON_MEAN`, `RF_FERTILE`, `LARVAL_MORTALITY`, `SEX_RATIO`…) | **Source unique** : le code les utilise et l'interface les affiche (page Protocole), sans recopie |
+
+### Source unique de vérité
+
+Aucun chiffre du modèle n'est écrit à la main dans l'interface ni dans les textes générés :
+
+| Information affichée | Lue depuis |
+|---|---|
+| Constantes biologiques fixes (ponte, périodes réfractaires, mortalité, émergence, sex-ratio) | `model.py` → `parameters.MODEL_CONSTANTS` / `FIXED_CONSTANTS` |
+| Caractéristiques des cultures (cartes, résumés, protocole) | `CropParameters` → `parameters._crop_summary` |
+| Paramètres et descriptions des stratégies | `runner.STRATEGY_PRESETS` → `parameters.STRATEGY_META` |
+| Paramètres biologiques réglables | `parameters.BIOLOGY_PARAMS` |
+| Plan factoriel du notebook (cultures, invasions, budgets, répétitions, saisons) | calculé depuis le CSV de référence (`main.reference_plan`) |
+| Estimation de durée | durées mesurées des exécutions terminées de ce serveur (`main._history`) ; absente s'il n'y en a pas |
+| Avertissements de validation | calendriers calculés par le moteur |
+
+Pour modifier une de ces valeurs, modifiez la source : toutes les pages suivent.
 
 ### Règle d'or : le flux aléatoire
 
@@ -171,12 +189,15 @@ Exemple : rendre réglable la ponte moyenne `mean_eggs_per_day` (6 dans le noteb
 
 ### 5.3 Ajouter une stratégie de lâcher
 
+0. **Paramètres** : ajouter la stratégie dans `runner.STRATEGY_PRESETS` (`kind` = `continuous`,
+   `periodic` ou `front_loaded`, avec ses paramètres). Si c'est un des types existants, les
+   étapes 1 et 2 ne sont pas nécessaires.
 1. **Calendrier** : si possible, réutiliser `continuous_schedule`, `periodic_schedule` ou
    `front_loaded_schedule` (`schedules.py`). Sinon, y ajouter une fonction
    `budget, season_length → {jour: nombre}` dont la somme vaut exactement le budget.
 2. `runner.py` : ajouter la clé dans `STRATEGIES` et une branche dans `build_schedule`.
-3. `parameters.py` : ajouter l'entrée dans `STRATEGY_META` (`label`, `short`, `nb`,
-   `description`).
+3. `parameters.py` : ajouter le nom dans `_NAMES` (`label`, `short`, nom du notebook). La
+   description est générée automatiquement depuis `STRATEGY_PRESETS`.
 4. `app/schemas.py` : ajouter la clé au `Literal` de `StrategySpec.key`, et un libellé dans
    `strategy_label` si la stratégie a des paramètres.
 5. Frontend :
@@ -190,12 +211,10 @@ Exemple : rendre réglable la ponte moyenne `mean_eggs_per_day` (6 dans le noteb
 ### 5.4 Ajouter une culture
 
 1. `model.py` : créer un `CropParameters` et l'ajouter à `CROPS`.
-   Attention à la logique spécifique dans `advance_day()` :
-   `if self.crop.name == "cherry" and self.time == self.crop.season_length - 1: self.harvest()`.
-   Une nouvelle culture à stock fermé et récolte unique doit être traitée de la même manière
-   (idéalement : remplacer ce test par un champ `final_harvest: bool` dans `CropParameters`,
-   en vérifiant que la non-régression passe toujours).
-2. `parameters.py` → `CROP_META` (`label`, `latin`, `summary`, `params`).
+   Une culture à stock fermé et récolte unique au dernier jour prend `final_harvest=True`
+   (comme la cerise).
+2. `parameters.py` → `CROP_META` (`label`, `latin`) ; le résumé et les paramètres affichés sont
+   générés depuis `CropParameters`. Pour une récolte unique au dernier jour, `final_harvest=True`.
 3. `app/jobs.py` → `_events` : dates de récolte de la culture.
 4. Frontend :
    - `src/lib/api.ts` → type `CropKey` ;

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { BarChart3, BookOpen, FlaskConical, Home, Layers, Menu, Play, X, Download, Plus } from "../icons";
 import { FieldLandscape, LeafMark, SeedlingIcon } from "../illustrations";
@@ -15,8 +15,8 @@ const NAV = [
 
 export function Logo() {
   return (
-    <div className="flex items-center gap-2.5">
-      <LeafMark width={44} height={44} aria-hidden />
+    <div className="logo flex items-center gap-2.5">
+      <LeafMark width={44} height={44} className="logo-leaf" aria-hidden />
       <div className="leading-none">
         <div className="font-serif text-[30px] font-semibold tracking-[-0.01em] text-ink">Modelly</div>
         <div className="mt-1 font-serif text-[15px] text-muted">TIS Research</div>
@@ -25,15 +25,33 @@ export function Logo() {
   );
 }
 
+function useActiveIndicator() {
+  const listRef = useRef<HTMLUListElement>(null);
+  const loc = useLocation();
+  const [ind, setInd] = useState({ top: 0, height: 0, visible: false });
+  const measure = useCallback(() => {
+    const li = listRef.current?.querySelector<HTMLElement>("a.is-active")?.closest("li");
+    if (!li) return setInd((i) => ({ ...i, visible: false }));
+    setInd({ top: li.offsetTop, height: li.offsetHeight, visible: true });   // repère : la liste (ul relative)
+  }, []);
+  useLayoutEffect(measure, [loc.pathname, measure]);
+  useEffect(() => { window.addEventListener("resize", measure); return () => window.removeEventListener("resize", measure); }, [measure]);
+  return { listRef, ind };
+}
+
 export function ResearchSidebar({ onNavigate }: { onNavigate?: () => void }) {
+  const { listRef, ind } = useActiveIndicator();
   return (
     <nav aria-label="Navigation principale" className="flex h-full flex-col bg-[linear-gradient(180deg,#F4F5EF_0%,#EFF2EA_55%,#E4ECE0_100%)]">
       <div className="px-7 pt-7 pb-10"><Logo /></div>
-      <ul className="flex flex-col gap-2 px-3.5">
+      <ul ref={listRef} className="relative flex flex-col gap-2 px-3.5">
+        {/* Indicateur de la section active : glisse d'un élément à l'autre */}
+        <span aria-hidden className="nav-indicator pointer-events-none absolute inset-x-3.5 top-0 rounded-[7px] bg-sage shadow-[inset_0_0_0_1px_rgba(52,122,85,0.08)]"
+          style={{ transform: `translateY(${ind.top}px)`, height: ind.height, opacity: ind.visible ? 1 : 0 }} />
         {NAV.map((n) => (
-          <li key={n.to}>
+          <li key={n.to} className="relative">
             <NavLink to={n.to} end={n.to === "/"} onClick={onNavigate}
-              className={({ isActive }) => `flex items-center gap-3.5 rounded-[7px] px-3.5 py-2.5 text-[16px] transition-colors ${isActive ? "bg-sage text-forest font-medium" : "text-ink hover:bg-[#E8EDE6]"}`}>
+              className={({ isActive }) => `nav-link flex items-center gap-3.5 rounded-[7px] px-3.5 py-2.5 text-[16px] transition-colors duration-200 ${isActive ? "is-active text-forest font-medium" : "text-ink hover:bg-[#E8EDE6]/80"}`}>
               <n.icon size={23} strokeWidth={1.45} aria-hidden />
               {n.label}
             </NavLink>
@@ -61,6 +79,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const loc = useLocation();
   const nav = useNavigate();
   useEffect(() => setOpen(false), [loc.pathname]);
+  // Boucles ambiantes en pause quand l'onglet n'est pas visible
+  useEffect(() => {
+    const h = () => document.documentElement.classList.toggle("is-hidden", document.hidden);
+    document.addEventListener("visibilitychange", h);
+    return () => document.removeEventListener("visibilitychange", h);
+  }, []);
   // Raccourcis clavier : « g » puis lettre ; « n » = nouvelle simulation
   useEffect(() => {
     let g = false, t: number | undefined;
@@ -97,7 +121,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       )}
       <main id="main" className="lg:pl-[243px] print:!pl-0">
-        <div className="mx-auto w-full max-w-[1640px] px-4 pb-8 pt-6 sm:px-6 lg:px-[30px] lg:pt-[14px] 2xl:px-10 print:max-w-none print:px-0">{children}</div>
+        <div className="mx-auto w-full max-w-[1640px] px-4 pb-8 pt-6 sm:px-6 lg:px-[30px] lg:pt-[14px] 2xl:px-10 print:max-w-none print:px-0"><div key={loc.pathname} className="m-route">{children}</div></div>
       </main>
     </div>
   );

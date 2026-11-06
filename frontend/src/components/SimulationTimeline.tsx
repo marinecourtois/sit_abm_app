@@ -20,9 +20,9 @@ export function ReleaseCalendar({ schedule, seasonLength, color = "#347A55", lab
           <span key={d} title={`J${d} : ${fmtInt(n)} stériles`}
             className="absolute bottom-0 rounded-t-[1px]"
             style={{ left: `${(d / seasonLength) * 100}%`, width: `max(2px, ${bw}%)`, height: Math.max(2, ((height - 2) * Math.sqrt(n)) / Math.sqrt(max)),
-              background: color, opacity: cursor != null && d > cursor ? 0.3 : 0.9 }} />
+              background: color, opacity: cursor != null && d > cursor ? 0.3 : 0.9, transition: "opacity 220ms ease-out" }} />
         ))}
-        {cursor != null && <span aria-hidden className="absolute inset-y-0 w-px bg-ink/50" style={{ left: `${(Math.min(cursor, seasonLength) / seasonLength) * 100}%` }} />}
+        {cursor != null && <span aria-hidden className="absolute inset-y-0 w-px bg-ink/50" style={{ left: `${(Math.min(cursor, seasonLength) / seasonLength) * 100}%`, transition: "left 160ms cubic-bezier(0.22, 0.7, 0.2, 1)" }} />}
       </div>
       <div className="relative mt-0.5 h-3.5 text-[10px] text-muted tnum" aria-hidden>
         {ticks.map((t) => (
@@ -68,7 +68,7 @@ export function SimulationTimeline({ max, value, onChange, events = [], availabl
           {events.map((e, i) => (
             <button key={i} type="button" onClick={() => onChange(Math.min(lim, e.day))} title={`J${e.day} — ${e.label}`} aria-label={`Aller au jour ${e.day} : ${e.label}`}
               className="absolute top-0 -translate-x-1/2" style={{ left: `${(e.day / max) * 100}%` }}>
-              <span className="block h-3 w-[3px] rounded-sm" style={{ background: EV_COLOR[e.type] ?? "#657068" }} />
+              <span className="m-pop block h-3 w-[3px] rounded-sm" style={{ background: EV_COLOR[e.type] ?? "#657068", animationDelay: `${120 + i * 70}ms` }} />
             </button>
           ))}
         </div>

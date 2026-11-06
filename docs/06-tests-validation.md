@@ -1,10 +1,58 @@
 # 06 — Tests et validation scientifique
 
 ```bash
-make test          # = cd backend && .venv/bin/python -m pytest -q tests
+make test-smart    # uniquement les tests touchés par vos modifications (SmartTest) — usage quotidien
+make test-all      # tout, via SmartTest, avec rapport .smarttest/reports/report.html
+make test          # tout, directement : pytest (backend) puis Vitest (frontend)
 ```
 
-Durée : environ une minute (des saisons complètes sont simulées).
+| Suite | Outil | Fichiers | Tests |
+|---|---|---|---|
+| Backend : non-régression, API, contrat | pytest (`backend/tests/`) | 3 | 45 |
+| Frontend : unitaires, composants, contrat | Vitest + Testing Library (`frontend/src/**/*.test.ts(x)`) | 8 | 66 |
+
+## SmartTest : ne lancer que les tests affectés
+
+[SmartTest](https://github.com/RemiPelloux/SmarttyTest) (`@tkmremi/smarttest`, installé à la
+racine du dépôt) construit le graphe de dépendances des deux projets — imports TypeScript du
+frontend, imports Python du backend — et ne lance que les tests qu'une modification peut
+atteindre, chacun avec la raison de sa sélection.
+
+```bash
+npx smarttest run                    # tests affectés par les modifications non commitées
+npx smarttest run --staged           # tests affectés par ce qui est indexé (avant un commit)
+npx smarttest run --base main        # tests affectés par la branche courante
+npx smarttest explain <fichier>      # quels tests protègent ce fichier, et par quel chemin
+npx smarttest run --all              # tout, par le même pipeline
+```
+
+Exemples de sélection réelle :
+
+| Fichier modifié | Tests sélectionnés |
+|---|---|
+| `frontend/src/lib/format.ts` | `format.test.ts`, et les tests des composants qui l'importent (`TimeSeriesChart`, `science`, `ui`) |
+| `backend/tis_engine/schedules.py` | `test_regression.py`, `test_api.py` (via `runner.py`), `test_frontend_contract.py` |
+| `backend/app/store.py` | `test_api.py` |
+
+Configuration : `smarttest.config.ts` (mode `balanced`, runners Vitest dans `frontend/` et
+pytest dans `backend/`). `backend/pytest.ini` déclare `pythonpath = .`, indispensable pour que
+SmartTest (comme pytest) résolve `import tis_engine` / `import app`.
+
+**Crochet pre-commit (facultatif)** : `npx smarttest hook install` lance les tests affectés à
+chaque commit. Il n'est pas installé par défaut : le dossier `.git/hooks` est partagé par
+tous les worktrees du dépôt et bloquerait les commits là où SmartTest n'est pas installé.
+
+### Contournements de SmartTest 1.1.1 (à retirer après correction)
+
+1. **`vitest.config.ts` à la racine** : avec plusieurs projets, l'adaptateur Vitest passe
+   `--config <racine>/vitest.config.ts` au lieu de `frontend/vitest.config.ts`. Le fichier racine
+   ne fait que réexporter la configuration du frontend.
+2. **`minWorkers: 1`** dans `frontend/vitest.config.ts` : SmartTest partage les cœurs entre
+   Vitest et pytest (`--maxWorkers=n`) ; Vitest 2 refuse de démarrer si `n` est inférieur à son
+   minimum par défaut (cœurs − 1).
+
+Sans ces deux réglages, `smarttest run --all` signale les 8 fichiers Vitest en « infrastructure
+error ».
 
 ## Ce qui est testé
 
@@ -21,6 +69,29 @@ Durée : environ une minute (des saisons complètes sont simulées).
 Les graines utilisées sont celles du notebook (`42 + 1000·rep + 7·B + 13·len(stratégie) +
 19·len(invasion)` pour le plan factoriel, `42 + 1000·rep + 17·len(stratégie)` pour les
 dynamiques).
+
+### `tests/test_frontend_contract.py` — contrat backend → frontend
+
+| Test | Vérifie |
+|---|---|
+| `test_frontend_meta_fixture_matches_engine` | L'instantané du registre utilisé par les tests du frontend (`frontend/src/test/fixtures/meta.json`) est identique au registre du moteur. Sinon : `make fixtures` |
+| `test_engine_produces_everything_the_interface_displays` | Une vraie saison courte : chaque indicateur et chaque série déclarés dans `frontend/src/lib/variables.ts` sont produits par le moteur (ou dérivés par `app/jobs.py`) |
+
+### Tests du frontend (Vitest)
+
+| Fichier | Vérifie |
+|---|---|
+| `lib/contract.test.ts` | Indicateurs et séries affichés présents dans le code du moteur ; stratégies colorées = registre ; descriptions de stratégies cohérentes avec leurs paramètres réels |
+| `components/science.test.tsx` | Cartes botaniques générées depuis `CropParameters` (et suivent une modification des paramètres) |
+| `components/charts/TimeSeriesChart.test.tsx` | Une courbe par série, bande ± écart-type seulement si elle existe, jamais d'axe négatif pour des données positives, accessibilité |
+| `components/ui.test.tsx` | Segmented (souris, clavier, ARIA), bornes de NumberField, libellés de statut |
+| `icons/icons.test.tsx` | Les 42 icônes : grille 24 × 24, `currentColor`, décoratives par défaut, nommées avec `aria-label` |
+| `lib/api.test.ts` | Messages d'erreur du backend, configuration transmise telle quelle, URL d'export |
+| `lib/format.test.ts` | Format français, tiret (jamais zéro) pour une valeur absente, signes |
+| `components/charts/exportChart.test.ts` | CSV : échappement et précision complète |
+
+Les deux tests de contrat ont été vérifiés par mutation : ajouter dans l'interface un
+indicateur que le moteur ne calcule pas fait échouer le test Vitest **et** le test pytest.
 
 ### `tests/test_api.py` — de bout en bout
 
@@ -59,7 +130,7 @@ touchent pas `data/app.db`.
 
 ## Vérifications manuelles avant une livraison
 
-- [ ] `make test` vert.
+- [ ] `make test-all` vert (SmartTest, 111 tests).
 - [ ] `cd frontend && npx tsc -b && npx vite build` sans erreur.
 - [ ] Vue d'ensemble : l'étude de référence se calcule au démarrage et s'affiche.
 - [ ] Studio → Lancer : la page Live suit la progression puis affiche les résultats.

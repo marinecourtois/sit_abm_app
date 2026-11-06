@@ -1,3 +1,4 @@
+import { sway } from './motion';
 import * as React from 'react';
 
 /*
@@ -192,8 +193,8 @@ export function CherryBranch(props: React.SVGProps<SVGSVGElement>) {
       </defs>
 
       {/* feuilles arrière */}
-      <Leaf x={86} y={40} a={62} L={80} W={32} bend={0.1} shade="c" petiole={9} />
-      <Leaf x={194} y={55} a={64} L={92} W={36} bend={0.14} shade="c" petiole={10} />
+      <g className="m-sway" style={sway(86, 40, 1.5, 11, 1.7)}><Leaf x={86} y={40} a={62} L={80} W={32} bend={0.1} shade="c" petiole={9} /></g>
+      <g className="m-sway" style={sway(194, 55, 1.5, 12, 3.4)}><Leaf x={194} y={55} a={64} L={92} W={36} bend={0.14} shade="c" petiole={10} /></g>
 
       {/* branche */}
       <path
@@ -212,9 +213,9 @@ export function CherryBranch(props: React.SVGProps<SVGSVGElement>) {
       <path d="M211 54C217 53.6 223 55.4 228 57C223 58.8 217 60.4 211 58.4Z" fill="#8A5E38" stroke="#3A2615" strokeWidth={0.6} />
       <path d="M213 54.8Q219 56 226.4 57M213 57.8Q218 57.6 226 57.2" fill="none" stroke="#C49A6A" strokeWidth={0.4} />
 
-      <Leaf x={40} y={32} a={104} L={100} W={42} bend={-0.12} shade="a" />
-      <Leaf x={202} y={56} a={-40} L={46} W={21} bend={0.1} shade="b" petiole={10} />
-      <Leaf x={126} y={50} a={16} L={100} W={40} bend={0.16} shade="a" />
+      <g className="m-sway" style={sway(40, 32, 1.5, 10, 5.1)}><Leaf x={40} y={32} a={104} L={100} W={42} bend={-0.12} shade="a" /></g>
+      <g className="m-sway" style={sway(202, 56, 1.5, 11, 6.8)}><Leaf x={202} y={56} a={-40} L={46} W={21} bend={0.1} shade="b" petiole={10} /></g>
+      <g className="m-sway" style={sway(126, 50, 1.5, 12, 8.5)}><Leaf x={126} y={50} a={16} L={100} W={40} bend={0.16} shade="a" /></g>
 
       {/* dard (rameau court) */}
       <path d="M116 44C116.4 49 117.2 54 118 58.6L124.4 58.6C125 54 125.6 49 126 45Z" fill="url(#cb-bark)" stroke="#3A2615" strokeWidth={0.6} />
@@ -223,6 +224,8 @@ export function CherryBranch(props: React.SVGProps<SVGSVGElement>) {
         <path key={a} d="M0 0Q2.2 4 0.4 8.6Q-1.6 4.4 0 0Z" transform={`translate(121 58) rotate(${a})`} fill="#B08A5A" stroke="#5E4026" strokeWidth={0.35} />
       ))}
 
+      {/* grappe : pédicelles et cerises balancent ensemble depuis le dard */}
+      <g className="m-sway" style={sway(121, 58, 2.2, 8, 1)}>
       {/* pédicelles */}
       {fruits.map((f, i) => {
         const d = `M${ps(SPUR)}C${ps(f.c1)} ${ps(f.c2)} ${ps(f.end)}`;
@@ -238,6 +241,7 @@ export function CherryBranch(props: React.SVGProps<SVGSVGElement>) {
       {fruits.map((f, i) => (
         <Cherry key={i} x={f.end[0]} y={f.end[1] - 1} a={f.a} s={f.s} />
       ))}
+      </g>
     </svg>
   );
 }

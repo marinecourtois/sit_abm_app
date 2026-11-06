@@ -133,7 +133,8 @@ function ExperimentDrawer({ exp, onClose, onChanged }: { exp: Experiment | null;
                   ["Empreinte de configuration", exp.config_hash], ["Graine de base", String(exp.seed)], ["Graines des répétitions", Array.from({ length: exp.config.replicates }, (_, r) => exp.seed + 1000 * r).join(", ")],
                   ["Créée", fmtDate(exp.created_at)], ["Démarrée", fmtDate(exp.started_at)], ["Terminée", fmtDate(exp.finished_at)],
                   ["Durée", exp.duration_s ? `${exp.duration_s} s` : "—"], ["Erreur", exp.error ?? "—"], ["Expérience parente", exp.parent_id ? exp.parent_id.slice(0, 8).toUpperCase() : "—"],
-                  ["Python / modelly", `${meta?.versions.python} / ${meta?.versions.modelly_version}`]] as [string, string][]).map(([k, v]) => (
+                  ["Python / modelly", exp.runtime ? `${exp.runtime.python} / ${exp.runtime.modelly_version}` : "non enregistré (expérience antérieure à ce suivi)"],
+                  ["Origine de modelly", exp.runtime?.modelly_source ? String(exp.runtime.modelly_source) : "non enregistrée"]] as [string, string][]).map(([k, v]) => (
                   <Fragment key={k}><dt className="text-muted">{k}</dt><dd className="break-all font-mono text-[11.5px]">{v}</dd></Fragment>
                 ))}
               </dl>

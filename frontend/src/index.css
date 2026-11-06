@@ -42,12 +42,88 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; font-
 }
 .skeleton { background: linear-gradient(90deg, #ECEFE8 0%, #F5F6F1 50%, #ECEFE8 100%); background-size: 200% 100%; animation: sk 1.4s ease-in-out infinite; border-radius: 4px; }
 @keyframes sk { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+/* ================================================================ Motion design
+   Principes : transform/opacity uniquement ; entrées 150–600 ms (ease-out) ; boucles ambiantes lentes
+   (6–14 s) réservées aux illustrations, jamais sur les données. Les états finaux sont les styles de base :
+   sans animation (prefers-reduced-motion, impression), tout s'affiche directement à sa place. */
+:root {
+  --ease-out: cubic-bezier(0.22, 0.7, 0.2, 1);
+  --ease-soft: cubic-bezier(0.45, 0.05, 0.35, 1);
+}
+
+/* Entrée des panneaux : légère montée + fondu, échelonnée dans les grilles */
+@keyframes m-rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes m-fade { from { opacity: 0; } }
+.panel { animation: m-rise 0.46s var(--ease-out) both; }
+.grid > :nth-child(2) > .panel, .grid > .panel:nth-child(2) { animation-delay: 50ms; }
+.grid > :nth-child(3) > .panel, .grid > .panel:nth-child(3) { animation-delay: 100ms; }
+.grid > :nth-child(4) > .panel, .grid > .panel:nth-child(4) { animation-delay: 150ms; }
+.grid > :nth-child(n+5) > .panel, .grid > .panel:nth-child(n+5) { animation-delay: 190ms; }
+.m-route { animation: m-fade 0.32s var(--ease-out) both; }
+
+/* Ambiance : balancement organique depuis un point d'attache (transform-origin défini en ligne) */
+@keyframes m-sway { 0%, 100% { transform: rotate(var(--sway-a, -1.6deg)); } 50% { transform: rotate(var(--sway-b, 1.6deg)); } }
+.m-sway { animation: m-sway var(--sway-t, 9s) var(--ease-soft) infinite; transform-box: view-box; will-change: transform; }
+@keyframes m-drift { 0% { transform: translateX(-18px); opacity: 0; } 15%, 85% { opacity: 1; } 100% { transform: translateX(26px); opacity: 0; } }
+.m-mist { animation: m-drift 14s linear infinite; }
+@keyframes m-flight {
+  0% { transform: translate(-30px, 0) ; opacity: 0; }
+  6% { opacity: 0.85; }
+  50% { transform: translate(120px, -38px); }
+  94% { opacity: 0.85; }
+  100% { transform: translate(270px, -12px); opacity: 0; }
+}
+.m-flight { animation: m-flight 13s var(--ease-soft) 3s infinite; opacity: 0; }
+@keyframes m-flutter { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-5deg); } }
+.m-flutter { animation: m-flutter 0.9s ease-in-out infinite; transform-box: view-box; }
+@keyframes m-nudge { 0%, 70%, 100% { transform: translateX(0); } 85% { transform: translateX(4px); } }
+.m-nudge { display: inline-block; animation: m-nudge 3.2s var(--ease-soft) infinite; }
+
+/* Navigation : indicateur actif glissant, micro-interactions d'icônes */
+.nav-indicator { transition: transform 0.38s var(--ease-out), height 0.38s var(--ease-out), opacity 0.2s; }
+.nav-link svg { transition: transform 0.3s var(--ease-out); }
+.nav-link:hover svg { transform: translateX(1px) rotate(-6deg) scale(1.06); }
+.logo-leaf { transition: transform 0.6s var(--ease-out); transform-origin: 20% 90%; }
+.logo:hover .logo-leaf { transform: rotate(-9deg) scale(1.04); }
+
+/* Contrôles */
+button, a, [role=radio] { -webkit-tap-highlight-color: transparent; }
+.press { transition: transform 0.15s var(--ease-out), background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s; }
+.press:active:not(:disabled) { transform: translateY(1px) scale(0.985); }
+.seg-thumb { transition: transform 0.32s var(--ease-out), width 0.32s var(--ease-out); }
+@keyframes m-toast { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
+.m-toast { animation: m-toast 0.32s var(--ease-out) both; }
+@keyframes m-pop { from { opacity: 0; transform: scale(0.4); } }
+.m-pop { animation: m-pop 0.35s var(--ease-out) both; transform-box: fill-box; transform-origin: center; }
+
+/* États vivants d'une simulation */
+@keyframes m-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.8); } }
+.m-pulse { animation: m-pulse 1.6s ease-in-out infinite; }
+@keyframes m-shimmer { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+.m-shimmer { position: relative; overflow: hidden; }
+.m-shimmer::after { content: ""; position: absolute; inset: 0; width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent); animation: m-shimmer 1.6s ease-in-out infinite; }
+
+/* Graphiques : révélation des courbes de gauche à droite, puis bandes et annotations (une seule fois) */
+@keyframes m-reveal { from { transform: scaleX(0); } }
+.m-reveal { animation: m-reveal 0.9s var(--ease-out) both; transform-box: fill-box; transform-origin: left center; }
+.m-late { animation: m-fade 0.4s var(--ease-out) 0.75s both; }
+.m-band { animation: m-fade 0.6s var(--ease-out) 0.25s both; }
+
+/* Onglet masqué : les boucles ambiantes s'arrêtent */
+.is-hidden .m-sway, .is-hidden .m-mist, .is-hidden .m-flight, .is-hidden .m-flutter, .is-hidden .m-nudge,
+.is-hidden .m-pulse, .is-hidden .m-shimmer::after, .is-hidden .skeleton { animation-play-state: paused; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .m-flight { display: none; }
+}
 
 input[type=number]::-webkit-inner-spin-button { opacity: 1; }
 .scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 @media print {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
   .no-print { display: none !important; }
   body { background: white; }
   .print-page { break-inside: avoid; }

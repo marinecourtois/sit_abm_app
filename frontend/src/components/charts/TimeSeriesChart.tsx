@@ -84,6 +84,8 @@ export const TimeSeriesChart = forwardRef<SVGSVGElement | null, TimeSeriesChartP
   const xf = p.xFormat ?? ((v: number) => fmt(v, 0));
   const curve = p.curve === "linear" ? curveLinear : curveMonotoneX;
   const clipId = useMemo(() => "clip-" + Math.random().toString(36).slice(2, 8), []);
+  // Signature des séries : l'animation d'entrée ne rejoue que si l'on change de séries (pas à chaque point ajouté)
+  const sig = p.series.map((s) => s.id).join("|");
   const cursor = p.cursorX ?? hover;
 
   const xTicks = x.ticks(Math.max(3, Math.min(12, Math.floor(iw / 70))));
@@ -142,7 +144,11 @@ export const TimeSeriesChart = forwardRef<SVGSVGElement | null, TimeSeriesChartP
           setDrag(null);
         }}
         onDoubleClick={() => setZoom(null)}>
-        <defs><clipPath id={clipId}><rect x={0} y={-4} width={iw} height={ih + 8} /></clipPath></defs>
+        <defs>
+          <clipPath id={clipId}><rect x={0} y={-4} width={iw} height={ih + 8} /></clipPath>
+          {/* révélation des courbes de gauche à droite (CSS .m-reveal ; sans animation, rectangle plein) */}
+          <clipPath id={`${clipId}-r`}><rect key={sig} className="m-reveal" x={-4} y={-8} width={iw + 8} height={ih + 16} /></clipPath>
+        </defs>
         <g transform={`translate(${M.left},${M.top})`}>
           {/* grille */}
           {yTicks.map((t) => <line key={"gy" + t} x1={0} x2={iw} y1={y(t)} y2={y(t)} stroke="#E3E8E1" strokeWidth={1} />)}
@@ -178,11 +184,14 @@ export const TimeSeriesChart = forwardRef<SVGSVGElement | null, TimeSeriesChartP
                 <path fill={`url(#${clipId}-w${k})`} d={area<number>().curve(curve).x((_, i) => x(s.x[i])).y0(ih).y1((v) => y(v))(s.y) ?? ""} />
               </g>
             ))}
+            <g className="m-band" key={"bands" + sig}>
             {p.showBands !== false && !p.errorBars && p.series.map((s) => s.sd && (
               <path key={"b" + s.id} fill={s.color} fillOpacity={0.2}
                 d={area<number>().curve(curve).x((_, i) => x(s.x[i])).y0((_, i) => y(Math.max(yExtent[0], s.y[i] - (s.sd![i] ?? 0))))
                   .y1((_, i) => y(s.y[i] + (s.sd![i] ?? 0)))(s.y) ?? ""} />
             ))}
+            </g>
+            <g clipPath={`url(#${clipId}-r)`}>
             {p.series.map((s) => (
               <path key={"l" + s.id} fill="none" stroke={s.color} strokeWidth={s.width ?? 2.6} strokeDasharray={s.dash}
                 strokeLinejoin="round" strokeLinecap="round" opacity={s.opacity ?? 1}
@@ -196,6 +205,7 @@ export const TimeSeriesChart = forwardRef<SVGSVGElement | null, TimeSeriesChartP
               </g>
             )))}
             {p.showMarkers && p.series.map((s) => s.y.map((v, i) => <Marker key={`m${s.id}${i}`} kind={s.marker ?? "circle"} cx={x(s.x[i])} cy={y(v)} color={s.color} />))}
+            </g>
           </g>
           {/* axes */}
           <line x1={0} x2={iw} y1={ih} y2={ih} stroke="#1B201C" strokeWidth={1} />
@@ -216,6 +226,7 @@ export const TimeSeriesChart = forwardRef<SVGSVGElement | null, TimeSeriesChartP
           <text transform={`translate(${-46},${ih / 2}) rotate(-90)`} textAnchor="middle" fontSize={13} fill="#1B201C">{p.yLabel}</text>
 
           {/* annotations calculées */}
+          <g className="m-late" key={"ann" + sig}>
           {width >= 560 && p.annotations?.map((a, k) => {
             const s = p.series.find((ss) => ss.id === a.seriesId); if (!s) return null;
             const i = s.x.indexOf(a.x); if (i < 0 || a.x < xExtent[0] || a.x > xExtent[1]) return null;
@@ -235,11 +246,12 @@ export const TimeSeriesChart = forwardRef<SVGSVGElement | null, TimeSeriesChartP
             );
           })}
 
+          </g>
           {/* curseur */}
           {cursor != null && cursor >= xExtent[0] && cursor <= xExtent[1] && (
-            <g data-export-hide pointerEvents="none">
-              <line x1={x(cursor)} x2={x(cursor)} y1={0} y2={ih} stroke="#1B201C" strokeOpacity={0.35} />
-              {p.series.map((s) => { const i = s.x.indexOf(cursor); return i < 0 ? null : { s, v: s.y[i] }; }).filter(Boolean).map((r) => <circle key={r!.s.id} cx={x(cursor)} cy={y(r!.v)} r={3.5} fill="#fff" stroke={r!.s.color} strokeWidth={2} />)}
+            <g data-export-hide pointerEvents="none" style={{ transform: `translateX(${x(cursor)}px)`, transition: "transform 140ms cubic-bezier(0.22, 0.7, 0.2, 1)" }}>
+              <line x1={0} x2={0} y1={0} y2={ih} stroke="#1B201C" strokeOpacity={0.35} />
+              {p.series.map((s) => { const i = s.x.indexOf(cursor); return i < 0 ? null : { s, v: s.y[i] }; }).filter(Boolean).map((r) => <circle key={r!.s.id} cx={0} cy={y(r!.v)} r={3.5} fill="#fff" stroke={r!.s.color} strokeWidth={2} style={{ transition: "cy 140ms cubic-bezier(0.22, 0.7, 0.2, 1)" }} />)}
             </g>
           )}
           {drag && <rect data-export-hide x={Math.min(drag[0], drag[1])} y={0} width={Math.abs(drag[1] - drag[0])} height={ih} fill="#347A55" fillOpacity={0.08} stroke="#347A55" strokeOpacity={0.4} />}

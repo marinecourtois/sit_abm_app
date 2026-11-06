@@ -6,7 +6,9 @@ biologiquement validées : le notebook ne fournit pas de plage d'incertitude.
 """
 from __future__ import annotations
 
-from .model import CHERRY, ECHELLE, ENGINE_VERSION, STRAWBERRY
+from .runner import STRATEGY_PRESETS
+from .model import (CHERRY, ECHELLE, EGGS_MAX_PER_DAY, EGGS_POISSON_MEAN, ENGINE_VERSION, FRUITS_PER_CLUTCH_MAX,
+                    LARVAL_EMERGENCE, LARVAL_MORTALITY, RF_FERTILE, RF_STERILE, SEX_RATIO, STRAWBERRY)
 
 PARAMS_VERSION = "nb-2025.10-echelle30"
 SCHEMA_VERSION = 1
@@ -19,20 +21,33 @@ INVASION_PRESETS = {
 
 BUDGET_PRESETS = [b * ECHELLE for b in (0, 150, 300, 600)]  # cellule 6 : BUDGETS
 
-STRATEGY_META = {
-    "no_tis":    {"label": "Témoin (sans TIS)", "short": "Témoin", "nb": "No TIS",
-                  "description": "Aucun lâcher de mâles stériles. Scénario de référence."},
-    "daily":     {"label": "Quotidien", "short": "Quotidien", "nb": "Daily",
-                  "description": "Budget réparti uniformément sur chaque jour de la saison (continuous_schedule)."},
-    "every_3":   {"label": "J+3", "short": "J+3", "nb": "Every 3 days",
-                  "description": "Un lâcher tous les 3 jours à partir de J0 (periodic_schedule, interval=3)."},
-    "every_7":   {"label": "J+7", "short": "J+7", "nb": "Every 7 days",
-                  "description": "Un lâcher tous les 7 jours à partir de J0 (periodic_schedule, interval=7)."},
-    "front_70":  {"label": "70 % initial + maintenance", "short": "70 % + maint.", "nb": "70% init + 7d maint",
-                  "description": "70 % du budget à J0, le reste réparti tous les 7 jours (front_loaded_schedule)."},
-    "front_100": {"label": "100 % initial", "short": "100 % initial", "nb": "100% init",
-                  "description": "Tout le budget lâché à J0 (front_loaded_schedule, initial_fraction=1)."},
+def _strategy_description(key):
+    """Description générée depuis STRATEGY_PRESETS (aucun chiffre recopié à la main)."""
+    p = STRATEGY_PRESETS[key]
+    if p["kind"] == "none":
+        return "Aucun lâcher de mâles stériles. Scénario de référence."
+    if p["kind"] == "continuous":
+        return "Budget réparti uniformément sur chaque jour de la saison (continuous_schedule)."
+    if p["kind"] == "periodic":
+        return f"Un lâcher tous les {p['interval']} jours à partir de J{p['first_day']} (periodic_schedule, interval={p['interval']})."
+    f, m = p["initial_fraction"], p["maintenance_interval"]
+    if f >= 1:
+        return "Tout le budget lâché à J0 (front_loaded_schedule, initial_fraction=1)."
+    return (f"{round(f * 100)} % du budget à J0, le reste réparti tous les {m} jours à partir de J{m} "
+            f"(front_loaded_schedule, initial_fraction={f}).")
+
+
+_NAMES = {  # noms des stratégies : notebook (nb) et traduction affichée
+    "no_tis": ("Témoin (sans TIS)", "Témoin", "No TIS"),
+    "daily": ("Quotidien", "Quotidien", "Daily"),
+    "every_3": ("J+3", "J+3", "Every 3 days"),
+    "every_7": ("J+7", "J+7", "Every 7 days"),
+    "front_70": ("70 % initial + maintenance", "70 % + maint.", "70% init + 7d maint"),
+    "front_100": ("100 % initial", "100 % initial", "100% init"),
 }
+STRATEGY_META = {k: {"label": l, "short": sh, "nb": nb, "description": _strategy_description(k),
+                     "params": {kk: vv for kk, vv in STRATEGY_PRESETS[k].items() if kk != "kind"}}
+                 for k, (l, sh, nb) in _NAMES.items()}
 
 REMATING_META = {
     "preference": {"label": "Préférence (polyandrie)", "description": "P(sperme fertile) = F / (F + η_s·S). Régime principal du notebook."},
@@ -41,17 +56,28 @@ REMATING_META = {
     "mixed": {"label": "Mélange proportionnel", "description": "P(sperme fertile) = F / (F + S) (non utilisé dans le plan du notebook)."},
 }
 
+def _fr(x):
+    return f"{x:,}".replace(",", "\u202f")
+
+
+def _crop_summary(c):
+    """Résumé généré à partir des CropParameters (aucun texte écrit à la main)."""
+    if c.initial_fruits and not c.daily_fruit_production:
+        txt = f"Stock fermé : {_fr(c.initial_fruits)} fruits présents à J0, saison de {c.season_length} jours"
+    else:
+        txt = f"Production continue : {_fr(c.daily_fruit_production)} fruits/jour pendant {c.season_length} jours"
+    if c.harvest_frequency:
+        txt += f", récolte tous les {c.harvest_frequency} jours"
+    if c.final_harvest:
+        txt += f", récolte unique à J{c.season_length - 1}"
+    if c.prophylaxis_frequency:
+        txt += f", prophylaxie tous les {c.prophylaxis_frequency} jours"
+    return txt + "."
+
+
 CROP_META = {
-    "strawberry": {
-        "label": "Fraise", "latin": "Fragaria × ananassa",
-        "summary": "Production continue : 900 fruits/jour pendant 100 jours, récolte et prophylaxie tous les 3 jours.",
-        "params": STRAWBERRY.to_dict(),
-    },
-    "cherry": {
-        "label": "Cerise", "latin": "Prunus avium",
-        "summary": "Stock fermé : 90 000 fruits présents à J0, saison de 25 jours, récolte unique à J24.",
-        "params": CHERRY.to_dict(),
-    },
+    "strawberry": {"label": "Fraise", "latin": "Fragaria × ananassa", "summary": _crop_summary(STRAWBERRY), "params": STRAWBERRY.to_dict()},
+    "cherry": {"label": "Cerise", "latin": "Prunus avium", "summary": _crop_summary(CHERRY), "params": CHERRY.to_dict()},
 }
 
 # name -> (symbole LaTeX, unité, défaut, min, max, pas, source, description, avancé ?)
@@ -88,15 +114,41 @@ BIOLOGY_PARAMS = {
                              "Part des fruits pourris retirés à chaque passage de prophylaxie (fraise).", True),
 }
 
+def _dec(x):
+    return str(x).replace(".", ",")
+
+
+def _rng(a, b):
+    return f"U{{{a}…{b}}}"
+
+
+# Constantes fixes : lues dans model.py (source unique), jamais recopiées à la main.
+MODEL_CONSTANTS = {
+    "eggs_poisson_mean": EGGS_POISSON_MEAN, "eggs_max_per_day": EGGS_MAX_PER_DAY,
+    "fruits_per_clutch_max": FRUITS_PER_CLUTCH_MAX,
+    "refractory_fertile": [RF_FERTILE[0], RF_FERTILE[1] - 1],
+    "refractory_sterile": [RF_STERILE[0], RF_STERILE[1] - 1],
+    "larval_emergence": list(LARVAL_EMERGENCE),
+    "larval_mortality": [{"p": p, "days": list(d)} for p, d in LARVAL_MORTALITY],
+    "sex_ratio": SEX_RATIO, "scale": ECHELLE,
+}
 FIXED_CONSTANTS = [
-    {"name": "Ponte journalière", "symbol": "\\lambda", "value": "Poisson(6), plafonnée à 6", "unit": "œufs / femelle / jour", "source": "Cellule 3 — Females_Agent.egglaying"},
-    {"name": "Période réfractaire après accouplement fertile", "symbol": "R_f", "value": "U{3…12}", "unit": "jours", "source": "Cellule 3 — RF_fertilized"},
-    {"name": "Période réfractaire après accouplement stérile", "symbol": "R_s", "value": "U{4…10}", "unit": "jours", "source": "Cellule 3 — RF_sterilized"},
-    {"name": "Développement larvaire (émergence)", "symbol": "D", "value": "U{6…11}", "unit": "jours", "source": "Cellule 3 — Larvae_Agent"},
-    {"name": "Mortalité larvaire J+1 / J+2 / J+3", "symbol": "\\mu_{1,2,3}", "value": "0,132 / 0,087 / 0,048", "unit": "probabilité séquentielle", "source": "Cellule 3 — Larvae_Agent.mortality"},
-    {"name": "Mortalité larvaire J+4–5 / J+7–11", "symbol": "\\mu_{4,5}", "value": "0,100 / 0,056", "unit": "probabilité séquentielle", "source": "Cellule 3 — Larvae_Agent.mortality"},
-    {"name": "Sex-ratio à l'émergence", "symbol": "r", "value": "0,5", "unit": "fraction de mâles", "source": "Cellule 3 — Larvae_Agent.sex_ratio"},
-    {"name": "Échelle", "symbol": "E", "value": str(ECHELLE), "unit": "facteur multiplicatif", "source": "Cellule 2 — ECHELLE"},
+    {"name": "Ponte journalière", "symbol": "\\lambda", "value": f"Poisson({EGGS_POISSON_MEAN}), plafonnée à {EGGS_MAX_PER_DAY}",
+     "unit": "œufs / femelle / jour", "source": "model.py — EGGS_POISSON_MEAN, EGGS_MAX_PER_DAY (cellule 3)"},
+    {"name": "Fruits visés par ponte", "symbol": "n_{fr}", "value": _rng(1, FRUITS_PER_CLUTCH_MAX),
+     "unit": "fruits", "source": "model.py — FRUITS_PER_CLUTCH_MAX (cellule 3)"},
+    {"name": "Période réfractaire après accouplement fertile", "symbol": "R_f", "value": _rng(RF_FERTILE[0], RF_FERTILE[1] - 1),
+     "unit": "jours", "source": "model.py — RF_FERTILE (cellule 3)"},
+    {"name": "Période réfractaire après accouplement stérile", "symbol": "R_s", "value": _rng(RF_STERILE[0], RF_STERILE[1] - 1),
+     "unit": "jours", "source": "model.py — RF_STERILE (cellule 3)"},
+    {"name": "Développement larvaire (émergence)", "symbol": "D", "value": _rng(*LARVAL_EMERGENCE),
+     "unit": "jours", "source": "model.py — LARVAL_EMERGENCE (cellule 3)"},
+    {"name": "Mortalité larvaire séquentielle", "symbol": "\\mu",
+     "value": " ; ".join(f"{_dec(p)} → J+{a}" + (f"…{b}" if b != a else "") for p, (a, b) in LARVAL_MORTALITY),
+     "unit": "probabilité → jour de mort", "source": "model.py — LARVAL_MORTALITY (cellule 3)"},
+    {"name": "Sex-ratio à l'émergence", "symbol": "r", "value": _dec(SEX_RATIO), "unit": "fraction de mâles",
+     "source": "model.py — SEX_RATIO (cellule 3)"},
+    {"name": "Échelle", "symbol": "E", "value": str(ECHELLE), "unit": "facteur multiplicatif", "source": "model.py — ECHELLE (cellule 2)"},
 ]
 
 
@@ -120,5 +172,6 @@ def registry() -> dict:
             for k, v in BIOLOGY_PARAMS.items()
         ],
         "fixed_constants": FIXED_CONSTANTS,
+        "model_constants": MODEL_CONSTANTS,
         "limits": {"replicates": [1, 30], "budget": [0, 1_000_000], "wild": [0, 100_000], "females": [0, 100_000]},
     }

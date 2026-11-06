@@ -12,8 +12,10 @@
 | `created_at`, `started_at`, `finished_at`, `duration_s` | Horodatages UTC (ISO 8601) et durée |
 | `status`, `error` | État d'exécution et message d'erreur éventuel |
 | `parent_id` | Expérience d'origine (duplication ou relance) |
+| `runtime` | Versions de l'environnement d'exécution : moteur, paramètres, schéma, modelly, **origine de modelly** (PyPI ou chemin du dépôt local), Python |
 
-Les versions de `modelly-abm` et de Python sont incluses dans les exports JSON et le rapport.
+Les expériences créées avant l'ajout de `runtime` affichent « non enregistré » : la valeur
+n'est jamais reconstituée après coup.
 
 ## Garanties
 

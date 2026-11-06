@@ -1,0 +1,512 @@
+{
+  "engine_version": "1.1.0",
+  "params_version": "nb-2025.10-echelle30",
+  "schema_version": 1,
+  "crops": {
+    "strawberry": {
+      "label": "Fraise",
+      "latin": "Fragaria × ananassa",
+      "summary": "Production continue : 900 fruits/jour pendant 100 jours, récolte tous les 3 jours, prophylaxie tous les 3 jours.",
+      "params": {
+        "name": "strawberry",
+        "season_length": 100,
+        "total_fruits": 90000,
+        "initial_fruits": 0,
+        "daily_fruit_production": 900,
+        "maturation_min": 2,
+        "maturation_max": 4,
+        "natural_lifespan_min": 7,
+        "natural_lifespan_max": 14,
+        "harvest_frequency": 3,
+        "prophylaxis_frequency": 3,
+        "final_harvest": false
+      }
+    },
+    "cherry": {
+      "label": "Cerise",
+      "latin": "Prunus avium",
+      "summary": "Stock fermé : 90 000 fruits présents à J0, saison de 25 jours, récolte unique à J24.",
+      "params": {
+        "name": "cherry",
+        "season_length": 25,
+        "total_fruits": 90000,
+        "initial_fruits": 90000,
+        "daily_fruit_production": 0,
+        "maturation_min": 10,
+        "maturation_max": 15,
+        "natural_lifespan_min": 20,
+        "natural_lifespan_max": 50,
+        "harvest_frequency": 0,
+        "prophylaxis_frequency": 0,
+        "final_harvest": true
+      }
+    }
+  },
+  "strategies": {
+    "no_tis": {
+      "label": "Témoin (sans TIS)",
+      "short": "Témoin",
+      "nb": "No TIS",
+      "description": "Aucun lâcher de mâles stériles. Scénario de référence.",
+      "params": {}
+    },
+    "daily": {
+      "label": "Quotidien",
+      "short": "Quotidien",
+      "nb": "Daily",
+      "description": "Budget réparti uniformément sur chaque jour de la saison (continuous_schedule).",
+      "params": {}
+    },
+    "every_3": {
+      "label": "J+3",
+      "short": "J+3",
+      "nb": "Every 3 days",
+      "description": "Un lâcher tous les 3 jours à partir de J0 (periodic_schedule, interval=3).",
+      "params": {
+        "interval": 3,
+        "first_day": 0
+      }
+    },
+    "every_7": {
+      "label": "J+7",
+      "short": "J+7",
+      "nb": "Every 7 days",
+      "description": "Un lâcher tous les 7 jours à partir de J0 (periodic_schedule, interval=7).",
+      "params": {
+        "interval": 7,
+        "first_day": 0
+      }
+    },
+    "front_70": {
+      "label": "70 % initial + maintenance",
+      "short": "70 % + maint.",
+      "nb": "70% init + 7d maint",
+      "description": "70 % du budget à J0, le reste réparti tous les 7 jours à partir de J7 (front_loaded_schedule, initial_fraction=0.7).",
+      "params": {
+        "initial_fraction": 0.7,
+        "maintenance_interval": 7
+      }
+    },
+    "front_100": {
+      "label": "100 % initial",
+      "short": "100 % initial",
+      "nb": "100% init",
+      "description": "Tout le budget lâché à J0 (front_loaded_schedule, initial_fraction=1).",
+      "params": {
+        "initial_fraction": 1.0,
+        "maintenance_interval": 0
+      }
+    }
+  },
+  "remating": {
+    "preference": {
+      "label": "Préférence (polyandrie)",
+      "description": "P(sperme fertile) = F / (F + η_s·S). Régime principal du notebook."
+    },
+    "first": {
+      "label": "Premier accouplement (monandrie)",
+      "description": "La femelle utilise le sperme de son premier accouplement."
+    },
+    "last": {
+      "label": "Dernier accouplement",
+      "description": "La femelle utilise le sperme de son dernier accouplement (non utilisé dans le plan du notebook)."
+    },
+    "mixed": {
+      "label": "Mélange proportionnel",
+      "description": "P(sperme fertile) = F / (F + S) (non utilisé dans le plan du notebook)."
+    }
+  },
+  "invasions": {
+    "faible": {
+      "label": "Faible (90 W : 90 F)",
+      "wild": 90,
+      "females": 90
+    },
+    "moyenne": {
+      "label": "Moyenne (300 W : 300 F)",
+      "wild": 300,
+      "females": 300
+    },
+    "forte": {
+      "label": "Forte (900 W : 900 F)",
+      "wild": 900,
+      "females": 900
+    }
+  },
+  "budget_presets": [
+    0,
+    4500,
+    9000,
+    18000
+  ],
+  "biology": [
+    {
+      "name": "eta",
+      "symbol": "\\eta",
+      "unit": "sans dimension",
+      "default": 0.8,
+      "min": 0.0,
+      "max": 2.0,
+      "step": 0.01,
+      "source": "Cellule 3 — Females_Agent.eta",
+      "description": "Compétitivité d'accouplement des mâles stériles relativement aux sauvages. P(accouplement fertile) = W / (W + η·S).",
+      "advanced": false
+    },
+    {
+      "name": "eta_sperm_choice",
+      "symbol": "\\eta_s",
+      "unit": "sans dimension",
+      "default": 0.59,
+      "min": 0.0,
+      "max": 2.0,
+      "step": 0.01,
+      "source": "Cellule 3 — Females_Agent.eta_sperm_choice",
+      "description": "Poids du sperme stérile dans le choix de la femelle (régime « preference »).",
+      "advanced": true
+    },
+    {
+      "name": "lifespan_sterile",
+      "symbol": "\\bar{T}_S",
+      "unit": "jours",
+      "default": 7.0,
+      "min": 1.0,
+      "max": 60.0,
+      "step": 0.5,
+      "source": "Cellule 3 — LIFESPAN_MEANS['sterile']",
+      "description": "Durée de vie moyenne des mâles stériles (loi normale tronquée à 1 j).",
+      "advanced": false
+    },
+    {
+      "name": "lifespan_wild",
+      "symbol": "\\bar{T}_W",
+      "unit": "jours",
+      "default": 25.0,
+      "min": 1.0,
+      "max": 120.0,
+      "step": 0.5,
+      "source": "Cellule 3 — LIFESPAN_MEANS['wild']",
+      "description": "Durée de vie moyenne des mâles sauvages.",
+      "advanced": true
+    },
+    {
+      "name": "lifespan_female",
+      "symbol": "\\bar{T}_F",
+      "unit": "jours",
+      "default": 25.0,
+      "min": 1.0,
+      "max": 120.0,
+      "step": 0.5,
+      "source": "Cellule 3 — LIFESPAN_MEANS['female']",
+      "description": "Durée de vie moyenne des femelles.",
+      "advanced": true
+    },
+    {
+      "name": "lifespan_cv",
+      "symbol": "CV_T",
+      "unit": "sans dimension",
+      "default": 0.3,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "source": "Cellule 3 — LIFESPAN_CV",
+      "description": "Coefficient de variation des durées de vie (commun aux trois groupes).",
+      "advanced": true
+    },
+    {
+      "name": "fruit_capacity",
+      "symbol": "K",
+      "unit": "pontes / fruit",
+      "default": 20,
+      "min": 1,
+      "max": 200,
+      "step": 1,
+      "source": "Cellule 4 — RematingModel(fruit_capacity)",
+      "description": "Nombre maximal de pontes (fertiles ou stériles) par fruit.",
+      "advanced": true
+    },
+    {
+      "name": "young_puncture_probability",
+      "symbol": "p_y",
+      "unit": "probabilité",
+      "default": 0.3,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "source": "Cellule 4 — young_puncture_probability",
+      "description": "Probabilité qu'une ponte tentée sur un fruit jeune réussisse.",
+      "advanced": true
+    },
+    {
+      "name": "rotten_puncture_probability",
+      "symbol": "p_r",
+      "unit": "probabilité",
+      "default": 0.1,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "source": "Cellule 5 — rotten_puncture_probability=0.10",
+      "description": "Probabilité qu'une ponte tentée sur un fruit pourri réussisse.",
+      "advanced": true
+    },
+    {
+      "name": "rotten_threshold",
+      "symbol": "\\theta",
+      "unit": "score",
+      "default": 5.0,
+      "min": 0.5,
+      "max": 100.0,
+      "step": 0.5,
+      "source": "Cellule 4 — rotten_threshold",
+      "description": "Seuil du score larvaire S(t) au-delà duquel le fruit pourrit.",
+      "advanced": true
+    },
+    {
+      "name": "larva_age_weight",
+      "symbol": "w",
+      "unit": "jour⁻¹",
+      "default": 0.5,
+      "min": 0.0,
+      "max": 5.0,
+      "step": 0.05,
+      "source": "Cellule 4 — larva_age_weight",
+      "description": "Poids de l'âge des larves dans le score S(t).",
+      "advanced": true
+    },
+    {
+      "name": "rot_hazard_sterile",
+      "symbol": "h_s",
+      "unit": "jour⁻¹",
+      "default": 0.231,
+      "min": 0.0,
+      "max": 5.0,
+      "step": 0.001,
+      "source": "Cellule 4 — rot_hazard_sterile",
+      "description": "Taux de pourrissement journalier d'un fruit piqué uniquement par des pontes stériles.",
+      "advanced": true
+    },
+    {
+      "name": "rot_hazard_fertile",
+      "symbol": "h_f",
+      "unit": "jour⁻¹",
+      "default": 0.3054,
+      "min": 0.0,
+      "max": 5.0,
+      "step": 0.001,
+      "source": "Cellule 4 — rot_hazard_fertile",
+      "description": "Taux de pourrissement journalier d'un fruit portant au moins une ponte fertile.",
+      "advanced": true
+    },
+    {
+      "name": "harvest_fraction",
+      "symbol": "\\phi_h",
+      "unit": "fraction",
+      "default": 0.9,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "source": "Cellule 4 — harvest_fraction",
+      "description": "Part des fruits récoltables cueillis à chaque récolte.",
+      "advanced": true
+    },
+    {
+      "name": "prophylaxis_fraction",
+      "symbol": "\\phi_p",
+      "unit": "fraction",
+      "default": 0.6,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "source": "Cellule 4 — prophylaxis_fraction",
+      "description": "Part des fruits pourris retirés à chaque passage de prophylaxie (fraise).",
+      "advanced": true
+    }
+  ],
+  "fixed_constants": [
+    {
+      "name": "Ponte journalière",
+      "symbol": "\\lambda",
+      "value": "Poisson(6), plafonnée à 6",
+      "unit": "œufs / femelle / jour",
+      "source": "model.py — EGGS_POISSON_MEAN, EGGS_MAX_PER_DAY (cellule 3)"
+    },
+    {
+      "name": "Fruits visés par ponte",
+      "symbol": "n_{fr}",
+      "value": "U{1…6}",
+      "unit": "fruits",
+      "source": "model.py — FRUITS_PER_CLUTCH_MAX (cellule 3)"
+    },
+    {
+      "name": "Période réfractaire après accouplement fertile",
+      "symbol": "R_f",
+      "value": "U{3…12}",
+      "unit": "jours",
+      "source": "model.py — RF_FERTILE (cellule 3)"
+    },
+    {
+      "name": "Période réfractaire après accouplement stérile",
+      "symbol": "R_s",
+      "value": "U{4…10}",
+      "unit": "jours",
+      "source": "model.py — RF_STERILE (cellule 3)"
+    },
+    {
+      "name": "Développement larvaire (émergence)",
+      "symbol": "D",
+      "value": "U{6…11}",
+      "unit": "jours",
+      "source": "model.py — LARVAL_EMERGENCE (cellule 3)"
+    },
+    {
+      "name": "Mortalité larvaire séquentielle",
+      "symbol": "\\mu",
+      "value": "0,132 → J+1 ; 0,087 → J+2 ; 0,048 → J+3 ; 0,1 → J+4…5 ; 0,056 → J+7…11",
+      "unit": "probabilité → jour de mort",
+      "source": "model.py — LARVAL_MORTALITY (cellule 3)"
+    },
+    {
+      "name": "Sex-ratio à l'émergence",
+      "symbol": "r",
+      "value": "0,5",
+      "unit": "fraction de mâles",
+      "source": "model.py — SEX_RATIO (cellule 3)"
+    },
+    {
+      "name": "Échelle",
+      "symbol": "E",
+      "value": "30",
+      "unit": "facteur multiplicatif",
+      "source": "model.py — ECHELLE (cellule 2)"
+    }
+  ],
+  "model_constants": {
+    "eggs_poisson_mean": 6,
+    "eggs_max_per_day": 6,
+    "fruits_per_clutch_max": 6,
+    "refractory_fertile": [
+      3,
+      12
+    ],
+    "refractory_sterile": [
+      4,
+      10
+    ],
+    "larval_emergence": [
+      6,
+      11
+    ],
+    "larval_mortality": [
+      {
+        "p": 0.132,
+        "days": [
+          1,
+          1
+        ]
+      },
+      {
+        "p": 0.087,
+        "days": [
+          2,
+          2
+        ]
+      },
+      {
+        "p": 0.048,
+        "days": [
+          3,
+          3
+        ]
+      },
+      {
+        "p": 0.1,
+        "days": [
+          4,
+          5
+        ]
+      },
+      {
+        "p": 0.056,
+        "days": [
+          7,
+          11
+        ]
+      }
+    ],
+    "sex_ratio": 0.5,
+    "scale": 30
+  },
+  "limits": {
+    "replicates": [
+      1,
+      30
+    ],
+    "budget": [
+      0,
+      1000000
+    ],
+    "wild": [
+      0,
+      100000
+    ],
+    "females": [
+      0,
+      100000
+    ]
+  },
+  "versions": {
+    "engine_version": "1.1.0",
+    "params_version": "nb-2025.10-echelle30",
+    "schema_version": 1,
+    "modelly_version": "1.5.0",
+    "modelly_source": "source locale /home/tkmremi/Desktop/work/Modelly",
+    "python": "3.15.0"
+  },
+  "biology_defaults": {
+    "eta": 0.8,
+    "eta_sperm_choice": 0.59,
+    "lifespan_sterile": 7.0,
+    "lifespan_wild": 25.0,
+    "lifespan_female": 25.0,
+    "lifespan_cv": 0.3,
+    "fruit_capacity": 20,
+    "young_puncture_probability": 0.3,
+    "rotten_puncture_probability": 0.1,
+    "rotten_threshold": 5.0,
+    "larva_age_weight": 0.5,
+    "rot_hazard_sterile": 0.231,
+    "rot_hazard_fertile": 0.3054,
+    "harvest_fraction": 0.9,
+    "prophylaxis_fraction": 0.6
+  },
+  "reference_plan": {
+    "crops": 2,
+    "invasions": [
+      "Faible (90 W : 90 F)",
+      "Moyenne (300 W : 300 F)",
+      "Forte (900 W : 900 F)"
+    ],
+    "budgets": [
+      0,
+      4500,
+      9000,
+      18000
+    ],
+    "remating": [
+      "first",
+      "preference"
+    ],
+    "strategies": 6,
+    "replicates": 3,
+    "seasons": 576,
+    "sha256": "974eab8e765998e2106ed61db718099557cd32aba7fe301641ef2fdff8b2a319"
+  },
+  "strategy_nb_names": {
+    "no_tis": "No TIS",
+    "daily": "Daily",
+    "every_3": "Every 3 days",
+    "every_7": "Every 7 days",
+    "front_70": "70% init + 7d maint",
+    "front_100": "100% init"
+  },
+  "workers": 8
+}

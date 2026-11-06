@@ -40,26 +40,34 @@ class Cancelled(Exception):
     pass
 
 
-def build_schedule(strategy: dict, budget: int, season_length: int) -> dict[int, int]:
-    """Construit le calendrier à partir des fonctions du notebook.
+# Paramètres des stratégies du notebook (make_strategies, cellule 5) — source unique, vérifiée par
+# tests/test_regression.py::test_schedules_match_make_strategies.
+STRATEGY_PRESETS = {
+    "no_tis": {"kind": "none"},
+    "daily": {"kind": "continuous"},
+    "every_3": {"kind": "periodic", "interval": 3, "first_day": 0},
+    "every_7": {"kind": "periodic", "interval": 7, "first_day": 0},
+    "front_70": {"kind": "front_loaded", "initial_fraction": 0.70, "maintenance_interval": 7},
+    "front_100": {"kind": "front_loaded", "initial_fraction": 1.00, "maintenance_interval": 0},
+    # calendriers personnalisés : valeurs par défaut si un champ est omis
+    "periodic": {"kind": "periodic", "interval": 3, "first_day": 0},
+    "front_loaded": {"kind": "front_loaded", "initial_fraction": 0.70, "maintenance_interval": 7},
+}
 
-    ``strategy`` : {"key": ..., "interval"?, "first_day"?, "initial_fraction"?, "maintenance_interval"?}
-    Les paramètres omis prennent les valeurs de ``make_strategies``.
-    """
+
+def build_schedule(strategy: dict, budget: int, season_length: int) -> dict[int, int]:
+    """Construit le calendrier avec les fonctions du notebook ; champs omis = STRATEGY_PRESETS."""
     key = strategy["key"]
-    if key == "no_tis" or budget == 0:
+    if key not in STRATEGY_PRESETS:
+        raise ValueError(f"Stratégie inconnue : {key}")
+    p = {**STRATEGY_PRESETS[key], **{k: v for k, v in strategy.items() if k != "key" and v is not None and k != "label"}}
+    if p["kind"] == "none" or budget == 0:
         return {}
-    if key == "daily":
+    if p["kind"] == "continuous":
         return continuous_schedule(budget, season_length)
-    if key in ("every_3", "every_7", "periodic"):
-        default = {"every_3": 3, "every_7": 7}.get(key, 3)
-        return periodic_schedule(budget, season_length, int(strategy.get("interval", default)),
-                                 int(strategy.get("first_day", 0)))
-    if key in ("front_70", "front_100", "front_loaded"):
-        frac = float(strategy.get("initial_fraction", 1.0 if key == "front_100" else 0.70))
-        maint = int(strategy.get("maintenance_interval", 0 if key == "front_100" else 7))
-        return front_loaded_schedule(budget, season_length, frac, maint)
-    raise ValueError(f"Stratégie inconnue : {key}")
+    if p["kind"] == "periodic":
+        return periodic_schedule(budget, season_length, int(p["interval"]), int(p["first_day"]))
+    return front_loaded_schedule(budget, season_length, float(p["initial_fraction"]), int(p["maintenance_interval"]))
 
 
 def run_season(task: dict, on_day: Callable[[int, dict], None] | None = None) -> dict:

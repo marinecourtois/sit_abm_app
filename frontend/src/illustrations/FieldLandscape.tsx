@@ -1,3 +1,4 @@
+import { sway } from './motion';
 import * as React from 'react';
 
 /*
@@ -50,10 +51,12 @@ function leafPaths(L: number, W: number, bend: number) {
 function Leaf({ x, y, a, L, W, bend, fill }: { x: number; y: number; a: number; L: number; W: number; bend: number; fill: string }) {
   const g = leafPaths(L, W, bend);
   return (
+    <g className="m-sway" style={sway(x, y, 3.2, 6 + (Math.abs(a) % 4), (x + y) % 5)}>
     <g transform={`translate(${x} ${y}) rotate(${a})`}>
       <path d={g.outline} fill={`url(#fl-${fill})`} stroke="#285638" strokeWidth={0.6} strokeOpacity={0.8} />
       <path d={g.veins} fill="none" stroke="#D6E7C2" strokeOpacity={0.45} strokeWidth={0.4} />
       <path d={g.midrib} fill="none" stroke="#DDEBC9" strokeOpacity={0.7} strokeWidth={0.65} />
+    </g>
     </g>
   );
 }
@@ -113,6 +116,7 @@ export function FieldLandscape(props: React.SVGProps<SVGSVGElement>) {
         </g>
         <path d="M0 166C42 150 98 164 140 162C178 160 212 152 240 156V190H0Z" fill="#A9C0A4" opacity={0.8} />
         <rect x="0" y="150" width="240" height="40" fill="url(#fl-mist)" />
+        <rect className="m-mist" x="-20" y="138" width="200" height="30" fill="url(#fl-mist)" opacity={0.9} />
 
         {/* champ et rangs en perspective */}
         <rect x="0" y="178" width="240" height="122" fill="url(#fl-ground)" />
@@ -130,9 +134,21 @@ export function FieldLandscape(props: React.SVGProps<SVGSVGElement>) {
           )}
         </g>
         <rect x="0" y="174" width="240" height="14" fill="url(#fl-mist)" />
+        <rect className="m-mist" style={{ animationDelay: "-7s", animationDuration: "18s" }} x="20" y="168" width="160" height="16" fill="url(#fl-mist)" />
+      </g>
+
+      {/* petit insecte qui traverse de temps en temps le champ (décoratif) */}
+      <g className="m-flight">
+        <g transform="translate(10 214)">
+          <ellipse cx="0" cy="0" rx="1.6" ry="0.9" fill="#4A3A2A" opacity={0.75} />
+          <g className="m-flutter" style={{ transformOrigin: "0px 0px", animationDuration: "0.18s" }}>
+            <ellipse cx="-0.6" cy="-1.4" rx="1.5" ry="0.7" fill="#E8EEF0" opacity={0.85} transform="rotate(-25)" />
+          </g>
+        </g>
       </g>
 
       {/* rameau du premier plan */}
+      <g className="m-sway" style={sway(252, 150, 1.4, 11, 2)}>
       <g transform="translate(250 262) scale(1.55) translate(-246 -262)">
         <path d="M246 192C230 208 214 232 200 262" fill="none" stroke="#4A3220" strokeWidth={2.2} strokeLinecap="round" />
         <path d="M246 192C230 208 214 232 200 262" fill="none" stroke="#8A6A48" strokeWidth={1.2} strokeLinecap="round" />
@@ -142,6 +158,7 @@ export function FieldLandscape(props: React.SVGProps<SVGSVGElement>) {
         <Leaf x={216} y={234} a={220} L={36} W={15} bend={-0.1} fill="b" />
         <Leaf x={208} y={248} a={140} L={42} W={17} bend={-0.08} fill="c" />
         <Leaf x={201} y={260} a={238} L={28} W={12} bend={0.08} fill="b" />
+      </g>
       </g>
     </svg>
   );

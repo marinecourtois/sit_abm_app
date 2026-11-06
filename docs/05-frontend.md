@@ -8,7 +8,12 @@ les formules, polices auto-hébergées (`@fontsource-variable` : Source Serif 4,
 cd frontend
 npm run dev      # http://localhost:5173 (API attendue sur 8765)
 npm run build    # vérification TypeScript + build dans dist/
+npm test         # tests Vitest (frontend/src/**/*.test.ts(x))
+npm run typecheck  # application + tests
 ```
+
+Les tests utilisent `src/test/fixtures/meta.json`, instantané du vrai registre du backend
+(régénéré par `make fixtures`, vérifié par `backend/tests/test_frontend_contract.py`).
 
 ## Arborescence
 
