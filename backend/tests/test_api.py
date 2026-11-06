@@ -36,7 +36,7 @@ def wait(c, eid, timeout=120):
 def cfg(c, **over):
     base = {"crops": ["cherry"], "strategies": [{"key": "every_7"}, {"key": "front_loaded", "initial_fraction": 0.5, "maintenance_interval": 5}],
             "invasion": {"preset": None, "wild": 120, "females": 150}, "budget": 3000, "remating": "first",
-            "replicates": 2, "seed": 1234, "include_control": True,
+            "replicates": 10, "seed": 1234, "include_control": True,
             "biology": {**c.get("/api/meta").json()["biology_defaults"], "eta": 0.65, "lifespan_sterile": 9.0}}
     base.update(over)
     return base
@@ -58,7 +58,7 @@ def test_parameters_reach_engine_exactly(client):
     assert e["status"] == "completed"
     res = client.get(f"/api/experiments/{e['id']}/results").json()
     sc = next(s for s in res["scenarios"] if s["strategy_key"] == "front_loaded")
-    assert sc["seeds"] == [1234, 2234]
+    assert sc["seeds"] == [1234 + 1000 * r for r in range(10)]
     for rep, seed in enumerate(sc["seeds"]):
         direct = run_season({"crop": "cherry", "wild": 120, "females": 150, "remating": "first", "seed": seed,
                              "schedule": build_schedule({"key": "front_loaded", "initial_fraction": 0.5, "maintenance_interval": 5}, 3000, 25),
@@ -71,8 +71,8 @@ def test_parameters_reach_engine_exactly(client):
 
 
 def test_reproducible_and_immutable(client):
-    a = wait(client, client.post("/api/experiments", json={"name": "a", "config": cfg(client, replicates=1)}).json()["id"])
-    b = wait(client, client.post("/api/experiments", json={"name": "b", "config": cfg(client, replicates=1)}).json()["id"])
+    a = wait(client, client.post("/api/experiments", json={"name": "a", "config": cfg(client)}).json()["id"])
+    b = wait(client, client.post("/api/experiments", json={"name": "b", "config": cfg(client)}).json()["id"])
     ra = client.get(f"/api/experiments/{a['id']}/results").json()
     rb = client.get(f"/api/experiments/{b['id']}/results").json()
     assert [s["metrics"] for s in ra["scenarios"]] == [s["metrics"] for s in rb["scenarios"]]
@@ -83,7 +83,7 @@ def test_reproducible_and_immutable(client):
 
 
 def test_cancel(client):
-    e = client.post("/api/experiments", json={"name": "long", "config": cfg(client, crops=["strawberry"], replicates=30)}).json()
+    e = client.post("/api/experiments", json={"name": "long", "config": cfg(client, crops=["strawberry"], replicates=50)}).json()
     time.sleep(0.8)
     assert client.post(f"/api/experiments/{e['id']}/cancel").status_code == 200
     e = wait(client, e["id"])

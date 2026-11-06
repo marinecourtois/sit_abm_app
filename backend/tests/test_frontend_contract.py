@@ -38,3 +38,10 @@ def test_engine_produces_everything_the_interface_displays():
     jobs_src = (Path(__file__).resolve().parents[1] / "app" / "jobs.py").read_text(encoding="utf-8")
     derived_in_jobs = {k for k in _declared_keys("VARIABLES") if f'"{k}"' in jobs_src}
     assert _declared_keys("VARIABLES") <= set(res["series"]) | derived_in_jobs, "série affichée mais non produite"
+
+
+def test_every_parameter_has_a_label_and_a_group():
+    from tis_engine.parameters import BIOLOGY_PARAMS, PARAM_GROUPS, PARAM_UI
+    groups = {k for k, _ in PARAM_GROUPS}
+    assert set(PARAM_UI) == set(BIOLOGY_PARAMS), "chaque paramètre exposé doit avoir un libellé et un groupe"
+    assert {g for _, g in PARAM_UI.values()} <= groups

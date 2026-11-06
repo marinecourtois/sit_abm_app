@@ -323,18 +323,18 @@ export function StrawberryPlant(props: React.SVGProps<SVGSVGElement>) {
 
       {/* feuilles arrière */}
       <Stem d="M126 207C120 168 108 110 100 64" w={1.3} />
-      <g className="m-sway" style={sway(100, 64, 2.2, 9, 1.7)}><Trifoliate x={100} y={64} a={-100} s={1.0} shade="c" /></g>
+      <g className="m-sway" style={sway(100, 64, 5, 5.5, 1.7)}><Trifoliate x={100} y={64} a={-100} s={1.0} shade="c" /></g>
       <Stem d="M131 207C130 160 142 112 140 70" w={1.4} />
-      <g className="m-sway" style={sway(140, 70, 2.2, 10, 3.4)}><Trifoliate x={140} y={70} a={-84} s={1.18} shade="c" latShade="a" /></g>
+      <g className="m-sway" style={sway(140, 70, 5, 6.5, 3.4)}><Trifoliate x={140} y={70} a={-84} s={1.18} shade="c" latShade="a" /></g>
 
       {/* pétioles */}
       <Stem d="M125 207C116 170 86 132 70 94" />
       <Stem d="M133 207C146 168 182 130 194 88" />
       <Stem d="M123 208C104 194 58 180 42 152" w={1.2} />
 
-      <g className="m-sway" style={sway(42, 152, 2.2, 8, 5.1)}><Trifoliate x={42} y={152} a={-166} s={0.86} shade="b" latShade="a" /></g>
-      <g className="m-sway" style={sway(70, 94, 2.2, 9, 6.8)}><Trifoliate x={70} y={94} a={-128} s={1.3} shade="a" latShade="b" /></g>
-      <g className="m-sway" style={sway(194, 88, 2.2, 10, 8.5)}><Trifoliate x={194} y={88} a={-54} s={1.3} shade="a" latShade="c" /></g>
+      <g className="m-sway" style={sway(42, 152, 5, 4.5, 5.1)}><Trifoliate x={42} y={152} a={-166} s={0.86} shade="b" latShade="a" /></g>
+      <g className="m-sway" style={sway(70, 94, 5, 5.5, 6.8)}><Trifoliate x={70} y={94} a={-128} s={1.3} shade="a" latShade="b" /></g>
+      <g className="m-sway" style={sway(194, 88, 5, 6.5, 8.5)}><Trifoliate x={194} y={88} a={-54} s={1.3} shade="a" latShade="c" /></g>
 
       {/* hampes florales et pédoncules */}
       <Stem d="M134 206C166 178 210 162 222 134" w={1.1} />
@@ -344,13 +344,13 @@ export function StrawberryPlant(props: React.SVGProps<SVGSVGElement>) {
       <Stem d="M131 206C148 152 176 132 182 160" w={1} />
       <Stem d="M129 206C136 176 148 140 153 150" w={0.9} />
 
-      <g className="m-sway" style={sway(222, 130, 2.6, 8, 1.7)}><Flower x={222} y={130} s={1.05} /></g>
-      <g className="m-sway" style={sway(240, 168, 3, 9, 1.7)}><Bud x={240} y={168} /></g>
+      <g className="m-sway" style={sway(222, 130, 7, 4.2, 1.7)}><Flower x={222} y={130} s={1.05} /></g>
+      <g className="m-sway" style={sway(240, 168, 8, 3.6, 0.6)}><Bud x={240} y={168} /></g>
 
-      <g className="m-sway" style={sway(153, 150, 2.8, 10, 1.7)}><Berry x={153} y={150} a={-6} s={0.72} ripe={false} /></g>
-      <g className="m-sway" style={sway(60, 146, 2.8, 11, 3.4)}><Berry x={60} y={146} a={16} s={1.18} /></g>
-      <g className="m-sway" style={sway(182, 160, 2.8, 9, 5.1)}><Berry x={182} y={160} a={-12} s={1.22} /></g>
-      <g className="m-sway" style={sway(98, 160, 2.8, 10, 6.8)}><Berry x={98} y={160} a={-4} s={1.28} /></g>
+      <g className="m-sway" style={sway(153, 150, 9, 4.2, 1.7)}><Berry x={153} y={150} a={-6} s={0.72} ripe={false} /></g>
+      <g className="m-sway" style={sway(60, 146, 9, 4.6, 3.4)}><Berry x={60} y={146} a={16} s={1.18} /></g>
+      <g className="m-sway" style={sway(182, 160, 9, 3.8, 5.1)}><Berry x={182} y={160} a={-12} s={1.22} /></g>
+      <g className="m-sway" style={sway(98, 160, 9, 4.2, 6.8)}><Berry x={98} y={160} a={-4} s={1.28} /></g>
 
       <Crown />
     </svg>

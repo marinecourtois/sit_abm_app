@@ -26,7 +26,11 @@ make serve     # construit le frontend puis lance l'application sur http://local
 
 Au premier démarrage, l'API lance automatiquement l'**étude de référence** affichée sur la
 vue d'ensemble (2 cultures × 5 stratégies + témoin, invasion Moyenne, 9 000 stériles,
-3 répétitions, graine 42). Le calcul dure quelques secondes ; la page se met à jour seule.
+10 répétitions, graine 42). Le calcul dure quelques secondes ; la page se met à jour seule.
+
+**Minimum de l'étude : 10 répétitions par scénario** (`MIN_REPLICATES`, `backend/tis_engine/parameters.py`).
+La page Analyses utilise le plan factoriel du notebook recalculé à 10 répétitions (`make factorial`,
+environ 5 minutes) ; les 576 saisons déjà calculées par le notebook y sont identiques au bit près.
 
 | Commande | Effet |
 |---|---|

@@ -50,8 +50,8 @@ export function BotanicalSpeciesCard({ crop, meta }: { crop: "strawberry" | "che
 export function ScientificProcessDiagram({ compact = false, bare = false }: { compact?: boolean; bare?: boolean }) {
   const meta = useMeta();
   const cap = "font-serif text-[13px] leading-tight text-muted @max-xs:text-[12px]";
-  const Male = <figure className="flex flex-col items-center"><SterileMaleFly className="h-auto w-full max-w-[104px]" /><figcaption className={cap}>Mâle stérile<br />(lâché)</figcaption></figure>;
-  const Female = <figure className="flex flex-col items-center"><WildFemaleFly className="h-auto w-full max-w-[104px]" /><figcaption className={cap}>Femelle sauvage<br />(terrain)</figcaption></figure>;
+  const Male = <figure className="flex flex-col items-center"><SterileMaleFly className="m-hover h-auto w-full max-w-[104px]" /><figcaption className={cap}>Mâle stérile<br />(lâché)</figcaption></figure>;
+  const Female = <figure className="flex flex-col items-center"><WildFemaleFly className="m-hover m-hover-b h-auto w-full max-w-[104px]" /><figcaption className={cap}>Femelle sauvage<br />(terrain)</figcaption></figure>;
   const body = (
     <div className="@container flex h-full w-full flex-col items-center text-center">
       {!bare && <>

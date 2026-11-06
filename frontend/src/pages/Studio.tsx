@@ -6,7 +6,7 @@ import { useMeta } from "../lib/meta";
 import { CROP_LABEL, fmt, fmtInt } from "../lib/format";
 import { CROP_COLOR, STRATEGY_COLOR } from "../lib/colors";
 import { StudyHeader } from "../components/layout";
-import { Badge, Button, Collapsible, NumberField, Panel, PanelTitle, ScientificTooltip, Segmented, Select, Tex, useToast } from "../components/ui";
+import { Badge, Button, NumberField, Panel, PanelTitle, ScientificTooltip, Segmented, Select, Tex, useToast } from "../components/ui";
 import { ReleaseCalendar } from "../components/SimulationTimeline";
 import { downloadText } from "../components/charts/exportChart";
 import { CherryDot, StrawberryDot } from "./Overview";
@@ -18,22 +18,81 @@ function useMode(): ["essentiel" | "avance", (m: "essentiel" | "avance") => void
   return [m, (v) => { setM(v); try { localStorage.setItem("tis-mode", v); } catch { /* */ } }];
 }
 
+const dec = (v: number) => String(v).replace(".", ",");
+
+/** Un paramètre biologique : nom clair, symbole, unité, curseur avec repère de la valeur du notebook. */
 export function ParameterField({ p, value, onChange }: { p: BiologyParam; value: number; onChange: (v: number) => void }) {
   const modified = value !== p.default;
   const invalid = !Number.isFinite(value) || value < p.min || value > p.max;
+  const pos = (v: number) => `${((v - p.min) / (p.max - p.min)) * 100}%`;
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_132px] items-center gap-x-3 gap-y-0.5 py-1.5">
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5 text-[13px]">
-          <span className="truncate">{p.description.split(".")[0].replace(/\s*\(.*$/, "")}</span>
-          <ScientificTooltip content={<div className="space-y-1"><div><Tex>{p.symbol}</Tex> — {p.description}</div><div className="text-muted">Unité : {p.unit} · plage admise [{p.min} ; {p.max}] · défaut {p.default}</div><div className="text-muted">Source : {p.source}</div></div>} />
-        </div>
-        <div className="flex items-center gap-2 text-[11px] text-muted">
-          <Tex>{p.symbol}</Tex><span>{p.unit}</span>
-          {modified && <button type="button" onClick={() => onChange(p.default)} className="inline-flex items-center gap-0.5 text-terracotta hover:underline"><RotateCcw size={10} />défaut {p.default}</button>}
-        </div>
+    <div className={`rounded-md border px-3 pb-2.5 pt-2 transition-colors ${invalid ? "border-cherry/50 bg-blush/40" : modified ? "border-terracotta/35 bg-[#FCF4EF]" : "border-line bg-white"}`}>
+      <div className="flex items-start justify-between gap-2">
+        <label htmlFor={`bio-${p.name}`} className="text-[13px] font-medium leading-snug text-ink">
+          {p.label} <span className="ml-0.5 font-normal text-muted"><Tex>{p.symbol}</Tex></span>
+        </label>
+        <ScientificTooltip content={<div className="space-y-1"><div>{p.description}</div><div className="text-muted">Source : {p.source}</div></div>} />
       </div>
-      <NumberField label={p.name} value={value} onChange={onChange} min={p.min} max={p.max} step={p.step} invalid={invalid} />
+      <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_128px] items-center gap-3">
+        <div className="relative h-6">
+          <input type="range" aria-label={`${p.label} (curseur)`} min={p.min} max={p.max} step={p.step} value={Number.isFinite(value) ? value : p.default}
+            onChange={(e) => onChange(Number(e.target.value))} className="absolute inset-x-0 top-1/2 w-full -translate-y-1/2 accent-[#347A55]" />
+          <span aria-hidden title={`Valeur du notebook : ${dec(p.default)}`} className="pointer-events-none absolute top-0 h-6 w-px bg-ink/45" style={{ left: pos(p.default) }} />
+        </div>
+        <NumberField id={`bio-${p.name}`} label={p.label} value={value} onChange={onChange} min={p.min} max={p.max} step={p.step} invalid={invalid} unit={p.unit === "sans dimension" ? undefined : p.unit} />
+      </div>
+      <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-muted">
+        <span className="tnum">plage {dec(p.min)} – {dec(p.max)}{p.unit !== "sans dimension" ? ` ${p.unit}` : ""} · notebook {dec(p.default)}</span>
+        {modified && <button type="button" onClick={() => onChange(p.default)} className="inline-flex items-center gap-1 font-medium text-terracotta hover:underline"><RotateCcw size={11} />Rétablir</button>}
+      </div>
+    </div>
+  );
+}
+
+/** Paramètres regroupés par thème, avec compteur et rétablissement par groupe. */
+function ParameterGroups({ params, values, onChange }: { params: BiologyParam[]; values: Record<string, number>; onChange: (v: Record<string, number>) => void }) {
+  const meta = useMeta();
+  return (
+    <div className="space-y-4">
+      {(meta?.biology_groups ?? []).map((g) => {
+        const items = params.filter((p) => p.group === g.key);
+        if (!items.length) return null;
+        const mod = items.filter((p) => values[p.name] !== p.default);
+        return (
+          <section key={g.key} aria-label={g.label}>
+            <div className="mb-1.5 flex items-center justify-between">
+              <h4 className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-forest">{g.label}</h4>
+              {mod.length > 0 && <button type="button" className="text-[11px] text-terracotta hover:underline"
+                onClick={() => onChange({ ...values, ...Object.fromEntries(mod.map((p) => [p.name, p.default])) })}>Rétablir ce groupe ({mod.length})</button>}
+            </div>
+            <div className="space-y-2">{items.map((p) => <ParameterField key={p.name} p={p} value={values[p.name]} onChange={(v) => onChange({ ...values, [p.name]: v })} />)}</div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Choix du régime d'utilisation du sperme (polyandrie / monandrie…), avec sa formule. */
+function RematingSelector({ value, onChange, all }: { value: string; onChange: (v: string) => void; all: boolean }) {
+  const meta = useMeta();
+  const keys = Object.keys(meta?.remating ?? {}).filter((k) => all || k === "preference" || k === "first");
+  return (
+    <div role="radiogroup" aria-label="Régime de réaccouplement" className="grid gap-2">
+      {keys.map((k) => {
+        const r = meta!.remating[k]; const on = value === k;
+        return (
+          <button key={k} type="button" role="radio" aria-checked={on} onClick={() => onChange(k)}
+            className={`rounded-md border px-3 py-2.5 text-left transition-colors ${on ? "border-botanic bg-sage-soft shadow-[inset_0_0_0_1px_#347A55]" : "border-line bg-white hover:border-botanic/50"}`}>
+            <span className="flex items-center justify-between gap-2">
+              <span className="text-[13px] font-semibold text-ink">{r.short} <span className="font-normal text-muted">· {r.label}</span></span>
+              {(k === "preference" || k === "first") && <Badge tone="green">notebook</Badge>}
+            </span>
+            <span className="mt-1 block overflow-x-auto text-[12px]"><Tex>{r.formula}</Tex></span>
+          </button>
+        );
+      })}
+      <p className="text-[11.5px] leading-snug text-muted">{meta?.remating[value]?.description}</p>
     </div>
   );
 }
@@ -111,7 +170,7 @@ export function SimulationConfigurator() {
     const from = sp.get("from");
     const base: ExperimentConfig = { crops: ["strawberry", "cherry"], strategies: [{ key: "every_3" }, { key: "every_7" }],
       invasion: { preset: "moyenne", wild: meta.invasions.moyenne.wild, females: meta.invasions.moyenne.females },
-      budget: 9000, remating: "preference", replicates: 3, seed: 42, include_control: true, biology: { ...meta.biology_defaults } };
+      budget: 9000, remating: "preference", replicates: meta.limits.replicates[0], seed: 42, include_control: true, biology: { ...meta.biology_defaults } };
     if (from) api.experiment(from).then((e) => { setCfg(e.config); setName(`${e.name} (variante)`); setProject(e.project); setParent(e.id); }).catch(() => setCfg(base));
     else setCfg(base);
   }, [meta]);
@@ -198,30 +257,28 @@ export function SimulationConfigurator() {
             <div className="mt-1"><StrategySelector value={cfg.strategies} onChange={(v) => set("strategies", v)} mode={mode} includeControl={cfg.include_control} setIncludeControl={(b) => set("include_control", b)} /></div></div>
           <div className="grid grid-cols-2 gap-3">
             <label className="block"><span className="flex items-center gap-1 font-medium">Répétitions <ScientificTooltip content="Saisons indépendantes par scénario. La répétition r utilise la graine s₀ + 1000·r, identique dans tous les scénarios (nombres aléatoires communs)." /></span>
-              <div className="mt-1"><NumberField label="Répétitions" value={cfg.replicates} min={1} max={30} onChange={(v) => set("replicates", v)} /></div></label>
+              <div className="mt-1"><NumberField label="Répétitions" value={cfg.replicates} min={meta.limits.replicates[0]} max={meta.limits.replicates[1]} onChange={(v) => set("replicates", v)} /></div></label>
             <label className="block"><span className="flex items-center gap-1 font-medium">Graine aléatoire <ScientificTooltip content="Graine de base s₀. Même configuration + même graine = mêmes résultats, au bit près (générateur Mersenne Twister du notebook)." /></span>
               <div className="mt-1"><NumberField label="Graine aléatoire" value={cfg.seed} min={0} max={2147483647} onChange={(v) => set("seed", v)} /></div></label>
           </div>
         </div>
-        {mode === "avance" ? (
-          <div className="mt-4">
-            <Collapsible title="Accouplement et réaccouplement" defaultOpen>
-              <Select label="Régime de réaccouplement" value={cfg.remating} onChange={(v) => set("remating", v)} options={Object.entries(meta.remating).map(([k, v]) => ({ value: k, label: v.label }))} />
-              <p className="mt-1.5 text-[11.5px] text-muted">{meta.remating[cfg.remating]?.description}</p>
-            </Collapsible>
-            <Collapsible title="Paramètres biologiques" badge={modifiedBio ? <Badge tone="terracotta">{modifiedBio} modifié{modifiedBio > 1 ? "s" : ""}</Badge> : undefined}>
-              <div className="divide-y divide-line/70">{bio.map((p) => <ParameterField key={p.name} p={p} value={cfg.biology[p.name]} onChange={(v) => set("biology", { ...cfg.biology, [p.name]: v })} />)}</div>
-              <Button size="sm" variant="ghost" className="mt-2" icon={<RotateCcw size={13} />} onClick={() => set("biology", { ...meta.biology_defaults })}>Rétablir les valeurs du notebook</Button>
-            </Collapsible>
+        <div className="mt-5 border-t border-line pt-4">
+          <h3 className="flex items-center gap-1.5 text-[13.5px] font-semibold">Réaccouplement des femelles
+            <ScientificTooltip content="Dans tous les régimes les femelles se réaccouplent ; le régime fixe quel sperme féconde les œufs (Females_Agent.use_fertile_sperm)." /></h3>
+          <div className="mt-2"><RematingSelector value={cfg.remating} onChange={(v) => set("remating", v)} all={mode === "avance"} /></div>
+        </div>
+        <div className="mt-5 border-t border-line pt-4">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-[13.5px] font-semibold">Paramètres biologiques {mode === "avance" ? null : <span className="font-normal text-muted">essentiels</span>}</h3>
+            {modifiedBio > 0 && <Badge tone="terracotta">{modifiedBio} modifié{modifiedBio > 1 ? "s" : ""}</Badge>}
           </div>
-        ) : (
-          <div className="mt-4 border-t border-line pt-3">
-            <Collapsible title="Paramètres biologiques essentiels">
-              <div className="divide-y divide-line/70">{bio.filter((p) => !p.advanced).map((p) => <ParameterField key={p.name} p={p} value={cfg.biology[p.name]} onChange={(v) => set("biology", { ...cfg.biology, [p.name]: v })} />)}</div>
-              <p className="mt-2 text-[11.5px] text-muted">Le Mode Avancé donne accès aux {bio.length} paramètres exposés par le moteur et au régime de réaccouplement.</p>
-            </Collapsible>
+          <p className="mt-0.5 text-[11.5px] text-muted">Repère vertical sur le curseur : valeur du notebook.</p>
+          <div className="mt-3"><ParameterGroups params={mode === "avance" ? bio : bio.filter((p) => !p.advanced)} values={cfg.biology} onChange={(v) => set("biology", v)} /></div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            {mode !== "avance" && <p className="text-[11.5px] text-muted">Mode Avancé : {bio.length} paramètres et 4 régimes de réaccouplement.</p>}
+            {modifiedBio > 0 && <Button size="sm" variant="ghost" icon={<RotateCcw size={13} />} onClick={() => set("biology", { ...meta.biology_defaults })}>Tout rétablir (notebook)</Button>}
           </div>
-        )}
+        </div>
       </Panel>
 
       {/* ---------- Centre : visualisation du scénario */}

@@ -92,7 +92,7 @@ export function Overview() {
       const e = await api.create({
         name: `${crop === "strawberry" ? "Fraise" : "Cerise"} · ${meta.strategies[strategy].label} · ${fmtInt(budget)} stériles`,
         config: { crops: [crop], strategies: [{ key: strategy }], invasion: { preset: invasion, wild: inv.wild, females: inv.females },
-          budget, remating: "preference", replicates: 3, seed: 42, include_control: true, biology: meta.biology_defaults },
+          budget, remating: "preference", replicates: meta.limits.replicates[0], seed: 42, include_control: true, biology: meta.biology_defaults },
       });
       toast(`Simulation ${e.short_id} lancée.`, "success");
       nav(`/simulation/${e.id}`);

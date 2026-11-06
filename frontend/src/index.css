@@ -76,6 +76,19 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; font-
 .m-flight { animation: m-flight 13s var(--ease-soft) 3s infinite; opacity: 0; }
 @keyframes m-flutter { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-5deg); } }
 .m-flutter { animation: m-flutter 0.9s ease-in-out infinite; transform-box: view-box; }
+/* Mouches : battement d'ailes rapide (bourdonnement) et vol stationnaire du corps */
+@keyframes m-buzz { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-16deg); } }
+.m-buzz { animation: m-buzz 0.14s linear infinite; transform-box: view-box; will-change: transform; }
+.m-buzz-near { animation-name: m-buzz-near; }
+@keyframes m-buzz-near { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(9deg); } }
+@keyframes m-hover {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(3px, -5px) rotate(-2.5deg); }
+  50% { transform: translate(-1px, -2px) rotate(1deg); }
+  75% { transform: translate(-3px, -6px) rotate(2deg); }
+}
+.m-hover { animation: m-hover 3.2s var(--ease-soft) infinite; will-change: transform; }
+.m-hover-b { animation-duration: 3.8s; animation-delay: -1.3s; }
 @keyframes m-nudge { 0%, 70%, 100% { transform: translateX(0); } 85% { transform: translateX(4px); } }
 .m-nudge { display: inline-block; animation: m-nudge 3.2s var(--ease-soft) infinite; }
 
@@ -111,7 +124,7 @@ button, a, [role=radio] { -webkit-tap-highlight-color: transparent; }
 .m-band { animation: m-fade 0.6s var(--ease-out) 0.25s both; }
 
 /* Onglet masqué : les boucles ambiantes s'arrêtent */
-.is-hidden .m-sway, .is-hidden .m-mist, .is-hidden .m-flight, .is-hidden .m-flutter, .is-hidden .m-nudge,
+.is-hidden .m-sway, .is-hidden .m-mist, .is-hidden .m-flight, .is-hidden .m-flutter, .is-hidden .m-nudge, .is-hidden .m-buzz, .is-hidden .m-hover,
 .is-hidden .m-pulse, .is-hidden .m-shimmer::after, .is-hidden .skeleton { animation-play-state: paused; }
 
 @media (prefers-reduced-motion: reduce) {

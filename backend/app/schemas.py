@@ -8,7 +8,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 from tis_engine.model import CROPS
-from tis_engine.parameters import BIOLOGY_PARAMS, INVASION_PRESETS, STRATEGY_META, biology_defaults
+from tis_engine.parameters import MAX_REPLICATES, MIN_REPLICATES, BIOLOGY_PARAMS, INVASION_PRESETS, STRATEGY_META, biology_defaults
 from tis_engine.runner import REMATING_MODES, STRATEGY_PRESETS, build_schedule
 
 
@@ -33,7 +33,7 @@ class ExperimentConfig(BaseModel):
     invasion: Invasion
     budget: int
     remating: str = "preference"
-    replicates: int = 3
+    replicates: int = MIN_REPLICATES
     seed: int = 42
     include_control: bool = True
     biology: dict = Field(default_factory=biology_defaults)
@@ -91,8 +91,9 @@ def validate_config(cfg: ExperimentConfig, history: list[dict] | None = None) ->
             errors.append(f"Culture inconnue du moteur : « {c} ».")
     if cfg.remating not in REMATING_MODES:
         errors.append(f"Régime de réaccouplement inconnu : « {cfg.remating} ».")
-    if not 1 <= cfg.replicates <= 30:
-        errors.append("Le nombre de répétitions doit être compris entre 1 et 30.")
+    if not MIN_REPLICATES <= cfg.replicates <= MAX_REPLICATES:
+        errors.append(f"Le nombre de répétitions doit être compris entre {MIN_REPLICATES} et {MAX_REPLICATES} "
+                      f"(minimum de l'étude : {MIN_REPLICATES} répétitions par scénario).")
     if cfg.budget < 0 or cfg.budget > 1_000_000:
         errors.append("Le budget (nombre total de mâles stériles lâchés) doit être compris entre 0 et 1 000 000.")
     if cfg.invasion.wild < 0 or cfg.invasion.females < 0:

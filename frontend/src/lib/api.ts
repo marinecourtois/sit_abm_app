@@ -29,12 +29,13 @@ export interface Scenario {
   vs_control?: Record<string, { mean: number; sd: number; n: number; values: number[] } | null>;
 }
 export interface Results { experiment_id: string; schema_version: number; series_vars: string[]; scenarios: Scenario[]; computed_at: string; duration_s: number }
-export interface BiologyParam { name: string; symbol: string; unit: string; default: number; min: number; max: number; step: number; source: string; description: string; advanced: boolean }
+export interface BiologyParam { name: string; label: string; group: string; symbol: string; unit: string; default: number; min: number; max: number; step: number; source: string; description: string; advanced: boolean }
 export interface Meta {
   engine_version: string; params_version: string; schema_version: number;
   crops: Record<CropKey, { label: string; latin: string; summary: string; params: Record<string, number | string> }>;
   strategies: Record<string, { label: string; short: string; nb: string; description: string; params: Record<string, number> }>;
-  remating: Record<string, { label: string; description: string }>;
+  remating: Record<string, { label: string; short: string; notebook: string; formula: string; description: string }>;
+  biology_groups: { key: string; label: string }[];
   invasions: Record<string, { label: string; wild: number; females: number }>;
   budget_presets: number[]; biology: BiologyParam[]; biology_defaults: Record<string, number>;
   fixed_constants: { name: string; symbol: string; value: string; unit: string; source: string }[];
@@ -74,6 +75,6 @@ export const api = {
   patch: (id: string, body: object) => req<Experiment>(`/api/experiments/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   importProtocol: (doc: object) => req<Experiment>("/api/protocol/import", { method: "POST", body: JSON.stringify(doc) }),
   reference: <T = Record<string, number | string>>(which: "factorial" | "dynamics") =>
-    req<{ source: string; sha256: string; description: string; verified: string; rows: T[] }>(`/api/reference/${which}`),
+    req<{ source: string; origin: "notebook" | "application"; provenance: Record<string, string | number> | null; sha256: string; description: string; verified: string; rows: T[] }>(`/api/reference/${which}`),
   exportUrl: (id: string, format: "json" | "csv-metrics" | "csv-series" | "protocol") => `/api/experiments/${id}/export?format=${format}`,
 };

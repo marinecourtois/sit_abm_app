@@ -10,6 +10,10 @@ from .runner import STRATEGY_PRESETS
 from .model import (CHERRY, ECHELLE, EGGS_MAX_PER_DAY, EGGS_POISSON_MEAN, ENGINE_VERSION, FRUITS_PER_CLUTCH_MAX,
                     LARVAL_EMERGENCE, LARVAL_MORTALITY, RF_FERTILE, RF_STERILE, SEX_RATIO, STRAWBERRY)
 
+# Répétitions par scénario : minimum de l'étude (exigence de robustesse statistique) et plafond technique
+MIN_REPLICATES = 10
+MAX_REPLICATES = 50
+
 PARAMS_VERSION = "nb-2025.10-echelle30"
 SCHEMA_VERSION = 1
 
@@ -49,11 +53,25 @@ STRATEGY_META = {k: {"label": l, "short": sh, "nb": nb, "description": _strategy
                      "params": {kk: vv for kk, vv in STRATEGY_PRESETS[k].items() if kk != "kind"}}
                  for k, (l, sh, nb) in _NAMES.items()}
 
+# Régimes d'utilisation du sperme — Females_Agent.use_fertile_sperm (cellule 3).
+# Dans tous les régimes la femelle se réaccouple (périodes réfractaires) ; seul l'usage du sperme change.
 REMATING_META = {
-    "preference": {"label": "Préférence (polyandrie)", "description": "P(sperme fertile) = F / (F + η_s·S). Régime principal du notebook."},
-    "first": {"label": "Premier accouplement (monandrie)", "description": "La femelle utilise le sperme de son premier accouplement."},
-    "last": {"label": "Dernier accouplement", "description": "La femelle utilise le sperme de son dernier accouplement (non utilisé dans le plan du notebook)."},
-    "mixed": {"label": "Mélange proportionnel", "description": "P(sperme fertile) = F / (F + S) (non utilisé dans le plan du notebook)."},
+    "preference": {"label": "Polyandrie avec préférence", "short": "Polyandrie", "notebook": "preference",
+                   "formula": "P(\\text{œuf fertile}) = \\dfrac{n_f}{n_f + \\eta_s\\, n_s}",
+                   "description": "Chaque accouplement compte : un œuf est fécondé par du sperme fertile avec une probabilité "
+                                  "qui dépend des nombres d'accouplements fertiles (n_f) et stériles (n_s), le sperme stérile "
+                                  "étant pondéré par η_s. Régime principal du notebook."},
+    "first": {"label": "Monandrie (priorité au premier mâle)", "short": "Monandrie", "notebook": "first",
+              "formula": "\\text{œuf fertile} \\iff \\text{1}^{\\text{er}}\\text{ mâle sauvage}",
+              "description": "Seul le premier accouplement détermine la descendance : une femelle d'abord accouplée à un mâle "
+                             "stérile reste stérile, même si elle se réaccouple ensuite avec un sauvage."},
+    "last": {"label": "Priorité au dernier mâle", "short": "Dernier mâle", "notebook": "last",
+             "formula": "\\text{œuf fertile} \\iff \\text{dernier mâle sauvage}",
+             "description": "Seul le dernier accouplement compte. Non utilisé dans le plan du notebook."},
+    "mixed": {"label": "Polyandrie, mélange proportionnel", "short": "Mélange", "notebook": "mixed",
+              "formula": "P(\\text{œuf fertile}) = \\dfrac{n_f}{n_f + n_s}",
+              "description": "Sperme fertile et stérile utilisés en proportion des accouplements, sans préférence. "
+                             "Non utilisé dans le plan du notebook."},
 }
 
 def _fr(x):
@@ -152,6 +170,33 @@ FIXED_CONSTANTS = [
 ]
 
 
+# Libellés courts et regroupement thématique des paramètres (affichage du Studio et du Protocole)
+PARAM_GROUPS = [
+    ("accouplement", "Accouplement"),
+    ("durees", "Durées de vie des adultes"),
+    ("ponte", "Ponte dans les fruits"),
+    ("pourrissement", "Pourrissement des fruits"),
+    ("recolte", "Récolte et prophylaxie"),
+]
+PARAM_UI = {
+    "eta": ("Compétitivité des mâles stériles", "accouplement"),
+    "eta_sperm_choice": ("Poids du sperme stérile", "accouplement"),
+    "lifespan_sterile": ("Mâles stériles", "durees"),
+    "lifespan_wild": ("Mâles sauvages", "durees"),
+    "lifespan_female": ("Femelles", "durees"),
+    "lifespan_cv": ("Variabilité (coefficient de variation)", "durees"),
+    "fruit_capacity": ("Pontes maximales par fruit", "ponte"),
+    "young_puncture_probability": ("Réussite d'une ponte sur fruit jeune", "ponte"),
+    "rotten_puncture_probability": ("Réussite d'une ponte sur fruit pourri", "ponte"),
+    "rotten_threshold": ("Seuil de charge larvaire", "pourrissement"),
+    "larva_age_weight": ("Poids de l'âge des larves", "pourrissement"),
+    "rot_hazard_sterile": ("Taux après piqûres stériles", "pourrissement"),
+    "rot_hazard_fertile": ("Taux après ponte fertile", "pourrissement"),
+    "harvest_fraction": ("Part des fruits mûrs récoltés", "recolte"),
+    "prophylaxis_fraction": ("Part des fruits pourris retirés", "recolte"),
+}
+
+
 def biology_defaults() -> dict:
     return {k: v[2] for k, v in BIOLOGY_PARAMS.items()}
 
@@ -167,11 +212,12 @@ def registry() -> dict:
         "invasions": INVASION_PRESETS,
         "budget_presets": BUDGET_PRESETS,
         "biology": [
-            {"name": k, "symbol": v[0], "unit": v[1], "default": v[2], "min": v[3], "max": v[4], "step": v[5],
-             "source": v[6], "description": v[7], "advanced": v[8]}
+            {"name": k, "label": PARAM_UI[k][0], "group": PARAM_UI[k][1], "symbol": v[0], "unit": v[1], "default": v[2],
+             "min": v[3], "max": v[4], "step": v[5], "source": v[6], "description": v[7], "advanced": v[8]}
             for k, v in BIOLOGY_PARAMS.items()
         ],
+        "biology_groups": [{"key": k, "label": l} for k, l in PARAM_GROUPS],
         "fixed_constants": FIXED_CONSTANTS,
         "model_constants": MODEL_CONSTANTS,
-        "limits": {"replicates": [1, 30], "budget": [0, 1_000_000], "wild": [0, 100_000], "females": [0, 100_000]},
+        "limits": {"replicates": [MIN_REPLICATES, MAX_REPLICATES], "budget": [0, 1_000_000], "wild": [0, 100_000], "females": [0, 100_000]},
     }

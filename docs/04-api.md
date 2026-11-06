@@ -21,7 +21,7 @@ En production (`make serve`), elle est désactivée : aucune documentation n'est
   "invasion": { "preset": "moyenne", "wild": 300, "females": 300 },
   "budget": 9000,                             // mâles stériles lâchés par saison (aucune unité monétaire)
   "remating": "preference",                   // preference | first | last | mixed
-  "replicates": 3,                            // 1 à 30
+  "replicates": 10,                           // 10 (minimum de l'étude) à 50
   "seed": 42,                                 // graine de base ; répétition r → seed + 1000·r
   "include_control": true,                    // ajoute le témoin sans TIS (même graines)
   "biology": { "eta": 0.8, "lifespan_sterile": 7.0, "...": "..." }   // TOUTES les clés de /api/meta
@@ -94,7 +94,7 @@ Statuts : `ready`, `queued`, `running`, `completed`, `cancelled`, `error`.
 
 | Méthode | Route | Description |
 |---|---|---|
-| GET | `/reference/factorial` | Plan factoriel du notebook (576 lignes), avec source, sha256 et mention de vérification |
+| GET | `/reference/factorial` | Plan factoriel : recalcul de l'application à ≥ 10 répétitions (`data/factorial/`, avec provenance) s'il existe, sinon le CSV du notebook (3 répétitions). Champ `origin` : `application` ou `notebook` |
 | GET | `/reference/dynamics` | Dynamiques journalières du notebook |
 | GET | `/overview` | Dernière étude de référence terminée et ses résultats (ou l'étude en cours) |
 

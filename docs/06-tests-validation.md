@@ -106,6 +106,18 @@ indicateur que le moteur ne calcule pas fait échouer le test Vitest **et** le t
 Les tests de l'API utilisent une base et un dossier de résultats temporaires : ils ne
 touchent pas `data/app.db`.
 
+## Plan factoriel à 10 répétitions
+
+Le notebook ne calcule que 3 répétitions par scénario ; l'étude en exige au moins 10.
+`make factorial` (`backend/scripts/factorial.py --reps 10`) recalcule le même plan (2 cultures ×
+3 invasions × 4 budgets × 2 régimes × stratégies) avec la **même formule de graine** que le
+notebook, sur tous les cœurs (≈ 5 min, 1 920 saisons). Avant d'écrire le résultat, le script
+vérifie que les 576 saisons déjà présentes dans le CSV du notebook (répétitions 0 à 2) sont
+**identiques au bit près** ; sinon il s'arrête sans rien écrire.
+
+Sortie : `backend/data/factorial/factorial_r10.csv` et `factorial_r10.json` (provenance : date,
+moteur, modelly, durée, sha256). La page Analyses l'utilise automatiquement.
+
 ## Que faire si la non-régression échoue
 
 1. **Vous n'aviez pas l'intention de changer le modèle** : c'est un bogue. Cherchez un tirage

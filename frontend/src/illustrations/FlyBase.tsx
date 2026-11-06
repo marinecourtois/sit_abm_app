@@ -94,7 +94,7 @@ export function FlyArt({ idp, c, female, label }: { idp: string; c: FlyPalette; 
         <Leg key={i} pts={l} color={c.legFar} w={1} />
       ))}
 
-      <g className="m-flutter" style={{ transformOrigin: "53px 31px", animationDuration: female ? "2.6s" : "2.2s" }}>
+      <g className="m-buzz" style={{ transformOrigin: "53px 31px", animationDuration: female ? "0.16s" : "0.13s" }}>
       {/* far wing (raised) */}
       <path d="M52 30C58 22 76 12.4 98 9.6C106.6 8.6 110.6 13.8 104.6 18.4C92 26 72 30.6 53 32.4Z" fill={u('wing')} stroke="#6D7C80" strokeWidth={0.5} strokeLinejoin="round" />
       <path
@@ -147,7 +147,7 @@ export function FlyArt({ idp, c, female, label }: { idp: string; c: FlyPalette; 
         <Leg key={i} pts={l} color={c.legNear} w={1.15} />
       ))}
 
-      <g className="m-flutter" style={{ transformOrigin: "53px 34px", animationDuration: female ? "2.6s" : "2.2s", animationDelay: "-0.4s" }}>
+      <g className="m-buzz m-buzz-near" style={{ transformOrigin: "53px 34px", animationDuration: female ? "0.16s" : "0.13s", animationDelay: "-0.06s" }}>
       {/* near wing (folded back over the abdomen) */}
       <path d="M52 33C60 30.4 84 30.6 103.6 34C112 35.6 113.4 41.6 106 43.8C92 47.4 70 44.6 54 37.4Z" fill={u('wing')} stroke="#6D7C80" strokeWidth={0.55} strokeLinejoin="round" />
       <path d="M52.6 33.2Q78 30.6 104 34.2" fill="none" stroke="#5E6C70" strokeWidth={0.6} />

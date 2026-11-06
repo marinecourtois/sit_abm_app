@@ -100,20 +100,32 @@
   },
   "remating": {
     "preference": {
-      "label": "Préférence (polyandrie)",
-      "description": "P(sperme fertile) = F / (F + η_s·S). Régime principal du notebook."
+      "label": "Polyandrie avec préférence",
+      "short": "Polyandrie",
+      "notebook": "preference",
+      "formula": "P(\\text{œuf fertile}) = \\dfrac{n_f}{n_f + \\eta_s\\, n_s}",
+      "description": "Chaque accouplement compte : un œuf est fécondé par du sperme fertile avec une probabilité qui dépend des nombres d'accouplements fertiles (n_f) et stériles (n_s), le sperme stérile étant pondéré par η_s. Régime principal du notebook."
     },
     "first": {
-      "label": "Premier accouplement (monandrie)",
-      "description": "La femelle utilise le sperme de son premier accouplement."
+      "label": "Monandrie (priorité au premier mâle)",
+      "short": "Monandrie",
+      "notebook": "first",
+      "formula": "\\text{œuf fertile} \\iff \\text{1}^{\\text{er}}\\text{ mâle sauvage}",
+      "description": "Seul le premier accouplement détermine la descendance : une femelle d'abord accouplée à un mâle stérile reste stérile, même si elle se réaccouple ensuite avec un sauvage."
     },
     "last": {
-      "label": "Dernier accouplement",
-      "description": "La femelle utilise le sperme de son dernier accouplement (non utilisé dans le plan du notebook)."
+      "label": "Priorité au dernier mâle",
+      "short": "Dernier mâle",
+      "notebook": "last",
+      "formula": "\\text{œuf fertile} \\iff \\text{dernier mâle sauvage}",
+      "description": "Seul le dernier accouplement compte. Non utilisé dans le plan du notebook."
     },
     "mixed": {
-      "label": "Mélange proportionnel",
-      "description": "P(sperme fertile) = F / (F + S) (non utilisé dans le plan du notebook)."
+      "label": "Polyandrie, mélange proportionnel",
+      "short": "Mélange",
+      "notebook": "mixed",
+      "formula": "P(\\text{œuf fertile}) = \\dfrac{n_f}{n_f + n_s}",
+      "description": "Sperme fertile et stérile utilisés en proportion des accouplements, sans préférence. Non utilisé dans le plan du notebook."
     }
   },
   "invasions": {
@@ -142,6 +154,8 @@
   "biology": [
     {
       "name": "eta",
+      "label": "Compétitivité des mâles stériles",
+      "group": "accouplement",
       "symbol": "\\eta",
       "unit": "sans dimension",
       "default": 0.8,
@@ -154,6 +168,8 @@
     },
     {
       "name": "eta_sperm_choice",
+      "label": "Poids du sperme stérile",
+      "group": "accouplement",
       "symbol": "\\eta_s",
       "unit": "sans dimension",
       "default": 0.59,
@@ -166,6 +182,8 @@
     },
     {
       "name": "lifespan_sterile",
+      "label": "Mâles stériles",
+      "group": "durees",
       "symbol": "\\bar{T}_S",
       "unit": "jours",
       "default": 7.0,
@@ -178,6 +196,8 @@
     },
     {
       "name": "lifespan_wild",
+      "label": "Mâles sauvages",
+      "group": "durees",
       "symbol": "\\bar{T}_W",
       "unit": "jours",
       "default": 25.0,
@@ -190,6 +210,8 @@
     },
     {
       "name": "lifespan_female",
+      "label": "Femelles",
+      "group": "durees",
       "symbol": "\\bar{T}_F",
       "unit": "jours",
       "default": 25.0,
@@ -202,6 +224,8 @@
     },
     {
       "name": "lifespan_cv",
+      "label": "Variabilité (coefficient de variation)",
+      "group": "durees",
       "symbol": "CV_T",
       "unit": "sans dimension",
       "default": 0.3,
@@ -214,6 +238,8 @@
     },
     {
       "name": "fruit_capacity",
+      "label": "Pontes maximales par fruit",
+      "group": "ponte",
       "symbol": "K",
       "unit": "pontes / fruit",
       "default": 20,
@@ -226,6 +252,8 @@
     },
     {
       "name": "young_puncture_probability",
+      "label": "Réussite d'une ponte sur fruit jeune",
+      "group": "ponte",
       "symbol": "p_y",
       "unit": "probabilité",
       "default": 0.3,
@@ -238,6 +266,8 @@
     },
     {
       "name": "rotten_puncture_probability",
+      "label": "Réussite d'une ponte sur fruit pourri",
+      "group": "ponte",
       "symbol": "p_r",
       "unit": "probabilité",
       "default": 0.1,
@@ -250,6 +280,8 @@
     },
     {
       "name": "rotten_threshold",
+      "label": "Seuil de charge larvaire",
+      "group": "pourrissement",
       "symbol": "\\theta",
       "unit": "score",
       "default": 5.0,
@@ -262,6 +294,8 @@
     },
     {
       "name": "larva_age_weight",
+      "label": "Poids de l'âge des larves",
+      "group": "pourrissement",
       "symbol": "w",
       "unit": "jour⁻¹",
       "default": 0.5,
@@ -274,6 +308,8 @@
     },
     {
       "name": "rot_hazard_sterile",
+      "label": "Taux après piqûres stériles",
+      "group": "pourrissement",
       "symbol": "h_s",
       "unit": "jour⁻¹",
       "default": 0.231,
@@ -286,6 +322,8 @@
     },
     {
       "name": "rot_hazard_fertile",
+      "label": "Taux après ponte fertile",
+      "group": "pourrissement",
       "symbol": "h_f",
       "unit": "jour⁻¹",
       "default": 0.3054,
@@ -298,6 +336,8 @@
     },
     {
       "name": "harvest_fraction",
+      "label": "Part des fruits mûrs récoltés",
+      "group": "recolte",
       "symbol": "\\phi_h",
       "unit": "fraction",
       "default": 0.9,
@@ -310,6 +350,8 @@
     },
     {
       "name": "prophylaxis_fraction",
+      "label": "Part des fruits pourris retirés",
+      "group": "recolte",
       "symbol": "\\phi_p",
       "unit": "fraction",
       "default": 0.6,
@@ -319,6 +361,28 @@
       "source": "Cellule 4 — prophylaxis_fraction",
       "description": "Part des fruits pourris retirés à chaque passage de prophylaxie (fraise).",
       "advanced": true
+    }
+  ],
+  "biology_groups": [
+    {
+      "key": "accouplement",
+      "label": "Accouplement"
+    },
+    {
+      "key": "durees",
+      "label": "Durées de vie des adultes"
+    },
+    {
+      "key": "ponte",
+      "label": "Ponte dans les fruits"
+    },
+    {
+      "key": "pourrissement",
+      "label": "Pourrissement des fruits"
+    },
+    {
+      "key": "recolte",
+      "label": "Récolte et prophylaxie"
     }
   ],
   "fixed_constants": [
@@ -437,8 +501,8 @@
   },
   "limits": {
     "replicates": [
-      1,
-      30
+      10,
+      50
     ],
     "budget": [
       0,
@@ -496,9 +560,11 @@
       "preference"
     ],
     "strategies": 6,
-    "replicates": 3,
-    "seasons": 576,
-    "sha256": "974eab8e765998e2106ed61db718099557cd32aba7fe301641ef2fdff8b2a319"
+    "replicates": 10,
+    "seasons": 1920,
+    "sha256": "223d8bdbb3024d0b161c052641e1f67b8185819bc209c178b49e40c1f0ebb14f",
+    "origin": "application",
+    "file": "factorial_r10.csv"
   },
   "strategy_nb_names": {
     "no_tis": "No TIS",

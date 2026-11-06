@@ -15,13 +15,14 @@ from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from tis_engine.parameters import INVASION_PRESETS, biology_defaults, registry
+from tis_engine.parameters import MIN_REPLICATES, INVASION_PRESETS, biology_defaults, registry
 from tis_engine.runner import STRATEGIES
 
 from . import jobs, store
 from .schemas import ExperimentConfig, ExperimentCreate, config_hash, count_seasons, validate_config
 
 REF = store.DATA / "reference"
+(store.DATA / "factorial").mkdir(exist_ok=True)
 DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 REFERENCE_TAG = "référence"
 
@@ -55,7 +56,7 @@ def reference_config() -> dict:
         crops=["strawberry", "cherry"],
         strategies=[{"key": k} for k in ("daily", "every_3", "every_7", "front_70", "front_100")],
         invasion={"preset": "moyenne", **{k: INVASION_PRESETS["moyenne"][k] for k in ("wild", "females")}},
-        budget=9000, remating="preference", replicates=3, seed=42, include_control=True,
+        budget=9000, remating="preference", replicates=MIN_REPLICATES, seed=42, include_control=True,
         biology=biology_defaults(),
     ).model_dump()
 
@@ -120,11 +121,13 @@ _PLAN_CACHE: dict = {}
 def reference_plan() -> dict:
     """Résumé du plan factoriel du notebook, calculé à partir du CSV (et non recopié)."""
     if not _PLAN_CACHE:
-        rows, sha = _read_csv("resultats_experience_factorielle.csv")
+        src = factorial_source()
+        rows, sha = _read_csv(src["path"])
         u = lambda k: {r[k] for r in rows}
         _PLAN_CACHE.update({"crops": len(u("Crop")), "invasions": sorted(u("Invasion"), key=lambda x: int(x.split("(")[1].split()[0])),
                             "budgets": sorted(u("Budget")), "remating": sorted(u("Remating")), "strategies": len(u("Strategy")),
-                            "replicates": len(u("Replicate")), "seasons": len(rows), "sha256": sha})
+                            "replicates": len(u("Replicate")), "seasons": len(rows), "sha256": sha,
+                            "origin": src["origin"], "file": src["path"].name})
     return _PLAN_CACHE
 
 
@@ -290,9 +293,8 @@ def import_protocol(doc: dict = Body(...)):
 
 
 # ---------------------------------------------------------------- données de référence du notebook
-def _read_csv(name):
-    p = REF / name
-    with open(p) as f:
+def _read_csv(path: Path):
+    with open(path) as f:
         rows = list(csv.DictReader(f))
     for r in rows:
         for k, v in r.items():
@@ -300,15 +302,42 @@ def _read_csv(name):
                 r[k] = float(v) if any(c in v for c in ".e") else int(v)
             except ValueError:
                 pass
-    return rows, hashlib.sha256(p.read_bytes()).hexdigest()
+    return rows, hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def factorial_source() -> dict:
+    """Plan factoriel servi à la page Analyses : le recalcul de l'application à ≥ MIN_REPLICATES
+    répétitions s'il existe (scripts/factorial.py), sinon le CSV du notebook (3 répétitions)."""
+    done = []
+    for prov_file in (store.DATA / "factorial").glob("factorial_r*.json"):
+        prov = json.loads(prov_file.read_text(encoding="utf-8"))
+        csv_file = prov_file.with_suffix(".csv")
+        if csv_file.exists() and prov.get("replicates", 0) >= MIN_REPLICATES:
+            done.append((prov["replicates"], csv_file, prov))
+    if done:
+        n, path, prov = max(done, key=lambda d: d[0])
+        return {"path": path, "origin": "application", "provenance": prov,
+                "label": f"Plan factoriel du notebook recalculé par l'application ({n} répétitions) → {path.name}",
+                "verified": (f"Mêmes plan et formule de graine que le notebook ; les {prov['notebook_rows_identical']} "
+                             "saisons déjà calculées par le notebook (répétitions 0 à 2) sont identiques au bit près "
+                             "(vérifié par scripts/factorial.py avant écriture).")}
+    path = REF / "resultats_experience_factorielle.csv"
+    return {"path": path, "origin": "notebook", "provenance": None,
+            "label": f"Notebook_ABM_TIS_Optimise_Modelly.ipynb → {path.name}",
+            "verified": "Reproduit à l'identique par le moteur extrait (tests/test_regression.py)."}
 
 
 @app.get("/api/reference/{which}")
 def reference(which: str):
-    files = {"factorial": "resultats_experience_factorielle.csv", "dynamics": "dynamiques_temporelles_journalieres.csv"}
-    if which not in files:
+    if which == "factorial":
+        src = factorial_source()
+    elif which == "dynamics":
+        p = REF / "dynamiques_temporelles_journalieres.csv"
+        src = {"path": p, "origin": "notebook", "provenance": None, "label": f"Notebook_ABM_TIS_Optimise_Modelly.ipynb → {p.name}",
+               "verified": "Reproduit à l'identique par le moteur extrait (tests/test_regression.py)."}
+    else:
         raise HTTPException(404)
-    rows, sha = _read_csv(files[which])
+    rows, sha = _read_csv(src["path"])
     uniq = lambda k: sorted({r[k] for r in rows}, key=str)
     if which == "factorial":
         desc = (f"Plan factoriel du notebook : {len(uniq('Crop'))} cultures × {len(uniq('Invasion'))} invasions × "
@@ -317,10 +346,8 @@ def reference(which: str):
     else:
         desc = (f"Dynamiques journalières du notebook : {len(uniq('Crop'))} cultures × {len(uniq('Strategy'))} stratégies × "
                 f"{len(uniq('Remating'))} régimes × {len(uniq('Replicate'))} répétitions — {len(rows)} lignes (une par jour).")
-    return {"source": f"Notebook_ABM_TIS_Optimise_Modelly.ipynb → {files[which]}", "sha256": sha,
-            "description": desc,
-            "verified": "Reproduit à l'identique par le moteur extrait (tests/test_regression.py).",
-            "rows": rows}
+    return {"source": src["label"], "origin": src["origin"], "provenance": src["provenance"], "sha256": sha,
+            "description": desc, "verified": src["verified"], "rows": rows}
 
 
 @app.get("/api/overview")
