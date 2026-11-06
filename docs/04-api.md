@@ -36,7 +36,7 @@ Clés de stratégie : `no_tis`, `daily`, `every_3`, `every_7`, `front_70`, `fron
 | Méthode | Route | Description |
 |---|---|---|
 | GET | `/health` | État du serveur et versions (moteur, paramètres, schéma, modelly, Python) |
-| GET | `/meta` | Registre complet : cultures, stratégies, régimes, préréglages d'invasion et de budget, paramètres biologiques (symbole, unité, défaut, plage, source), constantes fixes, limites, nombre de processus |
+| GET | `/meta` | Registre complet : cultures, stratégies (avec leurs paramètres), régimes de réaccouplement (libellé, formule LaTeX, description), préréglages d'invasion et de budget, paramètres biologiques (libellé, groupe, symbole, unité, défaut, plage, source), groupes, constantes fixes du modèle, limites (répétitions 10 – 50), résumé du plan factoriel servi, versions |
 | POST | `/validate` | Corps : `ExperimentConfig`. Renvoie `{ok, errors, warnings, scenarios[], estimate}` ; `scenarios` contient le calendrier calculé de chaque culture × stratégie |
 
 ## Expériences

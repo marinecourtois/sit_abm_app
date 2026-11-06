@@ -106,6 +106,9 @@ button, a, [role=radio] { -webkit-tap-highlight-color: transparent; }
 .seg-thumb { transition: transform 0.32s var(--ease-out), width 0.32s var(--ease-out); }
 @keyframes m-toast { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
 .m-toast { animation: m-toast 0.32s var(--ease-out) both; }
+/* Entrée des figures d'analyse : cellules et points apparaissent en cascade (une seule fois) */
+@keyframes m-cell { from { opacity: 0; transform: scale(0.94); } }
+.m-cell { animation: m-cell 0.45s var(--ease-out) both; transform-box: fill-box; transform-origin: center; }
 @keyframes m-pop { from { opacity: 0; transform: scale(0.4); } }
 .m-pop { animation: m-pop 0.35s var(--ease-out) both; transform-box: fill-box; transform-origin: center; }
 

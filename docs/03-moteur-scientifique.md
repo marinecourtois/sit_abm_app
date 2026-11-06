@@ -173,6 +173,14 @@ Exemple : rendre réglable la ponte moyenne `mean_eggs_per_day` (6 dans le noteb
    ```
 
    Le dernier booléen place le paramètre en Mode Avancé (`True`) ou Essentiel (`False`).
+   Ajouter aussi son **libellé court et son groupe** dans `PARAM_UI` (groupes définis dans
+   `PARAM_GROUPS` : accouplement, durées, ponte, pourrissement, récolte) :
+
+   ```python
+   "mean_eggs_per_day": ("Ponte journalière moyenne", "ponte"),
+   ```
+
+   `tests/test_frontend_contract.py` échoue si un paramètre n'a pas de libellé ou de groupe.
    Retirer la ligne correspondante de `FIXED_CONSTANTS` si elle y figure.
 
 3. **Exécution** (`runner.run_season`) : transmettre la valeur
@@ -252,7 +260,18 @@ Les plages des paramètres biologiques viennent de `BIOLOGY_PARAMS` ; les limite
 générales (répétitions, budget) sont codées dans `validate_config` et rappelées dans
 `parameters.registry()["limits"]`.
 
-### 5.8 Changer la formule des graines
+### 5.8 Régimes de réaccouplement et nombre de répétitions
+
+- Les régimes (`preference` = polyandrie, `first` = monandrie, `last`, `mixed`) sont implémentés
+  dans `Females_Agent.use_fertile_sperm` ; leurs libellés, formules (LaTeX) et descriptions sont
+  dans `parameters.REMATING_META`. Un nouveau régime demande une branche dans
+  `use_fertile_sperm`, une entrée dans `REMATING_META` et dans `runner.REMATING_MODES`.
+- Le minimum de répétitions de l'étude est `parameters.MIN_REPLICATES` (10) et le plafond
+  `MAX_REPLICATES` (50) : validation, Studio, vue d'ensemble et étude de référence les lisent.
+  Après un changement, relancer `make factorial` (plan factoriel à N répétitions) et
+  `make fixtures`.
+
+### 5.9 Changer la formule des graines
 
 `jobs.replicate_seed(base, rep)` renvoie `base + 1000 * rep`. La modifier change la
 reproductibilité de toutes les **nouvelles** expériences : incrémenter `SCHEMA_VERSION`

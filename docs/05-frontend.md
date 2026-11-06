@@ -27,6 +27,7 @@ frontend/src/
 │   ├── useAsync.ts          chargement asynchrone simple
 │   ├── format.ts            nombres et dates au format français
 │   ├── colors.ts            couleurs des cultures, stratégies et séries
+│   ├── indicators.ts        indicateurs du plan factoriel : libellé, unité, définition exacte, calcul
 │   └── variables.ts         libellés/unités des séries (VARIABLES) et indicateurs (METRICS)
 ├── components/
 │   ├── layout.tsx           AppShell, ResearchSidebar, StudyHeader, StudyTabs, raccourcis
@@ -128,6 +129,52 @@ proposent alors automatiquement.
 Les libellés scientifiques (paramètres, stratégies, cultures) viennent du backend
 (`tis_engine/parameters.py`) : les modifier là-bas pour qu'ils restent cohérents partout.
 Les autres textes sont directement dans les pages.
+
+## Paramètres (Studio)
+
+`pages/Studio.tsx` :
+
+- `ParameterField` : libellé court (`label` du registre), symbole KaTeX, curseur avec **repère
+  de la valeur du notebook**, champ numérique exact avec unité, plage admise, état « modifié »
+  mis en évidence et bouton « Rétablir ».
+- `ParameterGroups` : regroupe les paramètres par thème (`group`, ordre de `biology_groups`),
+  avec un « Rétablir ce groupe ». En Mode Essentiel, seuls les paramètres `advanced: false`.
+- `RematingSelector` : cartes des régimes avec leur formule ; polyandrie et monandrie (plan du
+  notebook) en Mode Essentiel, les quatre régimes en Mode Avancé.
+
+Libellés, groupes et formules viennent du backend : ne pas les écrire dans le frontend.
+
+## Indicateurs de la page Analyses
+
+`lib/indicators.ts` définit chaque indicateur du plan factoriel avec un **nom précis** et une
+**définition qui précise le dénominateur** (« en % des fruits produits pendant la saison »).
+Les écarts entre pourcentages s'affichent en « points de % » (`diffUnit`). La définition de
+l'indicateur choisi est affichée sous les filtres.
+
+## Motion design
+
+Principes : mouvement organique et discret, jamais sur les valeurs (aucun nombre animé, aucun
+« compteur »), uniquement `transform` et `opacity`, arrêt complet avec
+`prefers-reduced-motion: reduce` et à l'impression, boucles mises en pause quand l'onglet est
+masqué (classe `is-hidden` posée sur `<html>` par `layout.tsx`).
+
+| Classe (`index.css`) | Où | Effet |
+|---|---|---|
+| `m-sway` + `sway(x, y, amplitude, période, phase)` (`illustrations/motion.ts`) | feuilles, fleur, fraises, grappe de cerises, rameau de la barre latérale | balancement depuis un point d'attache |
+| `m-buzz`, `m-buzz-near` | ailes des mouches (schéma TIS) | battement rapide |
+| `m-hover`, `m-hover-b` | mouches | vol stationnaire |
+| `m-mist`, `m-flight` | paysage de la barre latérale | brume qui dérive, insecte qui traverse |
+| `m-nudge` | flèche « ⟶ Pas de descendance » | impulsion |
+| `m-route` ; `.panel` (animation `m-rise`) | pages, panneaux | entrée en fondu / montée décalée |
+| tracé des courbes (`TimeSeriesChart`) | graphiques | dessin de gauche à droite au premier affichage ; bandes et annotations ensuite |
+| `m-cell`, `m-pop` | heatmap, nuages de points, répétitions | apparition en cascade (une fois) |
+| `m-pulse`, `m-shimmer` | badge « Flux en direct », barre de progression (page Live) | activité du calcul |
+| indicateur de navigation, curseur du `Segmented` | barre latérale, contrôles | glissement vers l'élément actif |
+
+Ajouter un mouvement : réutiliser une de ces classes ; pour un élément SVG, préciser
+`transform-box` / `transform-origin` ; vérifier le rendu en temps réel (les captures headless
+avec `--virtual-time-budget` n'avancent pas les animations de `transform`) ; ajouter la
+classe à la liste `.is-hidden …` si elle boucle.
 
 ## Mise en page et responsive
 

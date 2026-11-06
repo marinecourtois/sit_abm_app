@@ -52,9 +52,9 @@ Arrêter le serveur : `Ctrl+C`, ou `pkill -f "uvicorn app.main:app"` s'il tourne
 |---|---|
 | **Vue d'ensemble** | Synthèse de l'étude : cultures, principe de la TIS, dynamique des populations, dommages larvaires, piqûres stériles, tableau des stratégies. Lancement rapide d'une simulation. |
 | **Expériences** | Liste, recherche, filtres, regroupement par projet, métadonnées de reproductibilité, duplication, exports, import de protocole, suppression. |
-| **Simulation** | *Studio* : configuration en Mode Essentiel ou Avancé, validation scientifique, estimation de la charge, aperçu des calendriers de lâchers. *Live* : suivi en direct, frise chronologique, calendrier, événements, annulation. |
+| **Simulation** | *Studio* : configuration en Mode Essentiel ou Avancé (paramètres groupés par thème, curseurs avec repère de la valeur du notebook, régime de réaccouplement avec sa formule), validation scientifique, durée estimée à partir des exécutions mesurées, aperçu des calendriers de lâchers. *Live* : suivi en direct, frise chronologique, calendrier, événements, annulation. |
 | **Comparaison** | 2 à 4 scénarios : courbes superposées ou séparées, normalisation explicite, axes synchronisés, incertitude, tableau ordonné selon un critère choisi. |
-| **Résultats** | Heatmaps, dose-réponse, front de Pareto, distribution des répétitions, sensibilité au réaccouplement (plan factoriel du notebook). |
+| **Résultats** | Plan factoriel du notebook recalculé à 10 répétitions : heatmaps, dose-réponse, front de Pareto, distribution des répétitions, **polyandrie vs monandrie** ; chaque indicateur affiche sa définition exacte. |
 | **Publications** | Rapport scientifique structuré (12 sections) imprimable en PDF, exports CSV/JSON. |
 | **Protocole** | Hypothèses, paramètres, équations (KaTeX), méthodologie, limites, références. |
 
@@ -89,6 +89,11 @@ Arrêter le serveur : `Ctrl+C`, ou `pkill -f "uvicorn app.main:app"` s'il tourne
 | [docs/05-frontend.md](docs/05-frontend.md) | Structure du frontend, design system, composants, ajout d'une page ou d'un graphique |
 | [docs/06-tests-validation.md](docs/06-tests-validation.md) | Stratégie de tests, non-régression, procédure de mise à jour du notebook |
 | [docs/07-reproductibilite-donnees.md](docs/07-reproductibilite-donnees.md) | Graines, immuabilité, métadonnées, formats d'export |
+
+## Branches
+
+`main` est la branche par défaut et contient tout le travail ; développez sur une branche
+dédiée puis fusionnez dans `main` après `make test-all` vert.
 
 ## Principes non négociables
 

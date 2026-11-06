@@ -32,9 +32,9 @@ export const ScatterChart = forwardRef<SVGSVGElement | null, ScatterProps>(funct
           {x.ticks(8).map((t) => <g key={"x" + t}><line y1={0} y2={ih} x1={x(t)} x2={x(t)} stroke="#EEF1EC" /><text x={x(t)} y={ih + 18} textAnchor="middle" fontSize={11} className="tnum" fill="#1B201C">{fmt(t, 0)}</text></g>)}
           <line x1={0} x2={iw} y1={ih} y2={ih} stroke="#1B201C" /><line x1={0} x2={0} y1={0} y2={ih} stroke="#1B201C" />
           {front.length > 1 && <path d={"M" + front.map((d) => `${x(d.x)},${y(d.y)}`).join("L")} fill="none" stroke="#1B201C" strokeWidth={1.3} strokeDasharray="5 3" />}
-          {p.points.map((d) => {
+          {p.points.map((d, idx) => {
             const cx = x(d.x), cy = y(d.y), rr = r(d.size ?? 1);
-            const common = { fill: d.color, fillOpacity: 0.78, stroke: front.includes(d) ? "#1B201C" : "#fff", strokeWidth: front.includes(d) ? 1.4 : 0.8,
+            const common = { className: "m-pop", style: { animationDelay: `${Math.min(idx, 60) * 9}ms` }, fill: d.color, fillOpacity: 0.78, stroke: front.includes(d) ? "#1B201C" : "#fff", strokeWidth: front.includes(d) ? 1.4 : 0.8,
               onPointerEnter: () => setHover(d), onPointerLeave: () => setHover(null), tabIndex: 0, onFocus: () => setHover(d), onBlur: () => setHover(null),
               "aria-label": `${d.label} : ${fmt(d.x, 1)} ; ${fmt(d.y, 1)}` };
             if (d.shape === "square") return <rect key={d.id} x={cx - rr} y={cy - rr} width={2 * rr} height={2 * rr} {...common} />;

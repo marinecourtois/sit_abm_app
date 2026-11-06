@@ -49,7 +49,7 @@ export const Heatmap = forwardRef<SVGSVGElement | null, HeatmapProps>(function H
               const dark = t > 0.6;
               const isH = hover?.[0] === i && hover?.[1] === j;
               return (
-                <g key={j} onPointerEnter={() => setHover([i, j])} onPointerLeave={() => setHover(null)} tabIndex={0}
+                <g key={j} className="m-cell" style={{ animationDelay: `${(i + j) * 28}ms` }} onPointerEnter={() => setHover([i, j])} onPointerLeave={() => setHover(null)} tabIndex={0}
                   onFocus={() => setHover([i, j])} onBlur={() => setHover(null)}
                   aria-label={`${r}, ${p.cols[j]} : ${v == null ? "non simulé" : `${fmt(v, 1)} ${p.unit}`}`}>
                   <rect x={left + j * cw + 1} y={top + i * ch + 1} width={cw - 2} height={ch - 2} fill={fill}

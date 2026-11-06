@@ -8,8 +8,8 @@ make test          # tout, directement : pytest (backend) puis Vitest (frontend)
 
 | Suite | Outil | Fichiers | Tests |
 |---|---|---|---|
-| Backend : non-régression, API, contrat | pytest (`backend/tests/`) | 3 | 45 |
-| Frontend : unitaires, composants, contrat | Vitest + Testing Library (`frontend/src/**/*.test.ts(x)`) | 8 | 66 |
+| Backend : non-régression, API, contrat | pytest (`backend/tests/`) | 3 | 46 |
+| Frontend : unitaires, composants, contrat | Vitest + Testing Library (`frontend/src/**/*.test.ts(x)`) | 9 | 70 |
 
 ## SmartTest : ne lancer que les tests affectés
 
@@ -75,6 +75,7 @@ dynamiques).
 | Test | Vérifie |
 |---|---|
 | `test_frontend_meta_fixture_matches_engine` | L'instantané du registre utilisé par les tests du frontend (`frontend/src/test/fixtures/meta.json`) est identique au registre du moteur. Sinon : `make fixtures` |
+| `test_every_parameter_has_a_label_and_a_group` | Chaque paramètre exposé a un libellé court et un groupe d'affichage |
 | `test_engine_produces_everything_the_interface_displays` | Une vraie saison courte : chaque indicateur et chaque série déclarés dans `frontend/src/lib/variables.ts` sont produits par le moteur (ou dérivés par `app/jobs.py`) |
 
 ### Tests du frontend (Vitest)
@@ -88,6 +89,7 @@ dynamiques).
 | `icons/icons.test.tsx` | Les 42 icônes : grille 24 × 24, `currentColor`, décoratives par défaut, nommées avec `aria-label` |
 | `lib/api.test.ts` | Messages d'erreur du backend, configuration transmise telle quelle, URL d'export |
 | `lib/format.test.ts` | Format français, tiret (jamais zéro) pour une valeur absente, signes |
+| `lib/indicators.test.ts` | Chaque indicateur en % précise son dénominateur ; somme des fruits infestés ; écarts en points de % ; écart-type n − 1 |
 | `components/charts/exportChart.test.ts` | CSV : échappement et précision complète |
 
 Les deux tests de contrat ont été vérifiés par mutation : ajouter dans l'interface un
@@ -142,7 +144,7 @@ moteur, modelly, durée, sha256). La page Analyses l'utilise automatiquement.
 
 ## Vérifications manuelles avant une livraison
 
-- [ ] `make test-all` vert (SmartTest, 111 tests).
+- [ ] `make test-all` vert (SmartTest, 116 tests).
 - [ ] `cd frontend && npx tsc -b && npx vite build` sans erreur.
 - [ ] Vue d'ensemble : l'étude de référence se calcule au démarrage et s'affiche.
 - [ ] Studio → Lancer : la page Live suit la progression puis affiche les résultats.

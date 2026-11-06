@@ -185,7 +185,7 @@ const StripPlot = forwardRef<SVGSVGElement, { data: { label: string; color: stri
         const cx = L + bw * (i + 0.5); const mean = d.values.reduce((a, b) => a + b, 0) / (d.values.length || 1);
         return (
           <g key={d.label}>
-            {d.values.map((v, j) => <circle key={j} cx={cx - 12 + (j * 24) / Math.max(1, d.values.length - 1)} cy={y(v)} r={4.5} fill={d.color} fillOpacity={0.7} stroke="#fff"><title>{`${d.label} — répétition ${j + 1} : ${fmt(v, 2)}`}</title></circle>)}
+            {d.values.map((v, j) => <circle key={j} className="m-pop" style={{ animationDelay: `${(i * 4 + j) * 18}ms` }} cx={cx - 12 + (j * 24) / Math.max(1, d.values.length - 1)} cy={y(v)} r={4.5} fill={d.color} fillOpacity={0.7} stroke="#fff"><title>{`${d.label} — répétition ${j + 1} : ${fmt(v, 2)}`}</title></circle>)}
             {d.values.length > 0 && <line x1={cx - 22} x2={cx + 22} y1={y(mean)} y2={y(mean)} stroke="#1B201C" strokeWidth={2.2} />}
             <text x={cx} y={H - B + 17} textAnchor="middle" fontSize={11}>{d.label}</text>
           </g>
@@ -316,8 +316,8 @@ function DodgedStrip({ crop, data, ind, labels, title }: { crop: string; data: {
                   {g.values.map((v, n) => {
                     const jx = cx + ((n * 37) % 11 - 5) * (bw * 0.012);
                     return reg.shape === "circle"
-                      ? <circle key={n} cx={jx} cy={y(v)} r={3.2} fill={reg.color} fillOpacity={0.55}><title>{`${labels[d.k]} · ${reg.key} · rép. ${n + 1} : ${fmt(v, 2)}`}</title></circle>
-                      : <path key={n} d={`M${jx},${y(v) - 3.6}L${jx + 3.4},${y(v) + 2.6}L${jx - 3.4},${y(v) + 2.6}Z`} fill={reg.color} fillOpacity={0.55}><title>{`${labels[d.k]} · ${reg.key} · rép. ${n + 1} : ${fmt(v, 2)}`}</title></path>;
+                      ? <circle key={n} className="m-pop" style={{ animationDelay: `${(i * 2 + j) * 40 + n * 12}ms` }} cx={jx} cy={y(v)} r={3.2} fill={reg.color} fillOpacity={0.55}><title>{`${labels[d.k]} · ${reg.key} · rép. ${n + 1} : ${fmt(v, 2)}`}</title></circle>
+                      : <path key={n} className="m-pop" style={{ animationDelay: `${(i * 2 + j) * 40 + n * 12}ms` }} d={`M${jx},${y(v) - 3.6}L${jx + 3.4},${y(v) + 2.6}L${jx - 3.4},${y(v) + 2.6}Z`} fill={reg.color} fillOpacity={0.55}><title>{`${labels[d.k]} · ${reg.key} · rép. ${n + 1} : ${fmt(v, 2)}`}</title></path>;
                   })}
                   {g.n > 0 && <line x1={cx - bw * 0.13} x2={cx + bw * 0.13} y1={y(g.mean)} y2={y(g.mean)} stroke={reg.color} strokeWidth={2.6} strokeLinecap="round" />}
                 </g>
