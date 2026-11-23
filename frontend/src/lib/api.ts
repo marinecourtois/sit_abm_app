@@ -4,11 +4,15 @@ export type StrategyKey = "no_tis" | "daily" | "every_3" | "every_7" | "front_70
 export type Status = "ready" | "queued" | "running" | "completed" | "cancelled" | "error";
 
 export interface StrategySpec { key: StrategyKey; interval?: number; first_day?: number; initial_fraction?: number; maintenance_interval?: number; label?: string }
+export interface Invasion { preset?: string | null; wild: number; females: number }
 export interface ExperimentConfig {
   crops: CropKey[]; strategies: StrategySpec[];
-  invasion: { preset?: string | null; wild: number; females: number };
+  invasion: Invasion;
   budget: number; remating: string; replicates: number; seed: number; include_control: boolean;
   biology: Record<string, number>;
+  /** Plan (1.7.0) : plusieurs budgets, invasions ou régimes croisés dans une même expérience.
+   *  Absents ou null : la valeur unique ci-dessus (budget, invasion, remating). */
+  budgets?: number[] | null; invasions?: Invasion[] | null; rematings?: string[] | null;
 }
 export interface Experiment {
   id: string; short_id: string; name: string; project: string; description: string;
@@ -23,6 +27,8 @@ export interface Band { mean: number[]; sd: number[] }
 export interface ScenarioEvent { type: string; day: number; label: string }
 export interface Scenario {
   key: string; crop: CropKey; strategy: StrategySpec; strategy_key: StrategyKey; strategy_label: string;
+  /** Plan (1.7.0) : identifiant de stratégie, invasion et régime propres au scénario (absents des anciens résultats : ceux de la configuration). */
+  strategy_id?: string; invasion?: Invasion; remating?: string;
   is_control: boolean; budget: number; schedule: Record<string, number>; seeds: number[];
   metrics: Record<string, Stat>; series: Record<string, Band> & { Time: number[] };
   events: ScenarioEvent[];
@@ -45,7 +51,7 @@ export interface Meta {
   versions: Record<string, string | number>; workers: number;
   reference_plan: { crops: number; invasions: string[]; budgets: number[]; remating: string[]; strategies: number; replicates: number; seasons: number; sha256: string };
 }
-export interface Validation { ok: boolean; errors: string[]; warnings: string[]; scenarios: { crop: CropKey; strategy: string; strategy_key: StrategyKey; release_days: number; total_released: number; season_length: number; schedule: Record<string, number> }[]; estimate: { seasons: number; seconds: number | null; basis: string } }
+export interface Validation { ok: boolean; errors: string[]; warnings: string[]; scenarios: { crop: CropKey; strategy: string; strategy_key: StrategyKey; budget?: number; release_days: number; total_released: number; season_length: number; schedule: Record<string, number> }[]; estimate: { seasons: number; seconds: number | null; basis: string } }
 export interface LiveState {
   status: Status; progress: number; done?: number; total?: number;
   /** Lignes du flux en direct par scénario ; `from` = index de la première ligne renvoyée (requête incrémentale `since`). */
@@ -54,7 +60,7 @@ export interface LiveState {
   seq?: number;
   /** Temps écoulé et temps restant estimé à partir du débit mesuré de l'exécution en cours. */
   elapsed_s?: number | null; eta_s?: number | null;
-  log: { t: string; msg: string }[]; plan: { key: string; crop: CropKey; strategy_label: string; is_control: boolean; budget: number }[];
+  log: { t: string; msg: string }[]; plan: { key: string; crop: CropKey; strategy_label: string; is_control: boolean; budget: number; invasion?: Invasion; remating?: string }[];
 }
 export interface ActiveRun { id: string; short_id: string; name: string; status: Status; progress: number; done: number; total: number; elapsed_s: number | null; eta_s: number | null }
 export type ExportFormat = "json" | "csv-metrics" | "csv-series" | "protocol" | "archive";

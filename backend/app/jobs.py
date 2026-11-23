@@ -12,7 +12,8 @@ from tis_engine.model import CROPS
 from tis_engine.runner import SERIES_VARS, Cancelled, aggregate, build_schedule
 
 from . import store, worker
-from .schemas import ExperimentConfig, StrategySpec, strategy_id, strategy_label
+from .schemas import (ExperimentConfig, StrategySpec, plan_budgets, plan_invasions, plan_rematings, strategy_id,
+                      strategy_label)
 from .worker import run_task
 
 WORKERS = int(os.environ.get("TIS_WORKERS", min(8, os.cpu_count() or 1)))
@@ -66,19 +67,35 @@ def _listen():
 
 
 def scenario_plan(cfg: ExperimentConfig):
-    """Liste ordonnée des scénarios (culture × stratégie [+ témoin])."""
+    """Liste ordonnée des scénarios : culture × invasion × régime × (témoin + stratégie × budget).
+
+    Le témoin (budget 0) est commun à tous les budgets d'une même culture, invasion et régime.
+    La clé d'un scénario ne mentionne que les dimensions que le plan fait varier : une expérience
+    sans plan garde la clé « culture::stratégie » d'avant la 1.7.0."""
     strategies = list(cfg.strategies)
     if cfg.include_control and not any(s.key == "no_tis" for s in strategies):
         strategies = [StrategySpec(key="no_tis")] + strategies
+    budgets, invasions, rematings = plan_budgets(cfg), plan_invasions(cfg), plan_rematings(cfg)
     out = []
     for crop in cfg.crops:
         L = CROPS[crop].season_length
-        for s in strategies:
-            budget = 0 if s.key == "no_tis" else cfg.budget
-            sched = build_schedule(s.model_dump(exclude_none=True), budget, L)
-            out.append({"key": f"{crop}::{strategy_id(s)}", "crop": crop, "strategy": s.model_dump(exclude_none=True),
-                        "strategy_key": s.key, "strategy_label": strategy_label(s), "is_control": s.key == "no_tis",
-                        "budget": budget, "schedule": sched})
+        for inv in invasions:
+            for rem in rematings:
+                for s in strategies:
+                    for budget in ([0] if s.key == "no_tis" else budgets):
+                        sched = build_schedule(s.model_dump(exclude_none=True), budget, L)
+                        parts = [crop]
+                        if len(invasions) > 1:
+                            parts.append(f"inv={inv.wild}:{inv.females}")
+                        if len(rematings) > 1:
+                            parts.append(f"rem={rem}")
+                        if len(budgets) > 1 and s.key != "no_tis":
+                            parts.append(f"b={budget}")
+                        sid = strategy_id(s)
+                        out.append({"key": "::".join([*parts, sid]), "crop": crop, "strategy": s.model_dump(exclude_none=True),
+                                    "strategy_key": s.key, "strategy_id": sid, "strategy_label": strategy_label(s),
+                                    "is_control": s.key == "no_tis", "budget": budget,
+                                    "invasion": inv.model_dump(), "remating": rem, "schedule": sched})
     return out
 
 
@@ -144,8 +161,8 @@ def _run(eid, cfg: ExperimentConfig, plan):
         order = sorted(((p, rep) for p in plan for rep in range(cfg.replicates)),
                        key=lambda pr: (pr[1] != 0, -season_cost(pr[0]["crop"])))
         for p, rep in order:
-            task = {"crop": p["crop"], "wild": cfg.invasion.wild, "females": cfg.invasion.females,
-                    "remating": cfg.remating, "seed": replicate_seed(cfg.seed, rep),
+            task = {"crop": p["crop"], "wild": p["invasion"]["wild"], "females": p["invasion"]["females"],
+                    "remating": p["remating"], "seed": replicate_seed(cfg.seed, rep),
                     "schedule": p["schedule"], "biology": cfg.biology}
             f = _pool.submit(run_task, eid, p["key"], rep, task, rep == 0)
             futures[f] = (p["key"], rep)
@@ -243,7 +260,8 @@ def _events(crop, series, schedule):
 
 def build_results(eid, cfg: ExperimentConfig, plan, results):
     scenarios = []
-    ctrl_by_crop = {p["crop"]: results[p["key"]] for p in plan if p["is_control"]}
+    cell = lambda p: (p["crop"], p["invasion"]["wild"], p["invasion"]["females"], p["remating"])
+    ctrl_by_cell = {cell(p): results[p["key"]] for p in plan if p["is_control"]}
     for p in plan:
         reps = results[p["key"]]
         agg = aggregate([reps[r] for r in sorted(reps)])
@@ -251,7 +269,7 @@ def build_results(eid, cfg: ExperimentConfig, plan, results):
               "seeds": [replicate_seed(cfg.seed, r) for r in sorted(reps)],
               "metrics": agg["metrics"], "series": agg["series"],
               "events": _events(p["crop"], agg["series"], p["schedule"])}
-        ctrl = ctrl_by_crop.get(p["crop"])
+        ctrl = ctrl_by_cell.get(cell(p))   # témoin de même culture, invasion et régime
         if ctrl:
             # Population relative au témoin : (W+F)_scénario / (W+F)_témoin, même jour, même graine
             sc["series"]["Wild_adults_vs_control"] = _paired_ratio_band(reps, ctrl)

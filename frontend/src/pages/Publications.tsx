@@ -7,6 +7,7 @@ import { useMeta } from "../lib/meta";
 import { CROP_LABEL, fmt, fmtDate, fmtInt } from "../lib/format";
 import { CROP_COLOR, STRATEGY_COLOR } from "../lib/colors";
 import { METRIC } from "../lib/variables";
+import { invasionLabel, planSize, scenarioLabel } from "../lib/analysis";
 import { StudyHeader } from "../components/layout";
 import { Button, EmptyState, Panel, PanelTitle, Select, Skeleton } from "../components/ui";
 import { TimeSeriesChart } from "../components/charts/TimeSeriesChart";
@@ -83,13 +84,13 @@ export function Publications() {
             <p className="mt-1 text-[18px] text-muted">{exp.name}</p>
             {H("Titre et contexte")}<p className="mt-2">Ce rapport présente les résultats de simulations individu-centrées de la Technique de l’Insecte Stérile sur {crops.map((c) => `${meta.crops[c].label.toLowerCase()} (${meta.crops[c].latin})`).join(" et ")}. Les résultats proviennent du moteur extrait du notebook de référence, exécuté le {fmtDate(exp.finished_at)}.</p>
           </header>}
-          {has("Objectifs") && <>{H("Objectifs")}<p>Décrire l’effet de différentes stratégies de lâchers de mâles stériles, à budget égal ({fmtInt(exp.config.budget)} stériles par saison), sur les populations de ravageurs et sur les dommages aux fruits, et comparer ces effets entre cultures.</p></>}
+          {has("Objectifs") && <>{H("Objectifs")}<p>Décrire l’effet de différentes stratégies de lâchers de mâles stériles, à budget égal ({planSize(exp.config).budgets.map((b) => fmtInt(b)).join(" / ")} stériles par saison), sur les populations de ravageurs et sur les dommages aux fruits, et comparer ces effets entre cultures.</p></>}
           {has("Description du modèle") && <>{H("Description du modèle")}<p>Modèle individu-centré journalier sans espace : mâles sauvages et stériles, femelles, larves et fruits. Les équations sont présentées en annexe (Protocole).</p></>}
           {has("Protocole expérimental") && <>{H("Protocole expérimental")}
             <ul className="list-disc pl-6"><li>Cultures : {crops.map((c) => meta.crops[c].label).join(", ")}.</li>
-              <li>Stratégies : {res.scenarios.filter((s) => s.crop === crops[0]).map((s) => s.strategy_label).join(", ")}.</li>
-              <li>Invasion initiale : {fmtInt(exp.config.invasion.wild)} mâles sauvages et {fmtInt(exp.config.invasion.females)} femelles.</li>
-              <li>Réaccouplement : {meta.remating[exp.config.remating]?.label}. Répétitions : {exp.config.replicates} (graines {exp.config.seed} + 1000·r, communes à tous les scénarios).</li></ul></>}
+              <li>Stratégies : {Array.from(new Set(res.scenarios.filter((s) => s.crop === crops[0]).map((s) => s.strategy_label))).join(", ")}.</li>
+              <li>Invasion initiale : {planSize(exp.config).invasions.map((i) => `${invasionLabel(i, meta).split(" (")[0]} (${fmtInt(i.wild)} mâles sauvages et ${fmtInt(i.females)} femelles)`).join(" ; ")}.</li>
+              <li>Réaccouplement : {planSize(exp.config).rematings.map((k) => meta.remating[k]?.label ?? k).join(", ")}. Répétitions : {exp.config.replicates} (graines {exp.config.seed} + 1000·r, communes à tous les scénarios).</li></ul></>}
           {has("Paramètres") && <>{H("Paramètres")}
             <table className="w-full font-sans text-[12px]"><tbody>{meta.biology.map((p) => (
               <tr key={p.name} className="border-b border-line/60"><td className="py-1">{p.description.split(".")[0]}</td><td className="py-1 text-right tnum">{String(exp.config.biology[p.name]).replace(".", ",")}</td><td className="py-1 pl-2 text-muted">{p.unit}</td><td className="py-1 pl-2 text-muted">{exp.config.biology[p.name] !== p.default ? `modifié (notebook : ${String(p.default).replace(".", ",")})` : ""}</td></tr>))}</tbody></table></>}
@@ -100,7 +101,7 @@ export function Publications() {
                 <table className="mt-1 w-full font-sans text-[12px]">
                   <thead><tr className="border-b border-line text-left text-muted"><th className="py-1 font-medium">Stratégie</th>{["larval_damage_pct", "harvested_clean_pct", "rotten_sterile_only_pct", "sterile_puncture_share_pct", "larvae_produced"].map((k) => <th key={k} className="py-1 text-right font-medium">{METRIC[k].label}<div className="font-normal">{METRIC[k].unit}</div></th>)}</tr></thead>
                   <tbody>{res.scenarios.filter((s) => s.crop === c).map((s) => (
-                    <tr key={s.key} className="border-b border-line/60"><td className="py-1">{s.strategy_label}</td>
+                    <tr key={s.key} className="border-b border-line/60"><td className="py-1">{scenarioLabel(s, exp.config, meta).split(" · ").slice(1).join(" · ")}</td>
                       {["larval_damage_pct", "harvested_clean_pct", "rotten_sterile_only_pct", "sterile_puncture_share_pct", "larvae_produced"].map((k) => <td key={k} className="py-1 text-right tnum">{fmt(s.metrics[k].mean, METRIC[k].digits)}<span className="text-muted"> ± {fmt(s.metrics[k].sd, METRIC[k].digits)}</span></td>)}</tr>))}</tbody>
                 </table>
               </div>
@@ -108,7 +109,7 @@ export function Publications() {
           {has("Graphiques") && <>{H("Graphiques")}
             {crops.map((c) => <figure key={c} className="mt-3 font-sans">
               <TimeSeriesChart height={240} xLabel="Jour de saison" yLabel="Population relative" zoomable={false} ariaLabel={`Population relative, ${c}`}
-                series={res.scenarios.filter((s) => s.crop === c).map((s) => ({ id: s.key, label: s.strategy_label, color: STRATEGY_COLOR[s.strategy_key] ?? "#547B91", dash: s.is_control ? "4 3" : undefined, x: s.series.Time, y: s.series.Wild_adults_relative.mean, sd: s.series.Wild_adults_relative.sd }))} />
+                series={res.scenarios.filter((s) => s.crop === c).map((s) => ({ id: s.key, label: scenarioLabel(s, exp.config, meta).split(" · ").slice(1).join(" · "), color: STRATEGY_COLOR[s.strategy_key] ?? "#547B91", dash: s.is_control ? "4 3" : undefined, x: s.series.Time, y: s.series.Wild_adults_relative.mean, sd: s.series.Wild_adults_relative.sd }))} />
               <figcaption className="text-[11.5px] text-muted">Figure — {meta.crops[c].label} : adultes sauvages (W + F) rapportés à J0, moyenne ± écart-type ({exp.config.replicates} répétitions). Témoin en tirets. {res.scenarios.filter((s) => s.crop === c).map((s) => <span key={s.key} className="mr-2 inline-flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full" style={{ background: STRATEGY_COLOR[s.strategy_key] }} />{s.strategy_label}</span>)}</figcaption>
             </figure>)}</>}
           {has("Comparaisons") && <>{H("Comparaisons")}{crops.map((c) => <p key={c}><strong>{meta.crops[c].label}.</strong> Variation des dommages larvaires par rapport au témoin (appariée) : {res.scenarios.filter((s) => s.crop === c && s.vs_control).map((s) => `${s.strategy_label} ${fmt(s.vs_control!.larval_damage_pct?.mean, 1)} %`).join(" ; ")}.</p>)}</>}

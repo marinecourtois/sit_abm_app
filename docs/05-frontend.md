@@ -28,6 +28,7 @@ frontend/src/
 │   ├── format.ts            nombres, dates et durées (fmtDuration) au format français
 │   ├── colors.ts            couleurs des cultures, stratégies et séries
 │   ├── indicators.ts        indicateurs du plan factoriel : libellé, unité, définition exacte, calcul
+│   ├── analysis.ts          jeu de données des analyses (référence ou expérience), planSize, scenarioLabel, paretoFront
 │   └── variables.ts         libellés/unités des séries (VARIABLES) et indicateurs (METRICS)
 ├── components/
 │   ├── layout.tsx           AppShell, ResearchSidebar, ActivityIndicator (useActiveRuns),
@@ -38,6 +39,8 @@ frontend/src/
 │   ├── science.tsx          BotanicalSpeciesCard, ScientificProcessDiagram, ResearchMetric,
 │   │                        UncertaintyLegend, ResearchAnnotation
 │   ├── SimulationTimeline.tsx  SimulationTimeline (frise), ReleaseCalendar
+│   ├── analysis/AnalysisSuite.tsx  heatmap, dose-réponse, Pareto, incertitude, polyandrie vs monandrie :
+│   │                        page Analyses ET section « Analyses de l'expérience » d'une simulation
 │   └── charts/
 │       ├── TimeSeriesChart.tsx  courbes + bandes ± écart-type, curseur, zoom, annotations, événements
 │       ├── ScatterChart.tsx     nuage de points, front de Pareto
@@ -145,6 +148,24 @@ Les autres textes sont directement dans les pages.
   notebook) en Mode Essentiel, les quatre régimes en Mode Avancé.
 
 Libellés, groupes et formules viennent du backend : ne pas les écrire dans le frontend.
+
+## Analyses : page de référence et page d'une simulation
+
+Les graphiques d'analyse sont **un seul composant**, `components/analysis/AnalysisSuite.tsx`,
+alimenté par un `AnalysisDataset` (`lib/analysis.ts`) : une ligne par saison aux colonnes du CSV
+du plan factoriel du notebook (`Crop, Invasion, Budget, Remating, Strategy, Replicate` +
+métriques).
+
+- Page **Analyses** (`/resultats`) : `datasetFromReference` sur le plan factoriel de référence.
+- Page d'une **simulation** (`/simulation/:id`, section `#analyses`, bouton « Analyses ») :
+  `datasetFromResults` sur les répétitions de l'expérience (valeurs de `metrics[k].values`, sans
+  recalcul). À côté de l'incertitude : l'effet apparié vs témoin de chaque stratégie.
+
+Chaque graphique n'utilise que les dimensions présentes. Une dimension à une seule valeur est
+indiquée (« Fixés dans ce plan ») et le graphique qui en a besoin dit ce qui manque, avec un lien
+« Dupliquer en plan » (`/simulation?from=<id>&plan=1`). Pour tout voir dans une expérience, le
+Studio propose la section **Plan d'expérience** (plusieurs budgets, invasions, régimes ; bouton
+« Plan du notebook (3 × 3 × 2) »).
 
 ## Indicateurs de la page Analyses
 

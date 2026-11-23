@@ -8,8 +8,8 @@ make test          # tout, directement : pytest (backend) puis Vitest (frontend)
 
 | Suite | Outil | Fichiers | Tests |
 |---|---|---|---|
-| Backend : non-régression, API, contrat | pytest (`backend/tests/`) | 3 | 52 |
-| Frontend : unitaires, composants, contrat | Vitest + Testing Library (`frontend/src/**/*.test.ts(x)`) | 11 | 83 |
+| Backend : non-régression, API, contrat | pytest (`backend/tests/`) | 3 | 54 |
+| Frontend : unitaires, composants, contrat | Vitest + Testing Library (`frontend/src/**/*.test.ts(x)`) | 12 | 90 |
 
 ## SmartTest : ne lancer que les tests affectés
 
@@ -97,6 +97,7 @@ dynamiques).
 | `lib/format.test.ts` | Format français, tiret (jamais zéro) pour une valeur absente, signes |
 | `lib/indicators.test.ts` | Chaque indicateur en % précise son dénominateur ; somme des fruits infestés ; écarts en points de % ; écart-type n − 1 |
 | `components/charts/exportChart.test.ts` | CSV : échappement et précision complète |
+| `lib/analysis.test.ts` | Jeu de données des analyses d'une expérience : une ligne par saison aux colonnes du CSV du notebook, valeurs non modifiées ; invasion et régime propres à chaque scénario d'un plan ; variantes d'une même stratégie distinctes ; noms du notebook → clés du moteur ; libellés de scénario ; front de Pareto |
 
 Les deux tests de contrat ont été vérifiés par mutation : ajouter dans l'interface un
 indicateur que le moteur ne calcule pas fait échouer le test Vitest **et** le test pytest.
@@ -115,6 +116,8 @@ indicateur que le moteur ne calcule pas fait échouer le test Vitest **et** le t
 | `test_results_are_served_precompressed_and_cacheable` | Résultats envoyés en gzip tels que stockés (et décompressés si le client ne l'accepte pas), cache immuable ; références compressées ; `no-store` sur le reste de l'API |
 | `test_reproducibility_archive` | L'archive contient les 5 fichiers attendus, chaque SHA-256 du LISEZMOI correspond, le protocole se réimporte à l'identique |
 | `test_health_reports_app_version` | `/api/health` renvoie `app_version` |
+| `test_plan_crosses_budgets_invasions_and_regimes` | Plan 2 invasions × 2 régimes × 2 budgets : chaque scénario est **identique au bit près** à un appel direct du moteur (répétitions 0 et 9), graines communes, effet apparié calculé contre le témoin de sa cellule, colonnes du CSV |
+| `test_plan_limits_and_legacy_hash` | Plan trop grand ou valeurs en double refusés ; une configuration sans plan garde l'empreinte d'avant la 1.7.0 |
 
 Les tests de l'API utilisent une base et un dossier de résultats temporaires : ils ne
 touchent pas `data/app.db`.

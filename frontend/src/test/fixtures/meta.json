@@ -518,7 +518,7 @@
     ]
   },
   "versions": {
-    "app_version": "1.6.0",
+    "app_version": "1.7.0",
     "engine_version": "1.2.0",
     "params_version": "nb-2025.10-echelle30",
     "schema_version": 1,

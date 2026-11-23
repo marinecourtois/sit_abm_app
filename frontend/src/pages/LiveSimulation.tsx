@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { BarChart3, Bell, Copy, Play, RefreshCw, Square } from "../icons";
+import { BarChart3, Bell, Copy, Layers, Play, RefreshCw, Square } from "../icons";
 import { api, mergeLive, type Experiment, type LiveState, type Results } from "../lib/api";
 import { useMeta } from "../lib/meta";
 import { CROP_LABEL, STATUS_LABEL, fmt, fmtDate, fmtDuration, fmtInt } from "../lib/format";
@@ -13,6 +13,8 @@ import { TimeSeriesChart, type ChartSeries } from "../components/charts/TimeSeri
 import { ChartExportMenu } from "../components/charts/ChartExportMenu";
 import { ReleaseCalendar, SimulationTimeline } from "../components/SimulationTimeline";
 import { downloadText, toCsv } from "../components/charts/exportChart";
+import { AnalysisSuite, PlanHint, type AnalysisSelection } from "../components/analysis/AnalysisSuite";
+import { datasetFromResults, invasionLabel, planSize, scenarioLabel } from "../lib/analysis";
 
 const DEFAULT_VARS = ["Wild_males", "Females", "Sterile_males", "Larvae"];
 const GROUPS = [{ key: "insectes", label: "Insectes" }, { key: "fruits", label: "Fruits" }, { key: "dérivées", label: "Dérivées" }] as const;
@@ -100,7 +102,7 @@ export function LiveSimulation() {
     const m = VAR[v];
     if (sc) return { id: v, label: m.label, color: m.color, dash: m.dash, x: sc.series.Time, y: sc.series[v].mean, sd: sc.series[v].sd };
     // en direct : répétition 1, valeurs brutes reçues jour par jour (pas de moyenne)
-    const init = initialRow(exp, Number(meta?.crops[crop]?.params.initial_fruits ?? 0));
+    const init = initialRow(planItem?.invasion ?? exp?.config.invasion, Number(meta?.crops[crop]?.params.initial_fruits ?? 0));
     const rows = [init, ...liveRows];
     const val = (r: Record<string, number>) => v === "Wild_adults" ? r.Wild_males + r.Females : v === "SW_ratio" ? r.Sterile_males / Math.max(1, r.Wild_males)
       : v === "Wild_adults_relative" ? (r.Wild_males + r.Females) / Math.max(1, init.Wild_males + init.Females) : r[v];
@@ -122,7 +124,7 @@ export function LiveSimulation() {
   return (
     <>
       <StudyHeader crumb={`Simulation / ${exp.short_id}`} title={exp.name}
-        subtitle={<span className="text-[16px] sm:text-[18px]">{exp.config.crops.map((c) => CROP_LABEL[c]).join(" · ")} — {fmtInt(exp.config.budget)} stériles · {exp.config.replicates} répétitions · graine {exp.config.seed}</span>}
+        subtitle={<span className="text-[16px] sm:text-[18px]">{exp.config.crops.map((c) => CROP_LABEL[c]).join(" · ")} — {planSize(exp.config).budgets.map((b) => fmtInt(b)).join(" / ")} stériles · {exp.config.replicates} répétitions · graine {exp.config.seed}</span>}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <ExperimentStatus status={exp.status} progress={live?.progress ?? exp.progress} />
@@ -130,6 +132,7 @@ export function LiveSimulation() {
             {(status === "running" || status === "queued") && <Button variant="danger" icon={<Square size={14} />} onClick={() => act(() => api.cancel(id), "Annulation demandée.")}>Interrompre</Button>}
             {(status === "cancelled" || status === "error") && <Button variant="primary" icon={<RefreshCw size={15} />} onClick={async () => { const e = await api.run(id); toast(`Nouvelle exécution ${e.short_id}.`, "success"); nav(`/simulation/${e.id}`); }}>Relancer (nouvelle exécution)</Button>}
             {status === "completed" && <>
+              <Button icon={<Layers size={15} />} onClick={() => document.getElementById("analyses")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Analyses</Button>
               <Button icon={<Copy size={15} />} onClick={() => nav(`/simulation?from=${id}`)}>Dupliquer et modifier</Button>
               <Button variant="primary" icon={<BarChart3 size={15} />} onClick={() => nav(`/comparaison?exp=${id}`)}>Comparer</Button>
             </>}
@@ -163,11 +166,11 @@ export function LiveSimulation() {
               </div>
             </div>
             <div className="flex w-full items-center gap-2 sm:w-auto">
-              <div className="w-full sm:w-64"><Select label="Scénario" value={scen} onChange={(v) => { setScen(v); setFollow(true); }}
-                options={plan.map((p) => ({ value: p.key, label: `${CROP_LABEL[p.crop]} · ${p.strategy_label}` }))} /></div>
+              <div className="w-full sm:w-80"><Select label="Scénario" value={scen} onChange={(v) => { setScen(v); setFollow(true); }}
+                options={plan.map((p) => ({ value: p.key, label: scenarioLabel(p, exp.config, meta) }))} /></div>
               <ChartExportMenu getSvg={() => chartRef.current}
-                meta={{ title: `${planItem ? `${CROP_LABEL[planItem.crop]} — ${planItem.strategy_label}` : ""}`, filename: `${exp.short_id}-dynamique`,
-                  caption: `${sc ? `Moyenne ± écart-type, ${exp.config.replicates} répétitions` : "Répétition 1 (calcul en cours)"}. Invasion ${exp.config.invasion.wild} W : ${exp.config.invasion.females} F, budget ${exp.config.budget} stériles, régime ${exp.config.remating}, graine ${exp.config.seed}. ${exp.short_id}, moteur ${exp.engine_version}.` }}
+                meta={{ title: planItem ? scenarioLabel(planItem, exp.config, meta) : "", filename: `${exp.short_id}-dynamique`,
+                  caption: `${sc ? `Moyenne ± écart-type, ${exp.config.replicates} répétitions` : "Répétition 1 (calcul en cours)"}. Invasion ${(planItem?.invasion ?? exp.config.invasion).wild} W : ${(planItem?.invasion ?? exp.config.invasion).females} F, budget ${planItem?.budget ?? exp.config.budget} stériles, régime ${planItem?.remating ?? exp.config.remating}, graine ${exp.config.seed}. ${exp.short_id}, moteur ${exp.engine_version}.` }}
                 onCsv={() => downloadText(toCsv([["jour", ...chartSeries.flatMap((s) => [s.id + "_moyenne", s.id + "_ecart_type"])], ...chartSeries[0]?.x.map((t, i) => [t, ...chartSeries.flatMap((s) => [s.y[i], s.sd?.[i] ?? ""])]) ?? []]), `${exp.short_id}-series.csv`)} />
             </div>
           </div>
@@ -272,14 +275,64 @@ export function LiveSimulation() {
           </Panel>
         </div>
       </div>
+
+      {res && <ExperimentAnalyses exp={exp} res={res} />}
     </>
+  );
+}
+
+/** Les graphiques de la page Analyses, calculés sur les répétitions de cette expérience. */
+function ExperimentAnalyses({ exp, res }: { exp: Experiment; res: Results }) {
+  const meta = useMeta();
+  const data = useMemo(() => datasetFromResults(res, exp, meta), [res, exp, meta]);
+  if (!meta) return null;
+  return (
+    <section id="analyses" aria-labelledby="analyses-h" className="mt-8 scroll-mt-4">
+      <div className="flex flex-wrap items-end justify-between gap-2 border-b border-line pb-2">
+        <div>
+          <h2 id="analyses-h" className="font-serif text-[26px] font-semibold">Analyses de l’expérience</h2>
+          <p className="font-serif text-[14px] text-muted">
+            Mêmes graphiques que la page Analyses, calculés sur les {data.nRep} répétitions de chaque scénario de {exp.short_id}
+            {" "}({data.rows.length} saisons : {data.crops.length} culture{data.crops.length > 1 ? "s" : ""} × {data.invasions.length} invasion{data.invasions.length > 1 ? "s" : ""} × {data.budgets.filter((b) => b > 0).length} budget{data.budgets.filter((b) => b > 0).length > 1 ? "s" : ""} × {data.strategies.length} stratégie{data.strategies.length > 1 ? "s" : ""} × {data.regimes.length} régime{data.regimes.length > 1 ? "s" : ""}).
+          </p>
+        </div>
+      </div>
+      <AnalysisSuite data={data} meta={meta} source={`${exp.short_id} (${exp.name}), moteur ${exp.engine_version}, graines ${exp.config.seed} + 1000·r`}
+        exportPrefix={`${exp.short_id}-`} planHint={<PlanHint id={exp.id} />}
+        aside={(sel) => <PairedEffects res={res} exp={exp} sel={sel} />} />
+    </section>
+  );
+}
+
+/** Effet de chaque stratégie par rapport au témoin de la même cellule, apparié par graine. */
+function PairedEffects({ res, exp, sel }: { res: Results; exp: Experiment; sel: AnalysisSelection }) {
+  const meta = useMeta();
+  const rows = res.scenarios.filter((s) => !s.is_control && s.vs_control && s.crop === sel.crop && s.budget === sel.budget
+    && (s.remating ?? exp.config.remating) === sel.remating && invasionLabel(s.invasion ?? exp.config.invasion, meta) === sel.invasion);
+  const K = [["larval_damage_pct", "Fruits infestés"], ["larvae_produced", "Larves produites"], ["harvested_clean_pct", "Récolte saine"]] as const;
+  return (
+    <Panel className="px-5 py-4">
+      <PanelTitle sub={`${CROP_LABEL[sel.crop]} · invasion ${sel.invasion.split(" (")[0]} · budget ${fmtInt(sel.budget)} · variation relative au témoin, même graine, moyenne ± écart-type`}>Effet vs témoin, apparié</PanelTitle>
+      {rows.length ? (
+        <table className="mt-3 w-full text-[12.5px]">
+          <thead><tr className="border-b border-line text-left text-[11.5px] text-muted"><th className="py-1.5 font-medium">Stratégie</th>{K.map(([k, l]) => <th key={k} className="py-1.5 text-right font-medium">{l}</th>)}</tr></thead>
+          <tbody>{rows.map((s) => (
+            <tr key={s.key} className="border-b border-line/60">
+              <td className="py-1.5"><span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: STRATEGY_COLOR[s.strategy_key] ?? "#547B91" }} />{s.strategy_label}</td>
+              {K.map(([k]) => { const v = s.vs_control?.[k]; return <td key={k} className="py-1.5 text-right tnum">{v ? <>{fmt(v.mean, 1).replace("-", "−")} %<span className="text-muted"> ± {fmt(v.sd, 1)}</span></> : "—"}</td>; })}
+            </tr>
+          ))}</tbody>
+        </table>
+      ) : <p className="mt-3 text-[12.5px] text-muted">Pas de témoin dans cette cellule : l’effet apparié n’est pas calculé.</p>}
+      <p className="mt-2 text-[11.5px] text-muted">Pour chaque répétition r : 100 × (scénario − témoin) / témoin, avec la même graine ; puis moyenne et écart-type sur les {exp.config.replicates} répétitions.</p>
+    </Panel>
   );
 }
 
 function cap(s: string) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
-function initialRow(exp: Experiment | null, initialFruits: number) {
+function initialRow(inv: { wild: number; females: number } | undefined, initialFruits: number) {
   // État à J0 (avant le premier jour) : effectifs initiaux de la configuration et stock initial de fruits (CropParameters.initial_fruits)
-  const w = exp?.config.invasion.wild ?? 0, f = exp?.config.invasion.females ?? 0;
+  const w = inv?.wild ?? 0, f = inv?.females ?? 0;
   return { Wild_males: w, Females: f, Sterile_males: 0, Larvae: 0, Young_fruits: initialFruits, Harvestable_fruits: 0, Rotten_natural: 0, Rotten_sterile_only: 0, Rotten_larvae: 0, Harvested_cumul: 0, Rotten_cumul: 0 } as Record<string, number>;
 }

@@ -5,6 +5,7 @@ import { useAsync } from "../lib/useAsync";
 import { useMeta } from "../lib/meta";
 import { CROP_LABEL, fmt, fmtInt } from "../lib/format";
 import { DASHES, SERIES_PALETTE } from "../lib/colors";
+import { invasionLabel, scenarioLabel } from "../lib/analysis";
 import { METRIC, METRICS, VAR, VARIABLES } from "../lib/variables";
 import { StudyHeader, StudyTabs } from "../components/layout";
 import { EmptyState, Panel, PanelTitle, ScientificTooltip, Segmented, Select, Skeleton } from "../components/ui";
@@ -106,8 +107,8 @@ export function Comparison() {
     const exp = done.find((e) => e.id === eid); const r = results[eid];
     const sc = r?.scenarios.find((s) => s.key === skey);
     if (!exp || !sc) return null;
-    const ctrl = r.scenarios.find((s) => s.is_control && s.crop === sc.crop);
-    return { exp, sc, ctrl, color: SERIES_PALETTE[i % SERIES_PALETTE.length], dash: DASHES[i % DASHES.length], name: `${CROP_LABEL[sc.crop]} · ${sc.strategy_label}${new Set(picked.map((p) => p.split("::")[0])).size > 1 ? ` · ${exp.short_id}` : ""}` };
+    const ctrl = r.scenarios.find((s) => s.is_control && s.crop === sc.crop && (s.invasion?.wild ?? 0) === (sc.invasion?.wild ?? 0) && (s.invasion?.females ?? 0) === (sc.invasion?.females ?? 0) && s.remating === sc.remating);
+    return { exp, sc, ctrl, color: SERIES_PALETTE[i % SERIES_PALETTE.length], dash: DASHES[i % DASHES.length], name: `${scenarioLabel(sc, exp.config, meta)}${new Set(picked.map((p) => p.split("::")[0])).size > 1 ? ` · ${exp.short_id}` : ""}` };
   }).filter(Boolean) as Sel[];
   const toggle = (k: string) => setPicked((p) => (p.includes(k) ? p.filter((x) => x !== k) : p.length >= 4 ? p : [...p, k]));
 
@@ -135,7 +136,7 @@ export function Comparison() {
                         <label key={k} className={`flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-[12.5px] hover:bg-sage-soft ${!on && picked.length >= 4 ? "opacity-50" : ""}`}>
                           <input type="checkbox" checked={on} disabled={!on && picked.length >= 4} onChange={() => toggle(k)} className="h-3.5 w-3.5 accent-[#347A55]" />
                           {on && <span className="h-2 w-2 rounded-full" style={{ background: SERIES_PALETTE[picked.indexOf(k) % SERIES_PALETTE.length] }} />}
-                          <span>{CROP_LABEL[s.crop]} · {s.strategy_label}</span>
+                          <span>{scenarioLabel(s, e.config, meta)}</span>
                         </label>
                       );
                     }) : <Skeleton className="h-16" />}
@@ -158,8 +159,8 @@ export function Comparison() {
                     <dt className="text-muted">Culture</dt><dd><em className="font-serif">{meta?.crops[s.sc.crop].latin}</em></dd>
                     <dt className="text-muted">Budget</dt><dd className="tnum">{fmtInt(s.sc.budget)} stériles</dd>
                     <dt className="text-muted">Période</dt><dd className="tnum">J0 – J{s.sc.series.Time[s.sc.series.Time.length - 1]}</dd>
-                    <dt className="text-muted">Invasion</dt><dd className="tnum">{s.exp.config.invasion.wild} W : {s.exp.config.invasion.females} F</dd>
-                    <dt className="text-muted">Régime</dt><dd>{s.exp.config.remating}</dd>
+                    <dt className="text-muted">Invasion</dt><dd className="tnum">{invasionLabel(s.sc.invasion ?? s.exp.config.invasion, meta)}</dd>
+                    <dt className="text-muted">Régime</dt><dd>{s.sc.remating ?? s.exp.config.remating}</dd>
                     <dt className="text-muted">Identifiant</dt><dd className="font-mono text-[10.5px]">{s.exp.short_id} · graines {s.sc.seeds.join(", ")}</dd>
                   </dl>
                 </Panel>

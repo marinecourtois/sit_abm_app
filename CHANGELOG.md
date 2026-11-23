@@ -4,6 +4,50 @@ Format : une section par version de l'application (`APP_VERSION`, `backend/app/_
 Les versions du moteur (`ENGINE_VERSION`), des paramètres et du schéma sont indépendantes et
 enregistrées avec chaque expérience (voir docs/03 § 4).
 
+## 1.7.0 — 23 novembre 2026
+
+Sprint « analyses de chaque simulation ». Le moteur ne change pas (`ENGINE_VERSION` 1.2.0) :
+les 38 tests de non-régression reproduisent toujours le notebook au bit près.
+
+### Nouveautés
+
+- **Analyses de l'expérience** sur la page d'une simulation (bouton « Analyses ») : la heatmap
+  invasion × budget × stratégie, les courbes dose-réponse, le front de Pareto, l'incertitude
+  entre répétitions et polyandrie vs monandrie, calculés sur les répétitions de cette expérience
+  (et non plus seulement sur le plan factoriel de référence). À côté : l'effet apparié de chaque
+  stratégie vs témoin. Mêmes exports (SVG, PNG, CSV) que la page Analyses, préfixés par
+  l'identifiant de l'expérience.
+- **Plan d'expérience** dans le Studio : plusieurs budgets, invasions et régimes de
+  réaccouplement croisés dans une même expérience, avec les mêmes graines. Le bouton « Plan du
+  notebook (3 × 3 × 2) » reprend le plan factoriel du notebook. Le témoin est calculé une fois
+  par culture, invasion et régime. Exemple mesuré : 2 cultures × 3 invasions × 3 budgets ×
+  2 régimes × (J+3, J+7, témoin) × 10 répétitions = 840 saisons en 126 s (122 s estimées).
+- Quand une dimension n'a qu'une valeur, chaque graphique l'indique et propose « Dupliquer en
+  plan ».
+- Configuration : champs facultatifs `budgets`, `invasions`, `rematings`. Chaque scénario
+  des résultats porte son `strategy_id`, son `invasion` et son `remating`. Une configuration
+  sans plan garde son empreinte et ses clés de scénario d'avant la 1.7.0. Au plus
+  10 000 saisons par expérience.
+- Exports CSV : colonnes `invasion, wild, females, remating` et `budget` ajoutées (aussi dans
+  l'archive).
+- Comparaison, liste des expériences et rapport : invasion, budget et régime de chaque scénario
+  d'un plan affichés.
+
+### Corrections
+
+- Front de Pareto : graduations en double quand l'étendue des axes est faible (« 1, 1, 2, 2… ») ;
+  les décimales s'adaptent maintenant au pas.
+- Incertitude entre répétitions : les points s'écartent selon le nombre de répétitions (lisible
+  à 20 ou 50 répétitions).
+
+### Tests
+
+- Backend : 54 tests (+2). Un plan 2 invasions × 2 régimes × 2 budgets est identique au bit
+  près au moteur appelé directement, et son témoin apparié est celui de sa cellule ; limites du
+  plan et empreinte inchangée sans plan.
+- Frontend : 90 tests (+7) : jeu de données des analyses d'une expérience, libellés de
+  scénario, front de Pareto.
+
 ## 1.6.0 — 23 novembre 2026
 
 Sprint « vitesse et confort de travail ». **Aucun résultat scientifique ne change** : les

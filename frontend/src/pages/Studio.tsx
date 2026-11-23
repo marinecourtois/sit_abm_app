@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, CircleX, Download, Play, Plus, RotateCcw, Save, Trash2, Upload } from "../icons";
-import { api, type BiologyParam, type CropKey, type ExperimentConfig, type StrategySpec, type Validation } from "../lib/api";
+import { api, type BiologyParam, type CropKey, type ExperimentConfig, type Invasion, type StrategySpec, type Validation } from "../lib/api";
+import { invasionLabel, planSize } from "../lib/analysis";
 import { useMeta } from "../lib/meta";
 import { CROP_LABEL, fmt, fmtInt } from "../lib/format";
 import { CROP_COLOR, STRATEGY_COLOR } from "../lib/colors";
@@ -97,6 +98,57 @@ function RematingSelector({ value, onChange, all }: { value: string; onChange: (
   );
 }
 
+/** Plan (1.7.0) : croiser plusieurs budgets, invasions et régimes dans une même expérience.
+ *  Une liste d'une seule valeur est ramenée au champ unique (budget, invasion, remating). */
+function PlanSection({ cfg, setCfg, all, open, setOpen }: {
+  cfg: ExperimentConfig; setCfg: (f: (c: ExperimentConfig) => ExperimentConfig) => void; all: boolean; open: boolean; setOpen: (v: boolean) => void;
+}) {
+  const meta = useMeta()!;
+  const d = planSize(cfg);
+  const invKey = (i: Invasion) => `${i.wild}:${i.females}`;
+  const setBudgets = (l: number[]) => setCfg((c) => { const v = [...new Set(l)].sort((a, b) => a - b); return v.length > 1 ? { ...c, budgets: v, budget: v[0] } : { ...c, budgets: null, budget: v[0] ?? c.budget }; });
+  const setInvasions = (l: Invasion[]) => setCfg((c) => { const v = [...l].sort((a, b) => a.wild + a.females - b.wild - b.females); return v.length > 1 ? { ...c, invasions: v, invasion: v[0] } : { ...c, invasions: null, invasion: v[0] ?? c.invasion }; });
+  const setRematings = (l: string[]) => setCfg((c) => { const order = Object.keys(meta.remating); const v = order.filter((k) => l.includes(k)); return v.length > 1 ? { ...c, rematings: v, remating: v[0] } : { ...c, rematings: null, remating: v[0] ?? c.remating }; });
+  const budgetOpts = [...new Set([...meta.budget_presets.filter((b) => b > 0), ...d.budgets])].sort((a, b) => a - b);
+  const invOpts: Invasion[] = [...Object.entries(meta.invasions).map(([k, v]) => ({ preset: k, wild: v.wild, females: v.females })),
+    ...d.invasions.filter((i) => !Object.values(meta.invasions).some((p) => p.wild === i.wild && p.females === i.females))];
+  const regOpts = Object.keys(meta.remating).filter((k) => all || k === "preference" || k === "first" || d.rematings.includes(k));
+  const active = d.budgets.length > 1 || d.invasions.length > 1 || d.rematings.length > 1;
+  const chip = (on: boolean) => `rounded border px-2 py-0.5 text-[11.5px] tnum ${on ? "border-botanic bg-sage text-forest" : "border-line bg-white hover:border-botanic/50"}`;
+  const notebook = () => setCfg((c) => ({ ...c,
+    budgets: meta.budget_presets.filter((b) => b > 0), budget: meta.budget_presets.filter((b) => b > 0)[0],
+    invasions: Object.entries(meta.invasions).map(([k, v]) => ({ preset: k, wild: v.wild, females: v.females })), invasion: { preset: "faible", wild: meta.invasions.faible.wild, females: meta.invasions.faible.females },
+    rematings: ["preference", "first"], remating: "preference" }));
+  return (
+    <div className="mt-5 border-t border-line pt-4" id="plan">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex w-full items-center justify-between gap-2 text-left">
+        <h3 className="flex items-center gap-1.5 text-[13.5px] font-semibold">Plan d’expérience <span className="font-normal text-muted">(optionnel)</span>
+          <ScientificTooltip content="Croise plusieurs budgets, invasions et régimes de réaccouplement dans la même expérience, avec les mêmes graines. Toutes les courbes de la section Analyses (heatmap, dose-réponse, polyandrie vs monandrie) deviennent alors complètes." /></h3>
+        {active ? <Badge tone="green">{d.invasions.length} × {d.budgets.length} × {d.rematings.length}</Badge> : <span className="text-[11.5px] text-muted">{open ? "Masquer" : "Afficher"}</span>}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2.5 text-[12px]">
+          <p className="text-[11.5px] leading-snug text-muted">Cochez plusieurs valeurs pour les croiser. Le témoin (sans lâcher) est calculé une fois par culture, invasion et régime.</p>
+          <div><div className="text-muted">Budgets (stériles / saison)</div>
+            <div className="mt-1 flex flex-wrap gap-1.5">{budgetOpts.map((b) => { const on = d.budgets.includes(b); return (
+              <button key={b} type="button" aria-pressed={on} className={chip(on)} onClick={() => setBudgets(on ? d.budgets.filter((x) => x !== b) : [...d.budgets, b])}>{fmtInt(b)}</button>); })}</div></div>
+          <div><div className="text-muted">Invasions</div>
+            <div className="mt-1 flex flex-wrap gap-1.5">{invOpts.map((i) => { const on = d.invasions.some((x) => invKey(x) === invKey(i)); return (
+              <button key={invKey(i)} type="button" aria-pressed={on} className={chip(on)} onClick={() => setInvasions(on ? d.invasions.filter((x) => invKey(x) !== invKey(i)) : [...d.invasions, i])}>
+                {i.preset && meta.invasions[i.preset] ? meta.invasions[i.preset].label : `${i.wild} W : ${i.females} F`}</button>); })}</div></div>
+          <div><div className="text-muted">Régimes de réaccouplement</div>
+            <div className="mt-1 flex flex-wrap gap-1.5">{regOpts.map((k) => { const on = d.rematings.includes(k); return (
+              <button key={k} type="button" aria-pressed={on} className={chip(on)} onClick={() => setRematings(on ? d.rematings.filter((x) => x !== k) : [...d.rematings, k])}>{meta.remating[k].short}</button>); })}</div></div>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button size="sm" onClick={notebook}>Plan du notebook (3 × 3 × 2)</Button>
+            {active && <Button size="sm" variant="ghost" onClick={() => setCfg((c) => ({ ...c, budgets: null, invasions: null, rematings: null }))}>Revenir à un seul scénario</Button>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StrategySelector({ value, onChange, mode, includeControl, setIncludeControl }: {
   value: StrategySpec[]; onChange: (v: StrategySpec[]) => void; mode: string; includeControl: boolean; setIncludeControl: (b: boolean) => void;
 }) {
@@ -164,6 +216,7 @@ export function SimulationConfigurator() {
   const [cfg, setCfg] = useState<ExperimentConfig | null>(null);
   const [val, setVal] = useState<Validation | null>(null);
   const [busy, setBusy] = useState(false);
+  const [planOpen, setPlanOpen] = useState(sp.get("plan") === "1");
 
   useEffect(() => {
     if (!meta || cfg) return;
@@ -171,7 +224,7 @@ export function SimulationConfigurator() {
     const base: ExperimentConfig = { crops: ["strawberry", "cherry"], strategies: [{ key: "every_3" }, { key: "every_7" }],
       invasion: { preset: "moyenne", wild: meta.invasions.moyenne.wild, females: meta.invasions.moyenne.females },
       budget: 9000, remating: "preference", replicates: meta.limits.replicates[0], seed: 42, include_control: true, biology: { ...meta.biology_defaults } };
-    if (from) api.experiment(from).then((e) => { setCfg(e.config); setName(`${e.name} (variante)`); setProject(e.project); setParent(e.id); }).catch(() => setCfg(base));
+    if (from) api.experiment(from).then((e) => { setCfg(e.config); setName(`${e.name} (variante)`); setProject(e.project); setParent(e.id); if (planSize(e.config).budgets.length > 1 || e.config.invasions?.length || e.config.rematings?.length) setPlanOpen(true); }).catch(() => setCfg(base));
     else setCfg(base);
   }, [meta]);
 
@@ -204,6 +257,8 @@ export function SimulationConfigurator() {
   };
 
   const invPreset = cfg.invasion.preset && meta.invasions[cfg.invasion.preset] ? cfg.invasion.preset : "custom";
+  const plan = planSize(cfg);
+  const inPlan = (n: number, what: string) => n > 1 && <p className="mt-1 rounded bg-sage-soft px-2 py-1 text-[11.5px] text-forest">{what} : défini par le plan d’expérience ci-dessous.</p>;
   return (
     <div className="mt-5 grid gap-4 xl:grid-cols-[400px_minmax(0,1fr)_330px]">
       {/* ---------- Gauche : paramètres */}
@@ -233,7 +288,8 @@ export function SimulationConfigurator() {
           </fieldset>
           <div>
             <div className="flex items-center gap-1.5 font-medium">Pression d’invasion <ScientificTooltip content="Effectifs initiaux d'adultes sauvages à J0 : mâles (W) et femelles (F). Préréglages du notebook (cellule 6), échelle 30." /></div>
-            <div className="mt-1"><Select label="Pression d'invasion" value={invPreset}
+            {inPlan(plan.invasions.length, `${plan.invasions.length} invasions`)}
+            {plan.invasions.length < 2 && <><div className="mt-1"><Select label="Pression d'invasion" value={invPreset}
               onChange={(v) => v === "custom" ? set("invasion", { ...cfg.invasion, preset: null }) : set("invasion", { preset: v, wild: meta.invasions[v].wild, females: meta.invasions[v].females })}
               options={[...Object.entries(meta.invasions).map(([k, v]) => ({ value: k, label: v.label })), ...(mode === "avance" ? [{ value: "custom", label: "Personnalisée…" }] : [])]} /></div>
             {(mode === "avance" || invPreset === "custom") && (
@@ -241,17 +297,18 @@ export function SimulationConfigurator() {
                 <label>Mâles sauvages W<NumberField label="Mâles sauvages" value={cfg.invasion.wild} min={0} max={100000} step={10} unit="ind." onChange={(v) => set("invasion", { ...cfg.invasion, preset: null, wild: v })} /></label>
                 <label>Femelles F<NumberField label="Femelles" value={cfg.invasion.females} min={0} max={100000} step={10} unit="ind." onChange={(v) => set("invasion", { ...cfg.invasion, preset: null, females: v })} /></label>
               </div>
-            )}
+            )}</>}
           </div>
           <div>
             <div className="flex items-center gap-1.5 font-medium">Budget <span className="font-normal text-muted">(mâles stériles lâchés par saison)</span>
               <ScientificTooltip content="Nombre total de mâles stériles lâchés sur la saison, réparti selon le calendrier de chaque stratégie. Le modèle ne contient pas de coût monétaire : aucune conversion n'est appliquée." /></div>
-            <div className="mt-1"><NumberField label="Budget" value={cfg.budget} min={0} max={1000000} step={500} unit="stériles" onChange={(v) => set("budget", v)} invalid={!Number.isFinite(cfg.budget)} /></div>
+            {inPlan(plan.budgets.length, `${plan.budgets.length} budgets`)}
+            {plan.budgets.length < 2 && <><div className="mt-1"><NumberField label="Budget" value={cfg.budget} min={0} max={1000000} step={500} unit="stériles" onChange={(v) => set("budget", v)} invalid={!Number.isFinite(cfg.budget)} /></div>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {meta.budget_presets.filter((b) => b > 0).map((b) => (
                 <button key={b} type="button" onClick={() => set("budget", b)} className={`rounded border px-2 py-0.5 text-[11.5px] tnum ${cfg.budget === b ? "border-botanic bg-sage text-forest" : "border-line bg-white hover:border-botanic/50"}`}>{fmtInt(b)}</button>
               ))}
-            </div>
+            </div></>}
           </div>
           <div><div className="font-medium">Stratégies de lâcher <span className="font-normal text-muted">et calendrier</span></div>
             <div className="mt-1"><StrategySelector value={cfg.strategies} onChange={(v) => set("strategies", v)} mode={mode} includeControl={cfg.include_control} setIncludeControl={(b) => set("include_control", b)} /></div></div>
@@ -265,8 +322,10 @@ export function SimulationConfigurator() {
         <div className="mt-5 border-t border-line pt-4">
           <h3 className="flex items-center gap-1.5 text-[13.5px] font-semibold">Réaccouplement des femelles
             <ScientificTooltip content="Dans tous les régimes les femelles se réaccouplent ; le régime fixe quel sperme féconde les œufs (Females_Agent.use_fertile_sperm)." /></h3>
-          <div className="mt-2"><RematingSelector value={cfg.remating} onChange={(v) => set("remating", v)} all={mode === "avance"} /></div>
+          {inPlan(plan.rematings.length, `${plan.rematings.length} régimes`)}
+          {plan.rematings.length < 2 && <div className="mt-2"><RematingSelector value={cfg.remating} onChange={(v) => set("remating", v)} all={mode === "avance"} /></div>}
         </div>
+        <PlanSection cfg={cfg} setCfg={(f) => setCfg((c) => (c ? f(c) : c))} all={mode === "avance"} open={planOpen} setOpen={setPlanOpen} />
         <div className="mt-5 border-t border-line pt-4">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-[13.5px] font-semibold">Paramètres biologiques {mode === "avance" ? null : <span className="font-normal text-muted">essentiels</span>}</h3>
@@ -298,7 +357,7 @@ export function SimulationConfigurator() {
                 <div className="mt-1 space-y-1">
                   {sc.filter((s) => s.strategy_key !== "no_tis").map((s, i) => (
                     <div key={i} className="grid grid-cols-[84px_minmax(0,1fr)_64px] items-center gap-2 sm:grid-cols-[160px_minmax(0,1fr)_92px] sm:gap-3">
-                      <span className="truncate text-[12.5px]">{s.strategy}</span>
+                      <span className="truncate text-[12.5px]" title={s.strategy}>{s.strategy}{plan.budgets.length > 1 && <span className="block text-[11px] text-muted tnum">{fmtInt(s.budget ?? 0)} st.</span>}</span>
                       <ReleaseCalendar schedule={s.schedule} seasonLength={s.season_length} color={STRATEGY_COLOR[s.strategy_key] ?? "#547B91"} label={`${s.strategy} ${c}`} height={30} maxValue={maxRelease} />
                       <span className="text-right text-[11.5px] tnum text-muted">{s.release_days} lâcher{s.release_days > 1 ? "s" : ""}<br />{fmtInt(s.total_released)} st.</span>
                     </div>
@@ -321,10 +380,10 @@ export function SimulationConfigurator() {
           <PanelTitle>Récapitulatif</PanelTitle>
           <dl className="mt-3 grid grid-cols-[110px_1fr] gap-x-3 gap-y-1.5 text-[12.5px]">
             <dt className="text-muted">Cultures</dt><dd>{cfg.crops.map((c) => CROP_LABEL[c]).join(", ") || "—"}</dd>
-            <dt className="text-muted">Invasion</dt><dd className="tnum">{fmtInt(cfg.invasion.wild)} W : {fmtInt(cfg.invasion.females)} F</dd>
-            <dt className="text-muted">Budget</dt><dd className="tnum">{fmtInt(cfg.budget)} mâles stériles / saison</dd>
+            <dt className="text-muted">Invasion</dt><dd className="tnum">{plan.invasions.map((i) => invasionLabel(i, meta)).join(" · ")}</dd>
+            <dt className="text-muted">Budget</dt><dd className="tnum">{plan.budgets.map((b) => fmtInt(b)).join(" / ")} mâles stériles / saison</dd>
             <dt className="text-muted">Stratégies</dt><dd>{cfg.strategies.length}{cfg.include_control ? " + témoin" : ""}</dd>
-            <dt className="text-muted">Réaccouplement</dt><dd>{meta.remating[cfg.remating]?.label}</dd>
+            <dt className="text-muted">Réaccouplement</dt><dd>{plan.rematings.map((k) => meta.remating[k]?.label ?? k).join(" · ")}</dd>
             <dt className="text-muted">Répétitions</dt><dd className="tnum">{cfg.replicates} · graines {cfg.seed} … {cfg.seed + 1000 * (cfg.replicates - 1)}</dd>
             <dt className="text-muted">Biologie</dt><dd>{modifiedBio ? `${modifiedBio} paramètre(s) modifié(s)` : "valeurs du notebook"}</dd>
             <dt className="text-muted">Moteur</dt><dd className="font-mono text-[11px]">{meta.engine_version} · {meta.params_version}</dd>

@@ -96,7 +96,7 @@ def test_exports_and_protocol_roundtrip(client):
     rows = list(csv.DictReader(io.StringIO(client.get(f"/api/experiments/{e['id']}/export?format=csv-metrics").text)))
     assert rows and "larval_damage_pct" in rows[0]
     series = client.get(f"/api/experiments/{e['id']}/export?format=csv-series").text.splitlines()
-    assert series[0].startswith("experiment,crop,strategy,day")
+    assert series[0].startswith("experiment,crop,invasion,wild,females,remating,strategy,budget,day")
     proto = client.get(f"/api/experiments/{e['id']}/export?format=protocol").json()
     imp = client.post("/api/protocol/import", json=proto).json()
     assert imp["config"] == e["config"] and imp["status"] == "ready"
@@ -180,3 +180,51 @@ def test_health_reports_app_version(client):
     from app import APP_VERSION
     h = client.get("/api/health").json()
     assert h["app_version"] == APP_VERSION and h["engine_version"]
+
+
+def test_plan_crosses_budgets_invasions_and_regimes(client):
+    """Plan (1.7.0) : chaque cellule culture × invasion × régime × stratégie × budget est une saison
+    du moteur au bit près, avec les graines communes, et le témoin apparié est celui de sa cellule."""
+    from tis_engine.runner import build_schedule, run_season
+    invs = [{"preset": "faible", "wild": 90, "females": 90}, {"preset": None, "wild": 120, "females": 150}]
+    config = cfg(client, crops=["strawberry"], strategies=[{"key": "every_7"}], budgets=[3000, 6000],
+                 invasions=invs, rematings=["preference", "first"])
+    v = client.post("/api/validate", json=config).json()
+    assert v["ok"], v["errors"]
+    assert v["estimate"]["seasons"] == 1 * 2 * 2 * (1 + 2) * 10
+    e = wait(client, client.post("/api/experiments", json={"name": "plan", "config": config}).json()["id"], timeout=300)
+    assert e["status"] == "completed"
+    res = client.get(f"/api/experiments/{e['id']}/results").json()
+    scs = res["scenarios"]
+    assert len(scs) == 12 and len({s["key"] for s in scs}) == 12
+    assert sorted({s["budget"] for s in scs}) == [0, 3000, 6000]
+    for s in scs:
+        assert s["seeds"] == [1234 + 1000 * r for r in range(10)]
+        for rep in (0, 9):
+            direct = run_season({"crop": "strawberry", "wild": s["invasion"]["wild"], "females": s["invasion"]["females"],
+                                 "remating": s["remating"], "seed": s["seeds"][rep],
+                                 "schedule": build_schedule(s["strategy"], s["budget"], 100), "biology": config["biology"]})["metrics"]
+            for k, val in direct.items():
+                assert s["metrics"][k]["values"][rep] == val, (s["key"], k)
+        if not s["is_control"]:
+            ctrl = next(c for c in scs if c["is_control"] and c["invasion"] == s["invasion"] and c["remating"] == s["remating"])
+            lv = lambda x: x["metrics"]["larvae_produced"]["values"]
+            expect = [100 * (a - b) / b for a, b in zip(lv(s), lv(ctrl))]
+            assert s["vs_control"]["larvae_produced"]["values"] == pytest.approx(expect)
+    rows = list(csv.DictReader(io.StringIO(client.get(f"/api/experiments/{e['id']}/export?format=csv-metrics").text)))
+    assert len(rows) == 120 and {r["remating"] for r in rows} == {"preference", "first"}
+    assert {r["invasion"] for r in rows} == {"Faible (90 W : 90 F)", "Personnalisée (120 W : 150 F)"}
+
+
+def test_plan_limits_and_legacy_hash(client):
+    from app.schemas import ExperimentConfig, config_hash
+    big = cfg(client, budgets=list(range(1000, 21000, 1000)), replicates=50,
+              rematings=["preference", "first", "last", "mixed"], crops=["strawberry", "cherry"])
+    r = client.post("/api/validate", json=big).json()
+    assert not r["ok"] and any("saisons" in x for x in r["errors"])
+    dup = client.post("/api/validate", json=cfg(client, budgets=[3000, 3000])).json()
+    assert not dup["ok"] and any("double" in x for x in dup["errors"])
+    # une configuration sans plan garde l'empreinte d'avant la 1.7.0
+    legacy = cfg(client)
+    import hashlib, json
+    assert config_hash(ExperimentConfig(**legacy)) == hashlib.sha256(json.dumps(ExperimentConfig(**legacy).model_dump(exclude={"budgets", "invasions", "rematings"}), sort_keys=True).encode()).hexdigest()[:16]

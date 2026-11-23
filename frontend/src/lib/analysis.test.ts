@@ -1,0 +1,85 @@
+import { describe, expect, it } from "vitest";
+import type { Experiment, ExperimentConfig, Meta, Results, Scenario } from "./api";
+import { METRIC_COLUMN, datasetFromReference, datasetFromResults, paretoFront, planSize, scenarioLabel } from "./analysis";
+import { INDICATOR } from "./indicators";
+import metaJson from "../test/fixtures/meta.json";
+
+const meta = metaJson as unknown as Meta;
+const config: ExperimentConfig = {
+  crops: ["strawberry"], strategies: [{ key: "every_3" }], invasion: { preset: "moyenne", wild: 300, females: 300 },
+  budget: 9000, remating: "preference", replicates: 2, seed: 42, include_control: true, biology: {},
+};
+const metrics = (base: number) => Object.fromEntries(Object.keys(METRIC_COLUMN).map((k, i) => {
+  const values = [base + i, base + i + 1];
+  return [k, { mean: base + i + 0.5, sd: 0.7, min: values[0], max: values[1], n: 2, values }];
+}));
+const scenario = (over: Partial<Scenario>): Scenario => ({
+  key: "strawberry::every_3", crop: "strawberry", strategy: { key: "every_3" }, strategy_key: "every_3", strategy_label: "J+3",
+  is_control: false, budget: 9000, schedule: {}, seeds: [42, 1042], metrics: metrics(10), series: { Time: [] } as unknown as Scenario["series"], events: [], ...over,
+});
+
+describe("jeu de données d'analyse d'une expérience", () => {
+  it("une ligne par saison, aux colonnes du CSV du notebook, valeurs non modifiées", () => {
+    const res = { scenarios: [scenario({ key: "strawberry::no_tis", strategy: { key: "no_tis" }, strategy_key: "no_tis", strategy_label: "Témoin (sans TIS)", is_control: true, budget: 0, metrics: metrics(50) }), scenario({})] } as unknown as Results;
+    const d = datasetFromResults(res, { config } as Experiment, meta);
+    expect(d.rows).toHaveLength(4);
+    expect(d.nRep).toBe(2);
+    expect(d.budgets).toEqual([0, 9000]);
+    expect(d.invasions).toEqual(["Moyenne (300 W : 300 F)"]);
+    expect(d.regimes).toEqual(["preference"]);
+    expect(d.strategies.map((s) => [s.id, s.control])).toEqual([["no_tis", true], ["every_3", false]]);
+    const r = d.rows.find((x) => x.Strategy === "every_3" && x.Replicate === 1)!;
+    expect(r["Harvested - clean (%)"]).toBe(res.scenarios[1].metrics.harvested_clean_pct.values[1]);
+    expect(r.Seed).toBe(1042);
+    // l'indicateur « fruits infestés » se recalcule à l'identique depuis les colonnes
+    const m = res.scenarios[1].metrics;
+    expect(INDICATOR.larval_damage_pct.value(r)).toBeCloseTo(m.harvested_larvae_pct.values[1] + m.rotten_larvae_pct.values[1] + m.remaining_larvae_pct.values[1]);
+  });
+
+  it("un plan garde l'invasion et le régime propres à chaque scénario", () => {
+    const res = { scenarios: [
+      scenario({ key: "strawberry::inv=90:90::rem=first::b=4500::every_3", budget: 4500, invasion: { preset: "faible", wild: 90, females: 90 }, remating: "first" }),
+      scenario({ key: "strawberry::inv=300:300::rem=preference::b=9000::every_3", invasion: { preset: "moyenne", wild: 300, females: 300 }, remating: "preference" }),
+    ] } as unknown as Results;
+    const d = datasetFromResults(res, { config } as Experiment, meta);
+    expect(d.invasions).toEqual(["Faible (90 W : 90 F)", "Moyenne (300 W : 300 F)"]);
+    expect(d.regimes).toEqual(["preference", "first"]);
+    expect(d.budgets).toEqual([4500, 9000]);
+    expect(d.strategies).toHaveLength(1);   // même stratégie dans toutes les cellules
+  });
+
+  it("deux variantes d'une même clé de stratégie restent distinctes, couleurs différentes", () => {
+    const res = { scenarios: [
+      scenario({ key: "strawberry::periodic|interval=4", strategy_key: "periodic", strategy_id: "periodic|interval=4", strategy_label: "J+4" }),
+      scenario({ key: "strawberry::periodic|interval=5", strategy_key: "periodic", strategy_id: "periodic|interval=5", strategy_label: "J+5" }),
+    ] } as unknown as Results;
+    const d = datasetFromResults(res, { config } as Experiment, meta);
+    expect(d.strategies.map((s) => s.label)).toEqual(["J+4", "J+5"]);
+    expect(new Set(d.strategies.map((s) => s.color)).size).toBe(2);
+  });
+});
+
+describe("plan factoriel de référence", () => {
+  it("les noms de stratégie du notebook deviennent les clés du moteur", () => {
+    const d = datasetFromReference([{ Crop: "cherry", Invasion: "Forte (900 W : 900 F)", Budget: 0, Remating: "first", Strategy: "No TIS", Replicate: 0 },
+      { Crop: "cherry", Invasion: "Faible (90 W : 90 F)", Budget: 4500, Remating: "first", Strategy: "Every 3 days", Replicate: 1 }], meta);
+    expect(d.strategies.map((s) => s.id)).toEqual(["no_tis", "every_3"]);
+    expect(d.invasions).toEqual(["Faible (90 W : 90 F)", "Forte (900 W : 900 F)"]);
+    expect(d.nRep).toBe(2);
+  });
+});
+
+describe("plan et libellés", () => {
+  it("planSize ramène les champs uniques en listes", () => {
+    expect(planSize(config)).toEqual({ budgets: [9000], invasions: [config.invasion], rematings: ["preference"] });
+    expect(planSize({ ...config, budgets: [4500, 9000] }).budgets).toEqual([4500, 9000]);
+  });
+  it("le libellé ne mentionne que les dimensions qui varient", () => {
+    const p = { crop: "strawberry", strategy_label: "J+3", is_control: false, budget: 4500, invasion: { preset: "faible", wild: 90, females: 90 }, remating: "first" };
+    expect(scenarioLabel(p, config, meta)).toBe("Fraise · J+3");
+    expect(scenarioLabel(p, { ...config, budgets: [4500, 9000], rematings: ["preference", "first"] }, meta)).toBe("Fraise · J+3 · 4\u202f500 stériles · Monandrie");
+  });
+  it("front de Pareto : points non dominés seulement", () => {
+    expect(paretoFront([{ id: "a", x: 1, y: 5 }, { id: "b", x: 2, y: 2 }, { id: "c", x: 3, y: 3 }, { id: "d", x: 5, y: 1 }])).toEqual(["a", "b", "d"]);
+  });
+});

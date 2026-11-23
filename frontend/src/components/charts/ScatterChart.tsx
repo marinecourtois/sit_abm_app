@@ -28,8 +28,8 @@ export const ScatterChart = forwardRef<SVGSVGElement | null, ScatterProps>(funct
     <div ref={wrap} className="relative">
       <svg ref={ref} viewBox={`0 0 ${w} ${h}`} width="100%" height={h} role="img" aria-label={p.ariaLabel}>
         <g transform={`translate(${M.left},${M.top})`}>
-          {y.ticks(6).map((t) => <g key={"y" + t}><line x1={0} x2={iw} y1={y(t)} y2={y(t)} stroke="#E3E8E1" /><text x={-9} y={y(t)} dy="0.32em" textAnchor="end" fontSize={11} className="tnum" fill="#1B201C">{fmt(t, 0)}</text></g>)}
-          {x.ticks(8).map((t) => <g key={"x" + t}><line y1={0} y2={ih} x1={x(t)} x2={x(t)} stroke="#EEF1EC" /><text x={x(t)} y={ih + 18} textAnchor="middle" fontSize={11} className="tnum" fill="#1B201C">{fmt(t, 0)}</text></g>)}
+          {y.ticks(6).map((t, _i, a) => <g key={"y" + t}><line x1={0} x2={iw} y1={y(t)} y2={y(t)} stroke="#E3E8E1" /><text x={-9} y={y(t)} dy="0.32em" textAnchor="end" fontSize={11} className="tnum" fill="#1B201C">{fmt(t, tickDigits(a))}</text></g>)}
+          {x.ticks(8).map((t, _i, a) => <g key={"x" + t}><line y1={0} y2={ih} x1={x(t)} x2={x(t)} stroke="#EEF1EC" /><text x={x(t)} y={ih + 18} textAnchor="middle" fontSize={11} className="tnum" fill="#1B201C">{fmt(t, tickDigits(a))}</text></g>)}
           <line x1={0} x2={iw} y1={ih} y2={ih} stroke="#1B201C" /><line x1={0} x2={0} y1={0} y2={ih} stroke="#1B201C" />
           {front.length > 1 && <path d={"M" + front.map((d) => `${x(d.x)},${y(d.y)}`).join("L")} fill="none" stroke="#1B201C" strokeWidth={1.3} strokeDasharray="5 3" />}
           {p.points.map((d, idx) => {
@@ -58,3 +58,9 @@ export const ScatterChart = forwardRef<SVGSVGElement | null, ScatterProps>(funct
     </div>
   );
 });
+
+/** Décimales nécessaires pour que deux graduations voisines ne s'affichent pas identiques. */
+export function tickDigits(ticks: number[]): number {
+  const step = ticks.length > 1 ? Math.abs(ticks[1] - ticks[0]) : 1;
+  return step > 0 && step < 1 ? Math.min(3, Math.ceil(-Math.log10(step) - 1e-9)) : 0;
+}

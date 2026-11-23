@@ -22,7 +22,7 @@ from tis_engine.parameters import MIN_REPLICATES, INVASION_PRESETS, biology_defa
 from tis_engine.runner import STRATEGIES
 
 from . import APP_VERSION, jobs, store
-from .schemas import ExperimentConfig, ExperimentCreate, config_hash, count_seasons, validate_config
+from .schemas import ExperimentConfig, ExperimentCreate, Invasion, config_hash, count_seasons, invasion_name, validate_config
 
 REF = store.DATA / "reference"
 (store.DATA / "factorial").mkdir(exist_ok=True)
@@ -300,9 +300,9 @@ def export(eid: str, format: str = Query("json")):
     if format == "json":
         return _download(_results_json(e, r), f"{name}.json", "application/json")
     if format == "csv-metrics":
-        return _download(_metrics_csv(name, r), f"{name}-{format}.csv", "text/csv")
+        return _download(_metrics_csv(name, r, e["config"]), f"{name}-{format}.csv", "text/csv")
     if format == "csv-series":
-        return _download(_series_csv(name, r), f"{name}-{format}.csv", "text/csv")
+        return _download(_series_csv(name, r, e["config"]), f"{name}-{format}.csv", "text/csv")
     if format == "archive":
         return Response(_archive(e, r), media_type="application/zip",
                         headers={"Content-Disposition": f'attachment; filename="{name}-archive.zip"'})
@@ -319,26 +319,37 @@ def _results_json(e, r) -> str:
     return json.dumps({"metadata": _metadata(e), "config": e["config"], "versions": versions(), "results": r}, ensure_ascii=False)
 
 
-def _metrics_csv(name, r) -> str:
+_CELL_COLS = ["crop", "invasion", "wild", "females", "remating", "strategy", "budget"]
+
+
+def _cell(sc, cfg) -> list:
+    """Identification d'un scénario : culture, invasion, régime, stratégie, budget (plan ou valeurs uniques)."""
+    inv = sc.get("invasion") or cfg["invasion"]
+    return [sc["crop"], invasion_name(Invasion(**inv)), inv["wild"], inv["females"], sc.get("remating") or cfg["remating"],
+            sc["strategy_label"], sc["budget"]]
+
+
+def _metrics_csv(name, r, cfg) -> str:
     buf = io.StringIO()
     w = csv.writer(buf)
     keys = list(r["scenarios"][0]["metrics"])
-    w.writerow(["experiment", "crop", "strategy", "budget", "replicate", "seed", *keys])
+    w.writerow(["experiment", *_CELL_COLS, "replicate", "seed", *keys])
     for sc in r["scenarios"]:
+        cell = _cell(sc, cfg)
         for i, seed in enumerate(sc["seeds"]):
-            w.writerow([name, sc["crop"], sc["strategy_label"], sc["budget"], i, seed,
-                        *[sc["metrics"][k]["values"][i] for k in keys]])
+            w.writerow([name, *cell, i, seed, *[sc["metrics"][k]["values"][i] for k in keys]])
     return buf.getvalue()
 
 
-def _series_csv(name, r) -> str:
+def _series_csv(name, r, cfg) -> str:
     buf = io.StringIO()
     w = csv.writer(buf)
     vars_ = [v for v in r["series_vars"] if v != "Time"]
-    w.writerow(["experiment", "crop", "strategy", "day", *[f"{v}_{s}" for v in vars_ for s in ("mean", "sd")]])
+    w.writerow(["experiment", *_CELL_COLS, "day", *[f"{v}_{s}" for v in vars_ for s in ("mean", "sd")]])
     for sc in r["scenarios"]:
+        cell = _cell(sc, cfg)
         for i, t in enumerate(sc["series"]["Time"]):
-            w.writerow([name, sc["crop"], sc["strategy_label"], t,
+            w.writerow([name, *cell, t,
                         *[x for v in vars_ for x in ((sc["series"][v]["mean"][i], sc["series"][v]["sd"][i]) if v in sc["series"] else ("", ""))]])
     return buf.getvalue()
 
@@ -350,8 +361,8 @@ def _archive(e, r) -> bytes:
     files = {
         "protocole.json": _protocol_json(e),
         "resultats.json": _results_json(e, r),
-        "metriques_par_repetition.csv": _metrics_csv(name, r),
-        "series_journalieres.csv": _series_csv(name, r),
+        "metriques_par_repetition.csv": _metrics_csv(name, r, e["config"]),
+        "series_journalieres.csv": _series_csv(name, r, e["config"]),
     }
     data = {k: v.encode("utf-8") for k, v in files.items()}
     rt = e.get("runtime") or {}

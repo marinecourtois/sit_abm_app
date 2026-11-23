@@ -30,9 +30,22 @@ En production (`make serve`), elle est désactivée : aucune documentation n'est
   "replicates": 10,                           // 10 (minimum de l'étude) à 50
   "seed": 42,                                 // graine de base ; répétition r → seed + 1000·r
   "include_control": true,                    // ajoute le témoin sans TIS (même graines)
-  "biology": { "eta": 0.8, "lifespan_sterile": 7.0, "...": "..." }   // TOUTES les clés de /api/meta
+  "biology": { "eta": 0.8, "lifespan_sterile": 7.0, "...": "..." },  // TOUTES les clés de /api/meta
+
+  // Plan (1.7.0, facultatif) : listes croisées dans la même expérience. Absentes ou null :
+  // la valeur unique ci-dessus. Une liste remplace la valeur unique correspondante.
+  "budgets": [4500, 9000, 18000],
+  "invasions": [{ "preset": "faible", "wild": 90, "females": 90 }, { "preset": "forte", "wild": 900, "females": 900 }],
+  "rematings": ["preference", "first"]
 }
 ```
+
+**Plan d'expérience.** Les scénarios sont culture × invasion × régime × (témoin + stratégie ×
+budget) : le témoin (budget 0) est calculé une fois par culture, invasion et régime, et sert de
+référence appariée à tous les budgets de sa cellule. Toutes les cellules utilisent les mêmes
+graines (`seed + 1000·r`). Validation : valeurs en double refusées, au plus `MAX_SEASONS`
+(10 000) saisons par expérience (`backend/app/schemas.py`). Une configuration sans champ de plan
+garde l'empreinte (`config_hash`) et les clés de scénario d'avant la 1.7.0.
 
 Clés de stratégie : `no_tis`, `daily`, `every_3`, `every_7`, `front_70`, `front_100`
 (stratégies du notebook) et `periodic`, `front_loaded` (calendriers personnalisés).
@@ -71,7 +84,7 @@ Statuts : `ready`, `queued`, `running`, `completed`, `cancelled`, `error`.
   "seq": 1834,                       // curseur : à renvoyer dans ?since= au prochain appel
   "elapsed_s": 5.2, "eta_s": 7.1,    // eta = écoulé / done × (total − done) ; null avant la 1re saison et après la fin
   "live": { "strawberry::daily": { "day": 63, "from": 58, "rows": [ {"Wild_males": …, …}, … ] } },
-  "log": [{"t": "…", "msg": "…"}], "plan": [{"key", "crop", "strategy_label", "is_control", "budget"}]
+  "log": [{"t": "…", "msg": "…"}], "plan": [{"key", "crop", "strategy_label", "is_control", "budget", "invasion", "remating"}]
 }
 ```
 
@@ -89,16 +102,17 @@ Statuts : `ready`, `queued`, `running`, `completed`, `cancelled`, `error`.
   "experiment_id": "…", "schema_version": 1, "computed_at": "…", "duration_s": 7.1,
   "series_vars": ["Time", "Wild_males", …, "Wild_adults_vs_control"],
   "scenarios": [{
-    "key": "strawberry::every_3", "crop": "strawberry",
-    "strategy": {"key": "every_3"}, "strategy_key": "every_3", "strategy_label": "J+3",
+    "key": "strawberry::every_3", "crop": "strawberry",   // plan : "strawberry::inv=90:90::rem=first::b=4500::every_3"
+    "strategy": {"key": "every_3"}, "strategy_key": "every_3", "strategy_id": "every_3", "strategy_label": "J+3",
     "is_control": false, "budget": 9000,
+    "invasion": {"preset": "moyenne", "wild": 300, "females": 300}, "remating": "preference",   // depuis 1.7.0
     "schedule": {"0": 265, "3": 265, …},
     "seeds": [42, 1042, 2042],
     "metrics": { "larval_damage_pct": {"mean", "sd", "min", "max", "n", "values": [...]}, … },
     "series":  { "Time": [0, 1, …], "Wild_males": {"mean": [...], "sd": [...]}, … },
     "events":  [{"type": "release" | "harvest_start" | "harvest_end" | "peak" | "larvae_peak" | "threshold" | "threshold_down", "day", "label"}],
     "vs_control": { "larval_damage_pct": {"mean", "sd", "n", "values"}, "larvae_produced": …, "rotten_pct": …,
-                    "wild_adults_final": …, "harvested_clean_pct": … }   // variations relatives appariées, en %
+                    "wild_adults_final": …, "harvested_clean_pct": … }   // variations relatives appariées, en %, vs le témoin de la même culture, invasion et régime
   }]
 }
 ```

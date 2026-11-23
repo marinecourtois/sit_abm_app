@@ -37,6 +37,11 @@ class ExperimentConfig(BaseModel):
     seed: int = 42
     include_control: bool = True
     biology: dict = Field(default_factory=biology_defaults)
+    # Plan (1.7.0) : plusieurs budgets, invasions ou régimes croisés dans la même expérience, avec
+    # les mêmes graines (nombres aléatoires communs). None : la valeur unique ci-dessus.
+    budgets: Optional[list[int]] = None
+    invasions: Optional[list[Invasion]] = None
+    rematings: Optional[list[str]] = None
 
 
 class ExperimentCreate(BaseModel):
@@ -69,8 +74,39 @@ def strategy_label(s: StrategySpec) -> str:
     return STRATEGY_META.get(s.key, {}).get("label", s.key)
 
 
+PLAN_FIELDS = ("budgets", "invasions", "rematings")
+MAX_SEASONS = 10_000
+
+
 def config_hash(cfg: ExperimentConfig) -> str:
-    return hashlib.sha256(json.dumps(cfg.model_dump(), sort_keys=True).encode()).hexdigest()[:16]
+    d = cfg.model_dump()
+    for k in PLAN_FIELDS:   # champs de plan absents : même empreinte qu'avant la 1.7.0
+        if d[k] is None:
+            del d[k]
+    return hashlib.sha256(json.dumps(d, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def plan_budgets(cfg: ExperimentConfig) -> list[int]:
+    return list(cfg.budgets) if cfg.budgets else [cfg.budget]
+
+
+def plan_invasions(cfg: ExperimentConfig) -> list[Invasion]:
+    return list(cfg.invasions) if cfg.invasions else [cfg.invasion]
+
+
+def plan_rematings(cfg: ExperimentConfig) -> list[str]:
+    return list(cfg.rematings) if cfg.rematings else [cfg.remating]
+
+
+def is_plan(cfg: ExperimentConfig) -> bool:
+    return any(len(f(cfg)) > 1 for f in (plan_budgets, plan_invasions, plan_rematings))
+
+
+def invasion_name(inv: Invasion) -> str:
+    p = INVASION_PRESETS.get(inv.preset or "")
+    if p and (p["wild"], p["females"]) == (inv.wild, inv.females):
+        return p["label"]
+    return f"Personnalisée ({inv.wild} W : {inv.females} F)"
 
 
 def crop_label(crop: str) -> str:
@@ -79,8 +115,10 @@ def crop_label(crop: str) -> str:
 
 
 def count_seasons(cfg: ExperimentConfig) -> int:
-    n_strat = len(cfg.strategies) + (1 if cfg.include_control and not any(s.key == "no_tis" for s in cfg.strategies) else 0)
-    return len(cfg.crops) * n_strat * cfg.replicates
+    treated = sum(1 for s in cfg.strategies if s.key != "no_tis")
+    control = 1 if cfg.include_control or any(s.key == "no_tis" for s in cfg.strategies) else 0
+    per_cell = control + treated * len(plan_budgets(cfg))   # le témoin (budget 0) est commun à tous les budgets
+    return len(cfg.crops) * len(plan_invasions(cfg)) * len(plan_rematings(cfg)) * per_cell * cfg.replicates
 
 
 def validate_config(cfg: ExperimentConfig, history: list[dict] | None = None) -> dict:
@@ -89,21 +127,31 @@ def validate_config(cfg: ExperimentConfig, history: list[dict] | None = None) ->
     for c in cfg.crops:
         if c not in CROPS:
             errors.append(f"Culture inconnue du moteur : « {c} ».")
-    if cfg.remating not in REMATING_MODES:
-        errors.append(f"Régime de réaccouplement inconnu : « {cfg.remating} ».")
+    for r in plan_rematings(cfg):
+        if r not in REMATING_MODES:
+            errors.append(f"Régime de réaccouplement inconnu : « {r} ».")
     if not MIN_REPLICATES <= cfg.replicates <= MAX_REPLICATES:
         errors.append(f"Le nombre de répétitions doit être compris entre {MIN_REPLICATES} et {MAX_REPLICATES} "
                       f"(minimum de l'étude : {MIN_REPLICATES} répétitions par scénario).")
-    if cfg.budget < 0 or cfg.budget > 1_000_000:
-        errors.append("Le budget (nombre total de mâles stériles lâchés) doit être compris entre 0 et 1 000 000.")
-    if cfg.invasion.wild < 0 or cfg.invasion.females < 0:
-        errors.append("Les effectifs initiaux d'insectes doivent être positifs.")
-    if cfg.invasion.wild + cfg.invasion.females > 200_000:
-        errors.append("Population initiale supérieure à 200 000 individus : non prise en charge.")
-    if cfg.invasion.preset and cfg.invasion.preset in INVASION_PRESETS:
-        p = INVASION_PRESETS[cfg.invasion.preset]
-        if (p["wild"], p["females"]) != (cfg.invasion.wild, cfg.invasion.females):
-            warnings.append("Les effectifs diffèrent du préréglage choisi : ils seront utilisés tels quels.")
+    for b in plan_budgets(cfg):
+        if b < 0 or b > 1_000_000:
+            errors.append(f"Budget {b} : le budget (nombre total de mâles stériles lâchés) doit être compris entre 0 et 1 000 000.")
+    for inv in plan_invasions(cfg):
+        if inv.wild < 0 or inv.females < 0:
+            errors.append("Les effectifs initiaux d'insectes doivent être positifs.")
+        if inv.wild + inv.females > 200_000:
+            errors.append("Population initiale supérieure à 200 000 individus : non prise en charge.")
+        if inv.preset and inv.preset in INVASION_PRESETS:
+            p = INVASION_PRESETS[inv.preset]
+            if (p["wild"], p["females"]) != (inv.wild, inv.females):
+                warnings.append(f"Invasion « {p['label']} » : les effectifs diffèrent du préréglage, ils seront utilisés tels quels.")
+    for name, values in (("budgets", plan_budgets(cfg)), ("régimes", plan_rematings(cfg)),
+                         ("invasions", [(i.wild, i.females) for i in plan_invasions(cfg)])):
+        if len(set(values)) != len(values):
+            errors.append(f"Plan : {name} en double.")
+    if count_seasons(cfg) > MAX_SEASONS:
+        errors.append(f"Plan de {count_seasons(cfg):,} saisons : au-delà de {MAX_SEASONS:,} saisons par expérience. ".replace(",", " ")
+                      + "Réduisez le nombre de budgets, d'invasions, de régimes, de stratégies ou de répétitions.")
     if not 0 <= cfg.seed < 2**31:
         errors.append("La graine aléatoire doit être un entier entre 0 et 2³¹−1.")
 
@@ -140,23 +188,26 @@ def validate_config(cfg: ExperimentConfig, history: list[dict] | None = None) ->
                 if s.maintenance_interval is not None and not 0 <= s.maintenance_interval <= L:
                     errors.append(f"{strategy_label(s)} : intervalle de maintenance entre 0 et {L} jours.")
                     continue
-                try:
-                    sched = build_schedule(s.model_dump(exclude_none=True), cfg.budget, L)
-                except (ValueError, ZeroDivisionError) as e:
-                    errors.append(f"{strategy_label(s)} : calendrier impossible ({e}).")
-                    continue
-                n_days = sum(1 for v in sched.values() if v > 0)
-                if s.key != "no_tis" and cfg.budget == 0:
-                    warnings.append(f"{strategy_label(s)} : budget nul, aucun lâcher (équivaut au témoin).")
-                if s.key != "no_tis" and 0 < cfg.budget < len(sched):
-                    warnings.append(f"{strategy_label(s)} ({crop}) : budget inférieur au nombre de jours de lâcher, certains jours reçoivent 0 stérile.")
-                if s.key != "no_tis" and 0 < n_days <= 4:
-                    days = ", ".join(f"J{d}" for d in sorted(int(k) for k, v in sched.items() if v))
-                    warnings.append(f"{crop_label(crop)} · {strategy_label(s)} : seulement {n_days} lâcher{'s' if n_days > 1 else ''} "
-                                    f"sur une saison de {L} jours ({days}).")
-                scenarios.append({"crop": crop, "strategy": strategy_label(s), "strategy_key": s.key, "release_days": n_days,
-                                  "total_released": sum(sched.values()), "season_length": L,
-                                  "schedule": {str(k): v for k, v in sched.items() if v}})
+                for budget in plan_budgets(cfg):
+                    try:
+                        sched = build_schedule(s.model_dump(exclude_none=True), budget, L)
+                    except (ValueError, ZeroDivisionError) as e:
+                        errors.append(f"{strategy_label(s)} : calendrier impossible ({e}).")
+                        break
+                    n_days = sum(1 for v in sched.values() if v > 0)
+                    if s.key != "no_tis" and budget == 0:
+                        warnings.append(f"{strategy_label(s)} : budget nul, aucun lâcher (équivaut au témoin).")
+                    if s.key != "no_tis" and 0 < budget < len(sched):
+                        warnings.append(f"{strategy_label(s)} ({crop}, {budget}) : budget inférieur au nombre de jours de lâcher, certains jours reçoivent 0 stérile.")
+                    if s.key != "no_tis" and 0 < n_days <= 4:
+                        days = ", ".join(f"J{d}" for d in sorted(int(k) for k, v in sched.items() if v))
+                        warnings.append(f"{crop_label(crop)} · {strategy_label(s)} : seulement {n_days} lâcher{'s' if n_days > 1 else ''} "
+                                        f"sur une saison de {L} jours ({days}).")
+                    scenarios.append({"crop": crop, "strategy": strategy_label(s), "strategy_key": s.key, "budget": budget,
+                                      "release_days": n_days, "total_released": sum(sched.values()), "season_length": L,
+                                      "schedule": {str(k): v for k, v in sched.items() if v}})
+                    if s.key == "no_tis":
+                        break
 
     seasons = count_seasons(cfg)
     estimate = {"seasons": seasons, "seconds": None,
@@ -168,5 +219,6 @@ def validate_config(cfg: ExperimentConfig, history: list[dict] | None = None) ->
         estimate = {"seasons": seasons, "seconds": round(seasons * rate, 1),
                     "basis": f"Mesuré : {rate:.2f}".replace(".", ",") + f" s par saison en moyenne sur {len(runs)} exécution{'s' if len(runs) > 1 else ''} "
                              f"terminée{'s' if len(runs) > 1 else ''} de ce serveur. La durée réelle dépend de la culture et des effectifs."}
+    warnings = list(dict.fromkeys(warnings))   # un avertissement par cause, pas un par budget
     return {"ok": not errors, "errors": errors, "warnings": warnings, "scenarios": scenarios,
             "estimate": estimate}
