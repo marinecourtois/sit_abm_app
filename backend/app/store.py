@@ -40,6 +40,7 @@ def init():
             engine_version TEXT, params_version TEXT, schema_version INTEGER,
             seed INTEGER, created_at TEXT, started_at TEXT, finished_at TEXT,
             error TEXT, parent_id TEXT, tags TEXT, duration_s REAL)""")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_experiments_created ON experiments(created_at)")
         cols = {r[1] for r in c.execute("PRAGMA table_info(experiments)")}
         if "runtime" not in cols:   # migration : versions complètes de l'environnement d'exécution
             c.execute("ALTER TABLE experiments ADD COLUMN runtime TEXT")
@@ -115,6 +116,12 @@ def delete(eid):
 def save_results(eid, results: dict):
     with gzip.open(RESULTS / f"{eid}.json.gz", "wt", encoding="utf-8") as f:
         json.dump(results, f, separators=(",", ":"))
+
+
+def results_gz(eid) -> bytes | None:
+    """Résultats tels que stockés (JSON compressé gzip) : servis sans décompression ni re-sérialisation."""
+    p = RESULTS / f"{eid}.json.gz"
+    return p.read_bytes() if p.exists() else None
 
 
 def load_results(eid) -> dict | None:

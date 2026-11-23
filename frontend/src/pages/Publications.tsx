@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Download, FileJson, FileText, Printer } from "../icons";
+import { Archive, Download, FileJson, FileText, Printer } from "../icons";
 import { api, type Experiment, type Results, type Scenario } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { useMeta } from "../lib/meta";
@@ -23,6 +23,7 @@ export function ExportDialog({ exp }: { exp: Experiment }) {
       <a className={a} href={api.exportUrl(exp.id, "csv-series")}><Download size={14} />CSV — séries journalières</a>
       <a className={a} href={api.exportUrl(exp.id, "json")}><FileJson size={14} />JSON — expérience complète</a>
       <a className={a} href={api.exportUrl(exp.id, "protocol")}><FileJson size={14} />JSON — protocole reproductible</a>
+      <a className={a} href={api.exportUrl(exp.id, "archive")}><Archive size={14} />ZIP — archive de reproductibilité (tout + empreintes SHA-256)</a>
       <button className={a} onClick={() => window.print()}><Printer size={14} />PDF — rapport (impression)</button>
       <span className="self-center text-[11.5px] text-muted">SVG / PNG : menu « Exporter » de chaque figure.</span>
     </div>

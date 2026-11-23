@@ -13,6 +13,11 @@ sont marquées « APP » et ne changent aucun nombre quand les valeurs par défa
           pour l'indicateur « proportion de piqûres non viables ».
   APP 4 : CropParameters.final_harvest remplace le test `crop.name == "cherry"` (même comportement).
   APP 5 : constantes biologiques fixes nommées (EGGS_POISSON_MEAN, LARVAL_MORTALITY…), mêmes valeurs.
+  APP 6 : performance uniquement (application 1.6.0). `Fruit_Agent` déclare `__slots__`, et
+          `advance_day` met à jour directement le statut des fruits jamais piqués encore dans leur
+          durée de vie naturelle : pour eux `check_status` ne fait aucun tirage aléatoire et se
+          réduit à « mûr si âge ≥ maturation ». Même ordre de tirages, mêmes nombres ; ≈ 2× plus
+          rapide sur la cerise (90 000 fruits vérifiés chaque jour).
 """
 from __future__ import annotations
 
@@ -21,7 +26,7 @@ from dataclasses import dataclass, asdict
 
 import modelly
 
-ENGINE_VERSION = "1.1.0"          # version de l'extraction (ce module)
+ENGINE_VERSION = "1.2.0"          # version de l'extraction (ce module)
 NOTEBOOK_REFERENCE = "Notebook_ABM_TIS_Optimise_Modelly.ipynb"
 ECHELLE = 30
 
@@ -261,6 +266,13 @@ class Females_Agent(modelly.Agent):
 
 
 class Fruit_Agent:
+    __slots__ = (  # APP 6
+        "unique_id", "model", "crop", "capacity", "young_puncture_probability", "rotten_puncture_probability",
+        "rotten_threshold", "larva_age_weight", "rot_hazard_control", "rot_hazard_sterile", "rot_hazard_fertile",
+        "creation_date", "first_oviposition_date", "maturation_age", "natural_lifespan", "slots", "n_fertile",
+        "n_sterile", "n_alive_fertile", "sum_creation", "status", "removed",
+    )
+
     def __init__(
         self, model, crop_parameters, capacity=20,
         young_puncture_probability=0.30, rotten_puncture_probability=0.10,
@@ -511,7 +523,19 @@ class RematingModel(modelly.Model):
         for a in agents:
             if a in self.agents: a.step()
 
-        for f in self.fruits: f.check_status()
+        t = self.time
+        for f in self.fruits:   # APP 6 : chemin rapide, strictement équivalent à f.check_status()
+            st = f.status
+            if st == "rotten":
+                continue
+            if f.first_oviposition_date is None:
+                age = t - f.creation_date
+                if age < f.natural_lifespan:
+                    harvestable = age >= f.maturation_age
+                    if (st == "harvestable") != harvestable:
+                        f.status = "harvestable" if harvestable else "young"
+                    continue
+            f.check_status()
         if self.crop.harvest_frequency > 0 and self.time > 0 and self.time % self.crop.harvest_frequency == 0: self.harvest()
         if self.crop.final_harvest and self.time == self.crop.season_length - 1: self.harvest()
         if self.crop.prophylaxis_frequency > 0 and self.time > 0 and self.time % self.crop.prophylaxis_frequency == 0: self.prophylaxis()

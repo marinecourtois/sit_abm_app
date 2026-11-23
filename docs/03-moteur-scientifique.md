@@ -19,7 +19,7 @@ pour les modifications les plus courantes.
 | 5 — calendriers | `schedules.py` | `continuous_schedule`, `periodic_schedule`, `front_loaded_schedule`, `make_strategies` |
 | 5 — `_run_factorial_season` | `runner.py` | Métriques de fin de saison |
 
-Trois ajouts, marqués `APP 1`, `APP 2`, `APP 3` dans `model.py`, ne changent **aucun
+Six ajouts, marqués `APP 1` à `APP 6` dans `model.py`, ne changent **aucun
 nombre** avec les valeurs par défaut :
 
 | Marque | Ajout | Pourquoi |
@@ -29,6 +29,7 @@ nombre** avec les valeurs par défaut :
 | APP 3 | Compteurs cumulés de pontes fertiles / stériles | Indicateur « piqûres stériles » ; lecture seule |
 | APP 4 | `CropParameters.final_harvest` remplace le test `crop.name == "cherry"` | Comportement identique, généralisable à d'autres cultures |
 | APP 5 | Constantes fixes nommées (`EGGS_POISSON_MEAN`, `RF_FERTILE`, `LARVAL_MORTALITY`, `SEX_RATIO`…) | **Source unique** : le code les utilise et l'interface les affiche (page Protocole), sans recopie |
+| APP 6 | `Fruit_Agent.__slots__` ; dans `advance_day`, statut des fruits **jamais piqués** et encore dans leur durée de vie naturelle mis à jour directement (« mûr si âge ≥ maturation ») au lieu d'appeler `check_status` | Performance (11 à 21 % par saison). Pour ces fruits, `check_status` ne tire aucun nombre aléatoire : l'ordre des tirages est identique. Tout autre fruit passe toujours par `check_status` |
 
 ### Source unique de vérité
 
@@ -126,6 +127,13 @@ Trois numéros de version accompagnent chaque expérience :
 | `SCHEMA_VERSION` | `tis_engine/parameters.py` | la structure de la configuration ou des résultats change |
 
 Les expériences existantes conservent les versions avec lesquelles elles ont été calculées.
+
+Historique de `ENGINE_VERSION` : **1.1.0** (extraction du notebook, APP 1 à 5) → **1.2.0**
+(application 1.6.0, APP 6, performance seule : mêmes nombres au bit près).
+
+La version de l'**application** (`APP_VERSION`, `backend/app/__init__.py`) est distincte : elle
+suit les évolutions de l'interface et de l'API (voir `CHANGELOG.md`) et est enregistrée dans
+`runtime.app_version` de chaque nouvelle expérience.
 
 ---
 

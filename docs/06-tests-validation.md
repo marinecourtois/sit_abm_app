@@ -8,8 +8,8 @@ make test          # tout, directement : pytest (backend) puis Vitest (frontend)
 
 | Suite | Outil | Fichiers | Tests |
 |---|---|---|---|
-| Backend : non-régression, API, contrat | pytest (`backend/tests/`) | 3 | 46 |
-| Frontend : unitaires, composants, contrat | Vitest + Testing Library (`frontend/src/**/*.test.ts(x)`) | 9 | 70 |
+| Backend : non-régression, API, contrat | pytest (`backend/tests/`) | 3 | 52 |
+| Frontend : unitaires, composants, contrat | Vitest + Testing Library (`frontend/src/**/*.test.ts(x)`) | 11 | 83 |
 
 ## SmartTest : ne lancer que les tests affectés
 
@@ -65,6 +65,10 @@ error ».
 | `test_cell9_quick_test` | Sortie affichée de la cellule de test rapide | Valeurs identiques à l'arrondi affiché |
 | `test_factorial_bit_exact` | 26 lignes de `resultats_experience_factorielle.csv` | **Égalité exacte** des 13 colonnes (aucune tolérance) |
 | `test_dynamics_bit_exact` | `dynamiques_temporelles_journalieres.csv` | Égalité exacte des 11 séries, jour par jour |
+| `test_worker_skips_seasons_of_cancelled_runs` | — | Une saison d'une expérience déjà annulée n'est pas calculée et n'émet rien |
+
+Ces tests protègent aussi les **optimisations** du moteur (APP 6) : une optimisation qui
+ajoute, retire ou réordonne un tirage aléatoire les fait échouer.
 
 Les graines utilisées sont celles du notebook (`42 + 1000·rep + 7·B + 13·len(stratégie) +
 19·len(invasion)` pour le plan factoriel, `42 + 1000·rep + 17·len(stratégie)` pour les
@@ -86,8 +90,10 @@ dynamiques).
 | `components/science.test.tsx` | Cartes botaniques générées depuis `CropParameters` (et suivent une modification des paramètres) |
 | `components/charts/TimeSeriesChart.test.tsx` | Une courbe par série, bande ± écart-type seulement si elle existe, jamais d'axe négatif pour des données positives, accessibilité |
 | `components/ui.test.tsx` | Segmented (souris, clavier, ARIA), bornes de NumberField, libellés de statut |
-| `icons/icons.test.tsx` | Les 42 icônes : grille 24 × 24, `currentColor`, décoratives par défaut, nommées avec `aria-label` |
-| `lib/api.test.ts` | Messages d'erreur du backend, configuration transmise telle quelle, URL d'export |
+| `icons/icons.test.tsx` | Les 46 icônes : grille 24 × 24, `currentColor`, décoratives par défaut, nommées avec `aria-label` |
+| `lib/api.test.ts` | Messages d'erreur du backend, configuration transmise telle quelle, URL d'export (dont l'archive), curseur `since` du flux en direct |
+| `lib/live.test.ts` | Fusion du flux incrémental (`mergeLive`) : ajout à la bonne position, aucune ligne dupliquée, scénarios absents conservés ; format des durées |
+| `components/CommandPalette.test.tsx` | Filtrage de la palette : sans accents ni casse, identifiant et mots-clés, tous les mots requis |
 | `lib/format.test.ts` | Format français, tiret (jamais zéro) pour une valeur absente, signes |
 | `lib/indicators.test.ts` | Chaque indicateur en % précise son dénominateur ; somme des fruits infestés ; écarts en points de % ; écart-type n − 1 |
 | `components/charts/exportChart.test.ts` | CSV : échappement et précision complète |
@@ -104,6 +110,11 @@ indicateur que le moteur ne calcule pas fait échouer le test Vitest **et** le t
 | `test_reproducible_and_immutable` | Même configuration → mêmes résultats ; relance d'une expérience terminée refusée ; duplication avec `parent_id` |
 | `test_cancel` | Annulation effective, aucun résultat partiel enregistré |
 | `test_exports_and_protocol_roundtrip` | Exports CSV, aller-retour export/import de protocole |
+| `test_live_stream_is_incremental_and_gapless` | Le curseur `since` ne renvoie que les nouvelles lignes ; recollées, elles forment une série sans trou ; temps écoulé publié ; flux libéré à la fin |
+| `test_queue_lists_active_runs` | `/api/queue` liste une exécution en cours avec son nombre de saisons, puis plus après l'annulation |
+| `test_results_are_served_precompressed_and_cacheable` | Résultats envoyés en gzip tels que stockés (et décompressés si le client ne l'accepte pas), cache immuable ; références compressées ; `no-store` sur le reste de l'API |
+| `test_reproducibility_archive` | L'archive contient les 5 fichiers attendus, chaque SHA-256 du LISEZMOI correspond, le protocole se réimporte à l'identique |
+| `test_health_reports_app_version` | `/api/health` renvoie `app_version` |
 
 Les tests de l'API utilisent une base et un dossier de résultats temporaires : ils ne
 touchent pas `data/app.db`.
@@ -144,10 +155,13 @@ moteur, modelly, durée, sha256). La page Analyses l'utilise automatiquement.
 
 ## Vérifications manuelles avant une livraison
 
-- [ ] `make test-all` vert (SmartTest, 116 tests).
+- [ ] `make test-all` vert (SmartTest, 135 tests).
+- [ ] `APP_VERSION` (`backend/app/__init__.py`), `frontend/package.json` et `CHANGELOG.md` à jour ; `make fixtures` si `ENGINE_VERSION` a changé.
 - [ ] `cd frontend && npx tsc -b && npx vite build` sans erreur.
 - [ ] Vue d'ensemble : l'étude de référence se calcule au démarrage et s'affiche.
-- [ ] Studio → Lancer : la page Live suit la progression puis affiche les résultats.
+- [ ] Studio → Lancer : la page Live suit la progression (temps restant, titre de l'onglet), l'indicateur d'activité de la barre latérale apparaît, puis les résultats s'affichent.
+- [ ] `Ctrl K` : la palette ouvre une page et une expérience au clavier.
+- [ ] Archive (.zip) d'une expérience terminée : `sha256sum -c` des empreintes du LISEZMOI.
 - [ ] Interrompre une simulation : statut « Interrompue », relance possible.
 - [ ] Comparaison de 2 à 4 scénarios, export CSV et SVG d'une figure.
 - [ ] Rapport (Publications) : aperçu avant impression correct (sans barre latérale).

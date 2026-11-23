@@ -25,5 +25,12 @@ describe("client de l'API", () => {
   });
   it("construit les URL d'export", () => {
     expect(api.exportUrl("abc", "csv-metrics")).toBe("/api/experiments/abc/export?format=csv-metrics");
+    expect(api.exportUrl("abc", "archive")).toBe("/api/experiments/abc/export?format=archive");
+  });
+  it("flux en direct : ne demande que les lignes postérieures au curseur", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(JSON.stringify({ live: {} }), { status: 200 }));
+    await api.live("abc", 0);
+    await api.live("abc", 42);
+    expect(spy.mock.calls.map((c) => c[0])).toEqual(["/api/experiments/abc/live", "/api/experiments/abc/live?since=42"]);
   });
 });

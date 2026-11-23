@@ -8,3 +8,11 @@ export const CROP_LABEL: Record<string, string> = { strawberry: "Fraise", cherry
 export const STATUS_LABEL: Record<string, string> = {
   ready: "Prête", queued: "En file", running: "En cours", completed: "Terminée", cancelled: "Interrompue", error: "En erreur",
 };
+/** Durée lisible : « 8 s », « 2 min 05 s », « 1 h 03 min ». */
+export const fmtDuration = (s: number | null | undefined) => {
+  if (s == null || !Number.isFinite(s)) return "—";
+  const t = Math.max(0, Math.round(s));
+  if (t < 60) return `${t} s`;
+  if (t < 3600) return `${Math.floor(t / 60)} min ${String(t % 60).padStart(2, "0")} s`;
+  return `${Math.floor(t / 3600)} h ${String(Math.floor((t % 3600) / 60)).padStart(2, "0")} min`;
+};

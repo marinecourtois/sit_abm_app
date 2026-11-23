@@ -22,16 +22,18 @@ frontend/src/
 ├── main.tsx                 routes (chargées à la demande, React.lazy), fournisseurs (méta, info-bulles, notifications)
 ├── index.css                jetons de couleur/typo (@theme), styles globaux, impression
 ├── lib/
-│   ├── api.ts               client HTTP + types miroirs des contrats backend
+│   ├── api.ts               client HTTP + types miroirs des contrats backend, mergeLive (flux incrémental)
 │   ├── meta.tsx             contexte React du registre /api/meta
 │   ├── useAsync.ts          chargement asynchrone simple
-│   ├── format.ts            nombres et dates au format français
+│   ├── format.ts            nombres, dates et durées (fmtDuration) au format français
 │   ├── colors.ts            couleurs des cultures, stratégies et séries
 │   ├── indicators.ts        indicateurs du plan factoriel : libellé, unité, définition exacte, calcul
 │   └── variables.ts         libellés/unités des séries (VARIABLES) et indicateurs (METRICS)
 ├── components/
-│   ├── layout.tsx           AppShell, ResearchSidebar, StudyHeader, StudyTabs, raccourcis
-│   ├── ui.tsx               Button, Select, Segmented, NumberField, ScientificTooltip, Tex,
+│   ├── layout.tsx           AppShell, ResearchSidebar, ActivityIndicator (useActiveRuns),
+│   │                        StudyHeader, StudyTabs, raccourcis
+│   ├── CommandPalette.tsx   palette Ctrl/⌘ K (chargée à la première ouverture), filterItems
+│   ├── ui.tsx               Button, Select, Segmented, NumberField, ScientificTooltip, Tex (KaTeX à la demande),
 │   │                        ExperimentStatus, Panel, Collapsible, EmptyState, Skeleton, Toast
 │   ├── science.tsx          BotanicalSpeciesCard, ScientificProcessDiagram, ResearchMetric,
 │   │                        UncertaintyLegend, ResearchAnnotation
@@ -188,6 +190,35 @@ classe à la liste `.is-hidden …` si elle boucle.
   sans cadre pour les panneaux latéraux.
 - Règle globale `.grid > * { min-width: 0 }` : les graphiques et tableaux se rétrécissent au
   lieu de déborder ; les tableaux larges défilent horizontalement (`.scroll-x`).
+
+## Performance du chargement
+
+- Chaque page est un fragment chargé à la demande (`React.lazy` dans `main.tsx`) ; React, Radix et
+  d3 sont des fragments partagés (`manualChunks` de `vite.config.ts`).
+- **KaTeX n'est jamais chargé à l'ouverture** : `Tex` (`ui.tsx`) importe `katex` et sa feuille de
+  style à la première formule affichée (`loadKatex`), et montre la source LaTeX en attendant.
+  N'importez pas `katex` directement ailleurs : vous le remettriez dans le fragment initial.
+- La palette de commandes est elle aussi chargée à sa première ouverture.
+- Vérifier après un build : `grep -o 'modulepreload[^>]*' dist/index.html` ne doit lister que
+  `react` et `radix`.
+
+## Suivi des calculs
+
+| Élément | Fichier | Fonctionnement |
+|---|---|---|
+| Flux en direct | `pages/LiveSimulation.tsx` | Sondage toutes les 450 ms, une requête à la fois, 3 s quand l'onglet est masqué. Envoie `since=<seq>` et fusionne avec `mergeLive` : seules les nouvelles lignes transitent |
+| Temps écoulé / restant | idem | `elapsed_s`, `eta_s` de `/live` (débit mesuré de l'exécution) ; jamais d'estimation inventée avant la première saison terminée |
+| Titre de l'onglet | idem | `42 % · TIS-XXXX — Modelly TIS` pendant le calcul ; rétabli à la fin et en quittant la page |
+| Avis de fin | idem | Toast au changement de statut ; notification système si l'utilisateur l'a demandée (« M'avertir à la fin ») et que l'onglet est masqué |
+| Indicateur d'activité | `components/layout.tsx` | `useActiveRuns` interroge `/api/queue` toutes les 2 s s'il y a des calculs, 8 s sinon, jamais onglet masqué ; réveillé immédiatement par l'évènement `tis:run-started` (émis par `api.create/run/duplicate`) |
+
+## Palette de commandes
+
+`Ctrl K` / `⌘ K` (y compris depuis un champ de saisie) ou le bouton « Rechercher… » de la barre
+latérale (évènement `tis:palette`). Elle liste les pages et toutes les expériences (chargées à
+l'ouverture) ; `filterItems` exige que chaque mot de la requête apparaisse dans le libellé,
+l'indication (identifiant, statut) ou les mots-clés, sans accents ni casse. Pour ajouter une
+entrée fixe, compléter `PAGES` dans `CommandPalette.tsx`.
 
 ## Icônes
 

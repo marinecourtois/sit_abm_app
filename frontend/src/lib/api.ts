@@ -46,7 +46,30 @@ export interface Meta {
   reference_plan: { crops: number; invasions: string[]; budgets: number[]; remating: string[]; strategies: number; replicates: number; seasons: number; sha256: string };
 }
 export interface Validation { ok: boolean; errors: string[]; warnings: string[]; scenarios: { crop: CropKey; strategy: string; strategy_key: StrategyKey; release_days: number; total_released: number; season_length: number; schedule: Record<string, number> }[]; estimate: { seasons: number; seconds: number | null; basis: string } }
-export interface LiveState { status: Status; progress: number; done?: number; total?: number; live: Record<string, { day: number; rows: Record<string, number>[] }>; log: { t: string; msg: string }[]; plan: { key: string; crop: CropKey; strategy_label: string; is_control: boolean; budget: number }[] }
+export interface LiveState {
+  status: Status; progress: number; done?: number; total?: number;
+  /** Lignes du flux en direct par scénario ; `from` = index de la première ligne renvoyée (requête incrémentale `since`). */
+  live: Record<string, { day: number; from?: number; rows: Record<string, number>[] }>;
+  /** Curseur à renvoyer dans `since` pour ne recevoir que les nouvelles lignes. */
+  seq?: number;
+  /** Temps écoulé et temps restant estimé à partir du débit mesuré de l'exécution en cours. */
+  elapsed_s?: number | null; eta_s?: number | null;
+  log: { t: string; msg: string }[]; plan: { key: string; crop: CropKey; strategy_label: string; is_control: boolean; budget: number }[];
+}
+export interface ActiveRun { id: string; short_id: string; name: string; status: Status; progress: number; done: number; total: number; elapsed_s: number | null; eta_s: number | null }
+export type ExportFormat = "json" | "csv-metrics" | "csv-series" | "protocol" | "archive";
+
+/** Fusionne une réponse incrémentale du flux en direct dans l'état déjà reçu. */
+export function mergeLive(prev: LiveState | null, next: LiveState): LiveState {
+  if (!prev) return next;
+  const live: LiveState["live"] = { ...prev.live };
+  for (const [k, v] of Object.entries(next.live)) {
+    const old = prev.live[k]?.rows ?? [];
+    const from = v.from ?? 0;
+    live[k] = { day: v.day, rows: from === 0 ? v.rows : [...old.slice(0, from), ...v.rows] };
+  }
+  return { ...next, live };
+}
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...init });
@@ -58,23 +81,27 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   return r.json();
 }
 
+/** Prévient l'indicateur d'activité qu'un calcul vient d'être lancé (pas d'attente du prochain sondage). */
+const started = <T,>(p: Promise<T>) => p.then((v) => { if (typeof window !== "undefined") window.dispatchEvent(new Event("tis:run-started")); return v; });
+
 export const api = {
   meta: () => req<Meta>("/api/meta"),
   overview: () => req<{ experiment: Experiment | null; results: Results | null }>("/api/overview"),
   experiments: (q = "") => req<Experiment[]>(`/api/experiments${q ? `?q=${encodeURIComponent(q)}` : ""}`),
   experiment: (id: string) => req<Experiment>(`/api/experiments/${id}`),
   results: (id: string) => req<Results>(`/api/experiments/${id}/results`),
-  live: (id: string) => req<LiveState>(`/api/experiments/${id}/live`),
+  live: (id: string, since = 0) => req<LiveState>(`/api/experiments/${id}/live${since ? `?since=${since}` : ""}`),
+  queue: () => req<{ workers: number; active: ActiveRun[] }>("/api/queue"),
   validate: (cfg: ExperimentConfig) => req<Validation>("/api/validate", { method: "POST", body: JSON.stringify(cfg) }),
   create: (body: { name: string; project?: string; description?: string; config: ExperimentConfig; run?: boolean; parent_id?: string }) =>
-    req<Experiment>("/api/experiments", { method: "POST", body: JSON.stringify(body) }),
-  run: (id: string) => req<Experiment>(`/api/experiments/${id}/run`, { method: "POST" }),
+    started(req<Experiment>("/api/experiments", { method: "POST", body: JSON.stringify(body) })),
+  run: (id: string) => started(req<Experiment>(`/api/experiments/${id}/run`, { method: "POST" })),
   cancel: (id: string) => req<{ ok: boolean }>(`/api/experiments/${id}/cancel`, { method: "POST" }),
-  duplicate: (id: string, body: object = {}) => req<Experiment>(`/api/experiments/${id}/duplicate`, { method: "POST", body: JSON.stringify(body) }),
+  duplicate: (id: string, body: object = {}) => started(req<Experiment>(`/api/experiments/${id}/duplicate`, { method: "POST", body: JSON.stringify(body) })),
   remove: (id: string) => req<{ ok: boolean }>(`/api/experiments/${id}`, { method: "DELETE" }),
   patch: (id: string, body: object) => req<Experiment>(`/api/experiments/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   importProtocol: (doc: object) => req<Experiment>("/api/protocol/import", { method: "POST", body: JSON.stringify(doc) }),
   reference: <T = Record<string, number | string>>(which: "factorial" | "dynamics") =>
     req<{ source: string; origin: "notebook" | "application"; provenance: Record<string, string | number> | null; sha256: string; description: string; verified: string; rows: T[] }>(`/api/reference/${which}`),
-  exportUrl: (id: string, format: "json" | "csv-metrics" | "csv-series" | "protocol") => `/api/experiments/${id}/export?format=${format}`,
+  exportUrl: (id: string, format: ExportFormat) => `/api/experiments/${id}/export?format=${format}`,
 };

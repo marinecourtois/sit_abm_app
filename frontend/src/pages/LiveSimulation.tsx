@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { BarChart3, Copy, Play, RefreshCw, Square } from "../icons";
-import { api, type Experiment, type LiveState, type Results } from "../lib/api";
+import { BarChart3, Bell, Copy, Play, RefreshCw, Square } from "../icons";
+import { api, mergeLive, type Experiment, type LiveState, type Results } from "../lib/api";
 import { useMeta } from "../lib/meta";
-import { CROP_LABEL, fmt, fmtDate, fmtInt } from "../lib/format";
+import { CROP_LABEL, STATUS_LABEL, fmt, fmtDate, fmtDuration, fmtInt } from "../lib/format";
 import { VAR, VARIABLES } from "../lib/variables";
 import { STRATEGY_COLOR } from "../lib/colors";
 import { StudyHeader } from "../components/layout";
@@ -33,18 +33,54 @@ export function LiveSimulation() {
   const [day, setDay] = useState(0);
   const [follow, setFollow] = useState(true);
   const chartRef = useRef<SVGSVGElement>(null);
+  const seqRef = useRef(0);   // curseur du flux en direct : seules les nouvelles lignes sont demandées
+  const [notify, setNotify] = useState(() => typeof Notification !== "undefined" && Notification.permission === "granted");
 
   const refresh = useCallback(async () => {
     try {
       const e = await api.experiment(id); setExp(e);
       if (e.status === "completed" && !res) { const r = await api.results(id); setRes(r); }
-      if (e.status !== "ready") setLive(await api.live(id));
+      if (e.status !== "ready") {
+        const l = await api.live(id, seqRef.current);
+        seqRef.current = l.seq ?? 0;
+        setLive((prev) => mergeLive(prev, l));
+      }
     } catch (x) { setErr((x as Error).message); }
   }, [id, res]);
-  useEffect(() => { setRes(null); setLive(null); setScen(""); refresh(); }, [id]);
+  useEffect(() => { seqRef.current = 0; setRes(null); setLive(null); setScen(""); refresh(); }, [id]);
+
+  // Progression dans le titre de l'onglet, et avis de fin (toast + notification système si autorisée)
+  const prevStatus = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!exp) return;
+    const was = prevStatus.current; prevStatus.current = exp.status;
+    const running = exp.status === "running" || exp.status === "queued";
+    if (running) document.title = `${Math.round((live?.progress ?? 0) * 100)} % · ${exp.short_id} — Modelly TIS`;
+    else document.title = "Modelly TIS Research";
+    if ((was === "running" || was === "queued") && !running) {
+      const msg = `${exp.short_id} — ${STATUS_LABEL[exp.status] ?? exp.status}${exp.duration_s ? ` en ${fmtDuration(exp.duration_s)}` : ""}`;
+      toast(msg, exp.status === "completed" ? "success" : "error");
+      if (notify && typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) {
+        try { new Notification("Simulation terminée", { body: `${exp.name}\n${msg}`, icon: "/favicon.svg", tag: exp.id }); } catch { /* navigateur sans notifications */ }
+      }
+    }
+  }, [exp?.status, live?.progress]);
+  useEffect(() => () => { document.title = "Modelly TIS Research"; }, []);
+  const askNotify = async () => {
+    if (typeof Notification === "undefined") return toast("Notifications non prises en charge par ce navigateur.", "info");
+    const p = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+    setNotify(p === "granted");
+    toast(p === "granted" ? "Vous serez averti à la fin du calcul." : "Notifications refusées par le navigateur.", p === "granted" ? "success" : "info");
+  };
   useEffect(() => {
     if (!exp || !["queued", "running"].includes(exp.status)) return;
-    const t = setInterval(refresh, 450);
+    // une seule requête à la fois ; onglet masqué : une mise à jour toutes les 3 s suffit (titre de l'onglet)
+    let busy = false, last = 0;
+    const t = setInterval(() => {
+      if (busy || (document.hidden && Date.now() - last < 3000)) return;
+      busy = true; last = Date.now();
+      refresh().finally(() => { busy = false; });
+    }, 450);
     return () => clearInterval(t);
   }, [exp?.status, refresh]);
 
@@ -104,7 +140,12 @@ export function LiveSimulation() {
       {(status === "running" || status === "queued") && (
         <div className="mt-4" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((live?.progress ?? 0) * 100)} aria-label="Progression du calcul">
           <div className="h-1.5 overflow-hidden rounded-full bg-line"><div className="m-shimmer h-full bg-botanic transition-[width] duration-500 ease-out" style={{ width: `${(live?.progress ?? 0) * 100}%` }} /></div>
-          <div className="mt-1 text-[12px] text-muted tnum">{live?.done ?? 0} / {live?.total ?? "…"} saisons terminées</div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted tnum">
+            <span>{live?.done ?? 0} / {live?.total ?? "…"} saisons terminées</span>
+            {live?.elapsed_s != null && <span>· écoulé {fmtDuration(live.elapsed_s)}</span>}
+            {live?.eta_s != null && <span title="Extrapolé du débit mesuré de cette exécution (saisons terminées / temps écoulé)">· reste ≈ {fmtDuration(live.eta_s)}</span>}
+            {!notify && <button type="button" onClick={askNotify} className="inline-flex items-center gap-1 underline underline-offset-2 hover:text-ink"><Bell size={12} aria-hidden />M’avertir à la fin</button>}
+          </div>
         </div>
       )}
       {status === "error" && <div className="mt-4"><ResearchAnnotation tone="warning"><strong>Simulation en erreur.</strong> {exp.error}</ResearchAnnotation></div>}

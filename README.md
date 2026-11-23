@@ -1,5 +1,7 @@
 # Modelly TIS Research
 
+**Version 1.6.0** · [journal des versions](CHANGELOG.md)
+
 Application web scientifique pour **simuler, comparer et documenter des stratégies de
 Technique de l'Insecte Stérile (TIS)** sur deux systèmes agricoles : la fraise
 (*Fragaria × ananassa*) et la cerise (*Prunus avium*).
@@ -51,12 +53,13 @@ Arrêter le serveur : `Ctrl+C`, ou `pkill -f "uvicorn app.main:app"` s'il tourne
 | Espace | Rôle |
 |---|---|
 | **Vue d'ensemble** | Synthèse de l'étude : cultures, principe de la TIS, dynamique des populations, dommages larvaires, piqûres stériles, tableau des stratégies. Lancement rapide d'une simulation. |
-| **Expériences** | Liste, recherche, filtres, regroupement par projet, métadonnées de reproductibilité, duplication, exports, import de protocole, suppression. |
-| **Simulation** | *Studio* : configuration en Mode Essentiel ou Avancé (paramètres groupés par thème, curseurs avec repère de la valeur du notebook, régime de réaccouplement avec sa formule), validation scientifique, durée estimée à partir des exécutions mesurées, aperçu des calendriers de lâchers. *Live* : suivi en direct, frise chronologique, calendrier, événements, annulation. |
+| **Expériences** | Liste, recherche, filtres, regroupement par projet, métadonnées de reproductibilité, duplication, exports, **archive de reproductibilité (.zip)**, import de protocole, suppression. |
+| **Simulation** | *Studio* : configuration en Mode Essentiel ou Avancé (paramètres groupés par thème, curseurs avec repère de la valeur du notebook, régime de réaccouplement avec sa formule), validation scientifique, durée estimée à partir des exécutions mesurées, aperçu des calendriers de lâchers. *Live* : suivi en direct, temps écoulé et restant (débit mesuré), progression dans le titre de l'onglet, notification de fin, frise chronologique, calendrier, événements, annulation. |
 | **Comparaison** | 2 à 4 scénarios : courbes superposées ou séparées, normalisation explicite, axes synchronisés, incertitude, tableau ordonné selon un critère choisi. |
 | **Résultats** | Plan factoriel du notebook recalculé à 10 répétitions : heatmaps, dose-réponse, front de Pareto, distribution des répétitions, **polyandrie vs monandrie** ; chaque indicateur affiche sa définition exacte. |
 | **Publications** | Rapport scientifique structuré (12 sections) imprimable en PDF, exports CSV/JSON. |
 | **Protocole** | Hypothèses, paramètres, équations (KaTeX), méthodologie, limites, références. |
+| *Partout* | **Palette de commandes** (`Ctrl K` / `⌘ K`) pour ouvrir une page ou une expérience ; **indicateur d'activité** des calculs en cours dans la barre latérale ; version de l'application et du moteur. |
 
 ---
 
@@ -72,7 +75,7 @@ Arrêter le serveur : `Ctrl+C`, ou `pkill -f "uvicorn app.main:app"` s'il tourne
 │   ├── app/                  ← API FastAPI, file d'exécution, stockage
 │   ├── data/reference/       ← CSV produits par le notebook (références de validation)
 │   ├── data/app.db           ← base SQLite des expériences (créée au démarrage)
-│   ├── data/results/         ← résultats JSON compressés (un fichier par expérience)
+│   ├── data/results/         ← résultats JSON compressés (un fichier par expérience, servis tels quels)
 │   └── tests/                ← non-régression scientifique + tests de l'API
 └── frontend/
     └── src/                  ← React + TypeScript + Tailwind, figures SVG
@@ -90,6 +93,17 @@ Arrêter le serveur : `Ctrl+C`, ou `pkill -f "uvicorn app.main:app"` s'il tourne
 | [docs/06-tests-validation.md](docs/06-tests-validation.md) | Stratégie de tests, non-régression, procédure de mise à jour du notebook |
 | [docs/07-reproductibilite-donnees.md](docs/07-reproductibilite-donnees.md) | Graines, immuabilité, métadonnées, formats d'export |
 
+## Performance
+
+La version 1.6.0 accélère l'application sans changer un seul nombre (détail et mesures dans
+[CHANGELOG.md](CHANGELOG.md)) :
+
+- moteur 11 à 21 % plus rapide par saison (APP 6, docs/03), tests de non-régression au bit près ;
+- flux en direct et annulation quasi gratuits pour les processus de calcul, saisons longues
+  ordonnancées en premier ;
+- résultats servis compressés et mis en cache, données de référence sérialisées une seule fois ;
+- flux en direct incrémental, KaTeX chargé à la demande (−43 % de JavaScript à l'ouverture).
+
 ## Branches
 
 `main` est la branche par défaut et contient tout le travail ; développez sur une branche
@@ -106,5 +120,5 @@ dédiée puis fusionnez dans `main` après `make test-all` vert.
 4. **Pas de statistique artificielle.** Aucune p-value, aucun intervalle de confiance ni
    « meilleure stratégie » sans critère explicite.
 
-Raccourcis clavier : `n` nouvelle simulation · `g` puis `o`/`e`/`s`/`c`/`r`/`p` pour naviguer ·
+Raccourcis clavier : `Ctrl K` / `⌘ K` palette de commandes · `n` nouvelle simulation · `g` puis `o`/`e`/`s`/`c`/`r`/`p` pour naviguer ·
 flèches ←/→ sur un graphique pour parcourir les jours · `Échap` pour réinitialiser le zoom.

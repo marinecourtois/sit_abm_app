@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
-import { BarChart3, Copy, Download, FileJson, Search, Trash2, Upload, X } from "../icons";
+import { Archive, BarChart3, Copy, Download, FileJson, Search, Trash2, Upload, X } from "../icons";
 import { api, type Experiment } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { useMeta } from "../lib/meta";
@@ -150,6 +150,8 @@ function ExperimentDrawer({ exp, onClose, onChanged }: { exp: Experiment | null;
                   <a className="inline-flex h-8 items-center gap-1.5 rounded border border-line bg-white px-3 text-[12.5px] hover:border-ink" href={api.exportUrl(exp.id, "json")}><Download size={13} />Expérience + résultats (JSON)</a>
                   <a className="inline-flex h-8 items-center gap-1.5 rounded border border-line bg-white px-3 text-[12.5px] hover:border-ink" href={api.exportUrl(exp.id, "csv-metrics")}><Download size={13} />Métriques par répétition (CSV)</a>
                   <a className="inline-flex h-8 items-center gap-1.5 rounded border border-line bg-white px-3 text-[12.5px] hover:border-ink" href={api.exportUrl(exp.id, "csv-series")}><Download size={13} />Séries journalières (CSV)</a>
+                  <a className="col-span-2 inline-flex h-8 items-center gap-1.5 rounded border border-botanic/50 bg-sage-soft px-3 text-[12.5px] text-forest hover:border-forest" href={api.exportUrl(exp.id, "archive")}
+                    title="Protocole réimportable, résultats complets, CSV et LISEZMOI avec versions et empreintes SHA-256"><Archive size={13} />Archive de reproductibilité (.zip)</a>
                 </>}
               </div>
 

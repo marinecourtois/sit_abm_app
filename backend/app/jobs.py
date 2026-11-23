@@ -11,7 +11,7 @@ from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 from tis_engine.model import CROPS
 from tis_engine.runner import SERIES_VARS, Cancelled, aggregate, build_schedule
 
-from . import store
+from . import store, worker
 from .schemas import ExperimentConfig, StrategySpec, strategy_id, strategy_label
 from .worker import run_task
 
@@ -28,9 +28,10 @@ _state_lock = threading.Lock()
 def start():
     global _pool, _manager, _queue, _cancel
     _manager = _ctx.Manager()
-    _queue = _manager.Queue()
+    # File directe (tube) plutôt qu'une file du Manager : un seul saut par message du flux en direct
+    _queue = _ctx.Queue()
     _cancel = _manager.dict()
-    _pool = ProcessPoolExecutor(max_workers=WORKERS, mp_context=_ctx)
+    _pool = ProcessPoolExecutor(max_workers=WORKERS, mp_context=_ctx, initializer=worker.init, initargs=(_queue, _cancel))
     threading.Thread(target=_listen, daemon=True).start()
 
 
@@ -47,16 +48,18 @@ def _listen():
     while True:
         try:
             kind, job, scen, rep, day, row = _queue.get()
-        except (EOFError, OSError):
+        except (EOFError, OSError, ValueError):
             return
         st = STATE.get(job)
         if not st:
             continue
         with _state_lock:
             if kind == "day":
-                lv = st["live"].setdefault(scen, {"day": 0, "rows": []})
+                lv = st["live"].setdefault(scen, {"day": 0, "rows": [], "seqs": []})
+                st["seq"] += 1
                 lv["day"] = day
                 lv["rows"].append(row)
+                lv["seqs"].append(st["seq"])
             elif kind == "season":
                 st["done"] += 1
                 st["progress"] = st["done"] / st["total"]
@@ -79,6 +82,14 @@ def scenario_plan(cfg: ExperimentConfig):
     return out
 
 
+def season_cost(crop: str) -> int:
+    """Coût relatif d'une saison (fruits suivis × jours), pour ordonner la file : les saisons
+    les plus longues partent en premier et la fin du calcul n'attend plus une saison isolée.
+    Sans effet sur les résultats (chaque saison a sa propre graine)."""
+    c = CROPS[crop]
+    return c.season_length * (c.initial_fruits + c.daily_fruit_production * c.natural_lifespan_max)
+
+
 def replicate_seed(base: int, rep: int) -> int:
     # Nombres aléatoires communs : la répétition r utilise la même graine dans tous les scénarios
     return base + 1000 * rep
@@ -89,11 +100,28 @@ def submit(exp: dict):
     cfg = ExperimentConfig(**exp["config"])
     plan = scenario_plan(cfg)
     total = len(plan) * cfg.replicates
-    STATE[eid] = {"status": "queued", "done": 0, "total": total, "progress": 0.0, "live": {}, "log": [],
+    STATE[eid] = {"status": "queued", "done": 0, "total": total, "progress": 0.0, "live": {}, "log": [], "seq": 0,
+                  "started": None, "name": exp["name"], "short_id": exp["short_id"],
                   "plan": [{k: v for k, v in p.items() if k != "schedule"} for p in plan]}
     _log(STATE[eid], f"{len(plan)} scénarios × {cfg.replicates} répétitions = {total} saisons, {WORKERS} processus.")
     store.update(eid, status="queued", progress=0.0, error=None)
     threading.Thread(target=_run, args=(eid, cfg, plan), daemon=True).start()
+
+
+def timing(st) -> dict:
+    """Temps écoulé et temps restant estimé à partir du débit mesuré de cette exécution."""
+    if not st.get("started"):
+        return {"elapsed_s": None, "eta_s": None}
+    elapsed = time.time() - st["started"]
+    eta = elapsed / st["done"] * (st["total"] - st["done"]) if st["done"] and st["status"] == "running" else None
+    return {"elapsed_s": round(elapsed, 1), "eta_s": None if eta is None else round(eta, 1)}
+
+
+def active() -> list[dict]:
+    """Exécutions en file ou en cours sur ce serveur."""
+    return [{"id": eid, "short_id": st["short_id"], "name": st["name"], "status": st["status"], "progress": st["progress"],
+             "done": st["done"], "total": st["total"], **timing(st)}
+            for eid, st in list(STATE.items()) if st["status"] in ("queued", "running")]
 
 
 def cancel(eid):
@@ -108,16 +136,19 @@ def _run(eid, cfg: ExperimentConfig, plan):
     t0 = time.time()
     store.update(eid, status="running", started_at=store.now())
     st["status"] = "running"
+    st["started"] = t0
     _log(st, "Exécution démarrée.")
     futures = {}
     try:
-        for p in plan:
-            for rep in range(cfg.replicates):
-                task = {"crop": p["crop"], "wild": cfg.invasion.wild, "females": cfg.invasion.females,
-                        "remating": cfg.remating, "seed": replicate_seed(cfg.seed, rep),
-                        "schedule": p["schedule"], "biology": cfg.biology}
-                f = _pool.submit(run_task, eid, p["key"], rep, task, rep == 0, _queue, _cancel)
-                futures[f] = (p["key"], rep)
+        # répétition 0 de chaque scénario d'abord (flux en direct), puis les plus coûteuses en premier
+        order = sorted(((p, rep) for p in plan for rep in range(cfg.replicates)),
+                       key=lambda pr: (pr[1] != 0, -season_cost(pr[0]["crop"])))
+        for p, rep in order:
+            task = {"crop": p["crop"], "wild": cfg.invasion.wild, "females": cfg.invasion.females,
+                    "remating": cfg.remating, "seed": replicate_seed(cfg.seed, rep),
+                    "schedule": p["schedule"], "biology": cfg.biology}
+            f = _pool.submit(run_task, eid, p["key"], rep, task, rep == 0)
+            futures[f] = (p["key"], rep)
         results: dict[str, dict[int, dict]] = {}
         pending = set(futures)
         while pending:
@@ -134,6 +165,7 @@ def _run(eid, cfg: ExperimentConfig, plan):
         store.save_results(eid, doc)
         store.update(eid, status="completed", progress=1.0, finished_at=store.now(), duration_s=doc["duration_s"])
         st["status"] = "completed"
+        st["live"] = {}   # les séries complètes sont dans les résultats : libérer le flux en direct
         _log(st, f"Terminé en {doc['duration_s']} s.")
     except Cancelled:
         store.update(eid, status="cancelled", finished_at=store.now(), error="Annulée par l'utilisateur",

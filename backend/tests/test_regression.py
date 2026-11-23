@@ -105,3 +105,14 @@ def test_dynamics_bit_exact():
             for v in ("Wild_males", "Sterile_males", "Females", "Larvae", "Young_fruits", "Harvestable_fruits",
                       "Rotten_natural", "Rotten_sterile_only", "Rotten_larvae", "Harvested_cumul", "Rotten_cumul"):
                 assert int(r[v]) == s[v][i], (crop, s_name, i, v)
+
+
+def test_worker_skips_seasons_of_cancelled_runs():
+    """Une saison mise en file d'une expérience déjà annulée n'est pas calculée."""
+    from app import worker
+    from tis_engine.runner import Cancelled
+    sent = []
+    worker.init(type("Q", (), {"put": lambda self, m: sent.append(m)})(), {"job": True})
+    with pytest.raises(Cancelled):
+        worker.run_task("job", "k", 0, {}, True)
+    assert sent == []

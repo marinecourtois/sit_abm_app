@@ -1,8 +1,7 @@
-import { createContext, type ReactNode, useCallback, useContext, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as RSelect from "@radix-ui/react-select";
 import * as RTooltip from "@radix-ui/react-tooltip";
 import * as RCollapsible from "@radix-ui/react-collapsible";
-import katex from "katex";
 import { Check, ChevronDown, ChevronUp, CircleHelp, Loader2, X } from "../icons";
 import { STATUS_LABEL } from "../lib/format";
 import type { Status } from "../lib/api";
@@ -139,9 +138,22 @@ export function ScientificTooltip({ children, content, side = "top" }: { childre
 }
 
 /* ---------------------------------------------------------------- Formules */
+// KaTeX (≈ 80 ko compressés + feuille de style) n'est chargé qu'à la première formule affichée,
+// et non plus avec chaque page : la source LaTeX s'affiche le temps du chargement.
+type Katex = { renderToString: typeof import("katex").renderToString };
+let katexMod: Katex | null = null;
+let katexLoad: Promise<Katex> | null = null;
+export function loadKatex(): Promise<Katex> {
+  katexLoad ??= Promise.all([import("katex"), import("katex/dist/katex.min.css")]).then(([m]) => (katexMod = (m as { default?: Katex }).default ?? (m as unknown as Katex)));
+  return katexLoad;
+}
 export function Tex({ children, block = false }: { children: string; block?: boolean }) {
-  const html = useMemo(() => katex.renderToString(children, { displayMode: block, throwOnError: false, output: "html" }), [children, block]);
-  return <span className={block ? "block overflow-x-auto py-1" : ""} dangerouslySetInnerHTML={{ __html: html }} />;
+  const [k, setK] = useState<Katex | null>(katexMod);
+  useEffect(() => { if (!k) { let live = true; loadKatex().then((m) => live && setK(() => m)); return () => { live = false; }; } }, [k]);
+  const html = useMemo(() => k?.renderToString(children, { displayMode: block, throwOnError: false, output: "html" }), [k, children, block]);
+  const cls = block ? "block overflow-x-auto py-1" : "";
+  if (html == null) return <span className={`${cls} font-mono text-[0.85em] text-muted`} aria-busy="true">{children}</span>;
+  return <span className={cls} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 /* ---------------------------------------------------------------- Statut */

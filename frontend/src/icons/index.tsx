@@ -159,6 +159,28 @@ export const FileJson = icon("FileJson", () => (<>
   <path d="M10.2 11.5c-1 0-1.2.6-1.2 1.4s-.4 1.1-1 1.1c.6 0 1 .3 1 1.1s.2 1.4 1.2 1.4M13.8 11.5c1 0 1.2.6 1.2 1.4s.4 1.1 1 1.1c-.6 0-1 .3-1 1.1s-.2 1.4-1.2 1.4" strokeWidth={1.1} />
 </>));
 
+export const Archive = icon("Archive", () => (<>
+  <rect x="3.5" y="4" width="17" height="4.5" rx="1.2" />
+  <path d="M5 8.5v10.2a1.8 1.8 0 0 0 1.8 1.8h10.4a1.8 1.8 0 0 0 1.8-1.8V8.5" />
+  <path d="M10 12h4" />
+  <path d="M12 14.6c-.9.9-1 2.4 0 3.4 1-1 .9-2.5 0-3.4Z" strokeWidth={1.1} />
+</>));
+
+export const Bell = icon("Bell", () => (<>
+  <path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 1.8H5Z" />
+  <path d="M10.2 20.5a2 2 0 0 0 3.6 0" />
+  <path d="M12 3.5v2" strokeWidth={1.1} />
+</>));
+
+export const Activity = icon("Activity", () => (<>
+  <path d="M3.5 12.5h3.3l2.2-5.5 3.8 11 2.6-7.5 1.4 2h3.7" />
+</>));
+
+export const Command = icon("Command", () => (<>
+  <path d="M9 6.5v11M15 6.5v11M6.5 9h11M6.5 15h11" strokeWidth={1.1} />
+  <path d="M9 9H7.2A2.2 2.2 0 1 1 9 6.8ZM15 9h1.8A2.2 2.2 0 1 0 15 6.8ZM9 15H7.2A2.2 2.2 0 1 0 9 17.2ZM15 15h1.8A2.2 2.2 0 1 1 15 17.2Z" />
+</>));
+
 /* ---------------------------------------------------------------- science */
 export const CalendarDays = icon("CalendarDays", () => (<>
   <rect x="3.5" y="5" width="17" height="15.5" rx="2" />

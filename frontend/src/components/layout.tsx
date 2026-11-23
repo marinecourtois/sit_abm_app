@@ -1,8 +1,61 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { BarChart3, BookOpen, FlaskConical, Home, Layers, Menu, Play, X, Download, Plus } from "../icons";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Activity, BarChart3, BookOpen, FlaskConical, Home, Layers, Menu, Play, Search, X, Download, Plus } from "../icons";
 import { FieldLandscape, LeafMark, SeedlingIcon } from "../illustrations";
+import { api, type ActiveRun } from "../lib/api";
+import { useMeta } from "../lib/meta";
+import { fmtDuration } from "../lib/format";
 import { Button } from "./ui";
+
+const CommandPalette = lazy(() => import("./CommandPalette").then((m) => ({ default: m.CommandPalette })));
+const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+
+/** Exécutions en cours sur le serveur : interrogé toutes les 2 s s'il y en a, 8 s sinon, jamais onglet masqué. */
+export function useActiveRuns() {
+  const [runs, setRuns] = useState<ActiveRun[]>([]);
+  useEffect(() => {
+    let t: number | undefined, alive = true, n = 0;
+    const tick = async () => {
+      if (!document.hidden) {
+        try { const r = await api.queue(); n = r.active.length; if (alive) setRuns(r.active); } catch { /* serveur indisponible : réessai */ }
+      }
+      if (alive) t = window.setTimeout(tick, n ? 2000 : 8000);
+    };
+    tick();
+    const wake = () => { if (!document.hidden) { clearTimeout(t); tick(); } };
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("tis:run-started", wake);
+    return () => { alive = false; clearTimeout(t); document.removeEventListener("visibilitychange", wake); window.removeEventListener("tis:run-started", wake); };
+  }, []);
+  return runs;
+}
+
+export function ActivityIndicator({ onNavigate }: { onNavigate?: () => void }) {
+  const runs = useActiveRuns();
+  if (!runs.length) return null;
+  return (
+    <div className="mx-3.5 mt-6 rounded-md border border-[#B9D3BF] bg-white/85 px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]" role="status" aria-live="polite">
+      <div className="flex items-center gap-2 text-[12px] font-semibold text-forest">
+        <Activity size={15} aria-hidden />
+        {runs.length === 1 ? "1 calcul en cours" : `${runs.length} calculs en cours`}
+      </div>
+      <ul className="mt-1.5 space-y-2">
+        {runs.slice(0, 3).map((r) => (
+          <li key={r.id}>
+            <Link to={`/simulation/${r.id}`} onClick={onNavigate} className="block rounded px-0.5 hover:bg-sage-soft">
+              <div className="flex items-baseline justify-between gap-2 text-[11.5px]">
+                <span className="truncate font-mono text-muted">{r.short_id}</span>
+                <span className="tnum text-ink">{r.status === "queued" ? "en file" : `${Math.round(r.progress * 100)} %`}</span>
+              </div>
+              <div className="mt-1 h-1 overflow-hidden rounded-full bg-line"><div className="h-full bg-botanic transition-[width] duration-700 ease-out" style={{ width: `${r.progress * 100}%` }} /></div>
+              {r.eta_s != null && <div className="mt-0.5 text-[10.5px] text-muted tnum">reste ≈ {fmtDuration(r.eta_s)}</div>}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 const NAV = [
   { to: "/", label: "Vue d’ensemble", icon: Home, key: "g o" },
@@ -41,9 +94,17 @@ function useActiveIndicator() {
 
 export function ResearchSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { listRef, ind } = useActiveIndicator();
+  const meta = useMeta();
   return (
     <nav aria-label="Navigation principale" className="flex h-full flex-col bg-[linear-gradient(180deg,#F4F5EF_0%,#EFF2EA_55%,#E4ECE0_100%)]">
-      <div className="px-7 pt-7 pb-10"><Logo /></div>
+      <div className="px-7 pt-7 pb-6"><Logo /></div>
+      <div className="px-3.5 pb-4">
+        <button type="button" onClick={() => { onNavigate?.(); window.dispatchEvent(new Event("tis:palette")); }}
+          className="flex w-full items-center gap-2.5 rounded-[7px] border border-line bg-white/70 px-3 py-2 text-left text-[13px] text-muted transition-colors hover:border-ink/30 hover:text-ink">
+          <Search size={15} aria-hidden /><span className="flex-1">Rechercher…</span>
+          <kbd className="rounded border border-line bg-white px-1.5 font-mono text-[10.5px]">{isMac ? "⌘" : "Ctrl"} K</kbd>
+        </button>
+      </div>
       <ul ref={listRef} className="relative flex flex-col gap-2 px-3.5">
         {/* Indicateur de la section active : glisse d'un élément à l'autre */}
         <span aria-hidden className="nav-indicator pointer-events-none absolute inset-x-3.5 top-0 rounded-[7px] bg-sage shadow-[inset_0_0_0_1px_rgba(52,122,85,0.08)]"
@@ -58,6 +119,7 @@ export function ResearchSidebar({ onNavigate }: { onNavigate?: () => void }) {
           </li>
         ))}
       </ul>
+      <ActivityIndicator onNavigate={onNavigate} />
       <div className="relative mt-auto">
         <FieldLandscape className="pointer-events-none block h-[430px] w-full" preserveAspectRatio="xMaxYMax slice" aria-hidden />
         <div className="absolute inset-x-3.5 bottom-4 rounded-md border border-line bg-white/92 px-3.5 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)] backdrop-blur-[2px]">
@@ -66,6 +128,7 @@ export function ResearchSidebar({ onNavigate }: { onNavigate?: () => void }) {
             <div>
               <div className="text-[13.5px] font-semibold text-forest">Modélisation TIS</div>
               <div className="mt-0.5 text-[11.5px] leading-snug text-muted">Dynamique des populations et optimisation des lâchers</div>
+              {meta && <div className="mt-1 font-mono text-[10.5px] text-muted" title={`Application ${meta.versions.app_version} · moteur ${meta.versions.engine_version} · modelly ${meta.versions.modelly_version}`}>v{String(meta.versions.app_version)} · moteur {String(meta.versions.engine_version)}</div>}
             </div>
           </div>
         </div>
@@ -76,9 +139,17 @@ export function ResearchSidebar({ onNavigate }: { onNavigate?: () => void }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [palette, setPalette] = useState(false);
   const loc = useLocation();
   const nav = useNavigate();
   useEffect(() => setOpen(false), [loc.pathname]);
+  // Palette de commandes : Ctrl/⌘ + K partout (y compris dans un champ), ou bouton « Rechercher »
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setPalette((v) => !v); } };
+    const ev = () => setPalette(true);
+    window.addEventListener("keydown", k); window.addEventListener("tis:palette", ev);
+    return () => { window.removeEventListener("keydown", k); window.removeEventListener("tis:palette", ev); };
+  }, []);
   // Boucles ambiantes en pause quand l'onglet n'est pas visible
   useEffect(() => {
     const h = () => document.documentElement.classList.toggle("is-hidden", document.hidden);
@@ -120,6 +191,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       )}
+      {palette && <Suspense fallback={null}><CommandPalette open={palette} onOpenChange={setPalette} /></Suspense>}
       <main id="main" className="lg:pl-[243px] print:!pl-0">
         <div className="mx-auto w-full max-w-[1640px] px-4 pb-8 pt-6 sm:px-6 lg:px-[30px] lg:pt-[14px] 2xl:px-10 print:max-w-none print:px-0"><div key={loc.pathname} className="m-route">{children}</div></div>
       </main>

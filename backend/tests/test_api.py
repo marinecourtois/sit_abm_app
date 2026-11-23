@@ -100,3 +100,83 @@ def test_exports_and_protocol_roundtrip(client):
     proto = client.get(f"/api/experiments/{e['id']}/export?format=protocol").json()
     imp = client.post("/api/protocol/import", json=proto).json()
     assert imp["config"] == e["config"] and imp["status"] == "ready"
+
+
+# ---------------------------------------------------------------- 1.6.0 : performance et nouveautés
+def test_live_stream_is_incremental_and_gapless(client):
+    """Le curseur `since` ne renvoie que les nouvelles lignes ; recollées, elles forment la série complète."""
+    e = client.post("/api/experiments", json={"name": "direct", "config": cfg(client, crops=["strawberry"])}).json()
+    acc, seq, seen_running = {}, 0, False
+    t0 = time.time()
+    while time.time() - t0 < 120:
+        lv = client.get(f"/api/experiments/{e['id']}/live", params={"since": seq}).json()
+        if lv["status"] == "running":
+            seen_running = True
+            assert lv["elapsed_s"] is not None
+        for key, part in lv["live"].items():
+            rows = acc.setdefault(key, [])
+            assert part["from"] <= len(rows), "trou dans le flux"
+            del rows[part["from"]:]
+            rows.extend(part["rows"])
+            assert len(rows) == part["day"]
+        seq = lv["seq"]
+        if lv["status"] in ("completed", "cancelled", "error"):
+            break
+        time.sleep(0.05)
+    assert seen_running and lv["status"] == "completed"
+    assert lv["eta_s"] is None and lv["live"] == {}     # flux libéré à la fin : les séries sont dans les résultats
+    res = client.get(f"/api/experiments/{e['id']}/results").json()
+    for key, rows in acc.items():                         # répétition 0 en direct = répétition 0 enregistrée (mêmes graines)
+        if rows and len(rows) == 100:
+            sc = next(s for s in res["scenarios"] if s["key"] == key)
+            assert sc["seeds"][0] == 1234
+
+
+def test_queue_lists_active_runs(client):
+    e = client.post("/api/experiments", json={"name": "file", "config": cfg(client, crops=["strawberry"], replicates=30)}).json()
+    q = client.get("/api/queue").json()
+    assert q["workers"] >= 1
+    run = next(r for r in q["active"] if r["id"] == e["id"])
+    assert run["total"] == 3 * 30 and run["short_id"] == e["short_id"]
+    client.post(f"/api/experiments/{e['id']}/cancel")
+    wait(client, e["id"])
+    assert all(r["id"] != e["id"] for r in client.get("/api/queue").json()["active"])
+
+
+def test_results_are_served_precompressed_and_cacheable(client):
+    from app import store
+    e = next(x for x in client.get("/api/experiments").json() if x["status"] == "completed")
+    r = client.get(f"/api/experiments/{e['id']}/results", headers={"Accept-Encoding": "gzip"})
+    assert r.headers["content-encoding"] == "gzip" and "immutable" in r.headers["cache-control"]
+    assert r.json() == store.load_results(e["id"])
+    plain = client.get(f"/api/experiments/{e['id']}/results", headers={"Accept-Encoding": "identity"})
+    assert "content-encoding" not in plain.headers and plain.json() == r.json()
+    assert client.get("/api/meta").headers["cache-control"] == "no-store"
+    ref = client.get("/api/reference/factorial", headers={"Accept-Encoding": "gzip"})
+    assert ref.headers["content-encoding"] == "gzip" and ref.json()["rows"]
+
+
+def test_reproducibility_archive(client):
+    import hashlib
+    import json
+    import zipfile
+    e = next(x for x in client.get("/api/experiments").json() if x["status"] == "completed")
+    r = client.get(f"/api/experiments/{e['id']}/export", params={"format": "archive"})
+    assert r.status_code == 200 and r.headers["content-type"] == "application/zip"
+    z = zipfile.ZipFile(io.BytesIO(r.content))
+    sid = e["short_id"]
+    names = set(z.namelist())
+    assert names == {f"{sid}/{n}" for n in ("LISEZMOI.txt", "protocole.json", "resultats.json",
+                                             "metriques_par_repetition.csv", "series_journalieres.csv")}
+    readme = z.read(f"{sid}/LISEZMOI.txt").decode()
+    for n in names - {f"{sid}/LISEZMOI.txt"}:                # chaque empreinte du LISEZMOI correspond au fichier
+        assert f"{hashlib.sha256(z.read(n)).hexdigest()}  {n.split('/')[1]}" in readme
+    assert "app_version" in readme and e["config_hash"] in readme
+    proto = json.loads(z.read(f"{sid}/protocole.json"))
+    assert client.post("/api/protocol/import", json=proto).json()["config"] == e["config"]
+
+
+def test_health_reports_app_version(client):
+    from app import APP_VERSION
+    h = client.get("/api/health").json()
+    assert h["app_version"] == APP_VERSION and h["engine_version"]

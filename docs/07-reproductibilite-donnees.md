@@ -12,7 +12,7 @@
 | `created_at`, `started_at`, `finished_at`, `duration_s` | Horodatages UTC (ISO 8601) et durée |
 | `status`, `error` | État d'exécution et message d'erreur éventuel |
 | `parent_id` | Expérience d'origine (duplication ou relance) |
-| `runtime` | Versions de l'environnement d'exécution : moteur, paramètres, schéma, modelly, **origine de modelly** (PyPI ou chemin du dépôt local), Python |
+| `runtime` | Versions de l'environnement d'exécution : **application** (`app_version`, depuis 1.6.0), moteur, paramètres, schéma, modelly, **origine de modelly** (PyPI ou chemin du dépôt local), Python |
 
 Les expériences créées avant l'ajout de `runtime` affichent « non enregistré » : la valeur
 n'est jamais reconstituée après coup.
@@ -20,8 +20,9 @@ n'est jamais reconstituée après coup.
 ## Garanties
 
 - **Déterminisme** : même configuration + même graine + même version du moteur ⇒ mêmes
-  résultats, au bit près, quel que soit le nombre de processus (chaque saison est
-  indépendante et rangée par clé de scénario et numéro de répétition).
+  résultats, au bit près, quel que soit le nombre de processus et l'ordre de calcul des saisons
+  (chaque saison est indépendante et rangée par clé de scénario et numéro de répétition).
+  Les moteurs 1.1.0 et 1.2.0 produisent les mêmes nombres (1.2.0 = optimisation seule, APP 6).
 - **Nombres aléatoires communs** : dans une expérience, la répétition *r* de chaque scénario
   (y compris le témoin) utilise la même graine. Les variations relatives au témoin
   (`vs_control`, `Wild_adults_vs_control`) sont donc **appariées** répétition par répétition.
@@ -48,15 +49,40 @@ notebook (voir `tests/test_regression.py`).
 | CSV figure | Menu « Exporter » d'un graphique | Les données exactement tracées (après normalisation éventuelle) |
 | JSON expérience | Expériences, Publications | Métadonnées, configuration, versions, résultats complets |
 | JSON protocole | Studio, Expériences | `{format: "modelly-tis-protocol", schema_version, name, config, versions}` — réimportable |
+| Archive de reproductibilité (.zip) | Expériences (tiroir), Publications | Tout ce qui précède dans un seul fichier, avec un LISEZMOI d'empreintes (voir ci-dessous) |
 | SVG / PNG | Menu « Exporter » d'un graphique | Figure avec titre et légende ; PNG ×3 |
 | Format publication | Menu « Exporter » | SVG 170 mm ou PNG 170 mm à 600 dpi, légende de figure incluse |
 | PDF | Publications → « Exporter en PDF » | Rapport en 12 sections + annexe protocole, via l'impression du navigateur |
 
 Les CSV utilisent le point décimal et la virgule comme séparateur (compatibles pandas / R).
 
+### Archive de reproductibilité
+
+`GET /api/experiments/{id}/export?format=archive` → `TIS-XXXXXXXX-archive.zip` :
+
+```
+TIS-XXXXXXXX/
+├── LISEZMOI.txt                   nom, projet, dates, hash de configuration, graine et règle des
+│                                  graines, versions de l'exécution (runtime), SHA-256 des fichiers
+├── protocole.json                 identique à l'export « protocol » (réimportable)
+├── resultats.json                 identique à l'export « json »
+├── metriques_par_repetition.csv   identique à l'export « csv-metrics »
+└── series_journalieres.csv        identique à l'export « csv-series »
+```
+
+Vérifier l'intégrité d'une archive reçue :
+
+```bash
+unzip TIS-XXXXXXXX-archive.zip && cd TIS-XXXXXXXX
+sed -n '/SHA-256/,/^$/p' LISEZMOI.txt | tail -n +2 | sed 's/^  //' | sha256sum -c
+```
+
+Reproduire : importer `protocole.json` (Expériences → Importer), lancer, comparer
+`resultats.json` ; avec les mêmes versions, les nombres sont identiques.
+
 ## Stockage
 
 - Métadonnées : `backend/data/app.db` (SQLite, table `experiments`).
-- Résultats : `backend/data/results/<uuid>.json.gz` (JSON compressé, ~100 Ko pour l'étude
-  de référence).
+- Résultats : `backend/data/results/<uuid>.json.gz` (JSON compressé, ~150 Ko pour l'étude
+  de référence). Ce fichier est envoyé tel quel au navigateur (`Content-Encoding: gzip`).
 - Les données de référence du notebook (`backend/data/reference/`) sont en lecture seule.

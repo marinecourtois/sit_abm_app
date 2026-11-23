@@ -5,7 +5,6 @@ import * as RTooltip from "@radix-ui/react-tooltip";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/source-serif-4/opsz.css";
 import "@fontsource-variable/source-serif-4/opsz-italic.css";
-import "katex/dist/katex.min.css";
 import "./index.css";
 import { api, type Meta } from "./lib/api";
 import { MetaContext } from "./lib/meta";
