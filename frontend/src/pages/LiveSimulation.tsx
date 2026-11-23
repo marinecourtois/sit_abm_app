@@ -155,7 +155,60 @@ export function LiveSimulation() {
       {status === "cancelled" && <div className="mt-4"><ResearchAnnotation tone="warning"><strong>Simulation interrompue.</strong> {exp.error} — aucun résultat partiel n’est enregistré. Une relance crée une nouvelle exécution identifiable.</ResearchAnnotation></div>}
       {status === "ready" && <div className="mt-4"><ResearchAnnotation>Simulation prête : la configuration est enregistrée ({exp.short_id}) et peut être lancée.</ResearchAnnotation></div>}
 
-      <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="text-[12.5px] font-medium">Scénario affiché</span>
+        <div className="w-full sm:w-96"><Select label="Scénario" value={scen} onChange={(v) => { setScen(v); setFollow(true); }}
+          options={plan.map((p) => ({ value: p.key, label: scenarioLabel(p, exp.config, meta) }))} /></div>
+        <span className="text-[12px] text-muted">Les cartes et le graphique ci-dessous portent sur ce scénario.</span>
+      </div>
+
+      <div className="mt-3 grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Panel className="px-5 py-4">
+          <PanelTitle sub={sc ? "Moyenne ± écart-type" : "Répétition 1"}>État au jour {day}</PanelTitle>
+          <dl className="mt-3 space-y-1.5 text-[12.5px]">
+            {["Wild_males", "Females", "Sterile_males", "Larvae", "SW_ratio"].map((v) => {
+              const s = chartSeries.find((c) => c.id === v) ? atDay(v) : null;
+              const i = sc ? sc.series.Time.indexOf(day) : day;
+              const val = s ?? (sc && i >= 0 ? { v: sc.series[v].mean[i], sd: sc.series[v].sd[i] } : liveRows[day - 1] ? { v: v === "SW_ratio" ? liveRows[day - 1].Sterile_males / Math.max(1, liveRows[day - 1].Wild_males) : liveRows[day - 1][v], sd: undefined } : null);
+              return (
+                <div key={v} className="flex items-baseline justify-between gap-2 border-b border-line/60 pb-1">
+                  <dt className="text-muted">{VAR[v].label}</dt>
+                  <dd className="tnum">{val ? fmt(val.v, v === "SW_ratio" ? 2 : 0) : "—"}{val?.sd ? <span className="text-muted"> ± {fmt(val.sd, v === "SW_ratio" ? 2 : 0)}</span> : null}</dd>
+                </div>
+              );
+            })}
+          </dl>
+        </Panel>
+        <Panel className="px-5 py-4">
+          <PanelTitle sub="Calculés à partir des séries moyennes">Événements du scénario</PanelTitle>
+          {sc ? (
+            <ol className="mt-3 space-y-1.5 text-[12.5px]">
+              {sc.events.map((e, i) => (
+                <li key={i}><button type="button" onClick={() => { setDay(e.day); setFollow(false); }} className="flex w-full items-baseline gap-3 rounded px-1 py-0.5 text-left hover:bg-sage-soft">
+                  <span className="w-9 shrink-0 font-mono text-[11.5px] text-muted">J{e.day}</span><span>{e.label}</span></button></li>
+              ))}
+            </ol>
+          ) : <p className="mt-3 text-[12.5px] text-muted">Disponibles à la fin du calcul.</p>}
+        </Panel>
+        <Panel className="px-5 py-4">
+          <PanelTitle sub="Variation relative appariée (mêmes graines)">Effet vs témoin</PanelTitle>
+          {sc && !sc.is_control && sc.vs_control ? (
+            <dl className="mt-3 space-y-1.5 text-[12.5px]">
+              {([["larval_damage_pct", "Dommages larvaires"], ["larvae_produced", "Larves produites"], ["wild_adults_final", `Adultes sauvages à J${L}`], ["harvested_clean_pct", "Récolte saine"]] as const).map(([k, l]) => (
+                <div key={k} className="flex items-baseline justify-between gap-3 border-b border-line/60 pb-1"><dt className="text-muted">{l}</dt>
+                  <dd className="shrink-0 whitespace-nowrap tnum">{sc.vs_control?.[k] ? `${fmt(sc.vs_control[k]!.mean, 1).replace("-", "−")} %` : "—"}<span className="text-muted"> ± {fmt(sc.vs_control?.[k]?.sd, 1)}</span></dd></div>
+              ))}
+            </dl>
+          ) : <p className="mt-3 text-[12.5px] text-muted">{!sc ? "Disponible à la fin du calcul." : sc.is_control ? "Ce scénario est le témoin : choisissez une stratégie pour voir son effet." : "Pas de témoin dans cette expérience."}</p>}
+        </Panel>
+        <Panel className="px-5 py-4">
+          <div className="flex items-center justify-between"><h3 className="text-[13.5px] font-semibold">Schéma pédagogique</h3><Badge tone="demo">non quantitatif</Badge></div>
+          <p className="mt-1 text-[11.5px] text-muted">Illustration du mécanisme, sans lien avec les valeurs calculées.</p>
+          <div className="mt-3"><ScientificProcessDiagram compact bare /></div>
+        </Panel>
+      </div>
+
+      <div className="mt-4">
         <Panel className="min-w-0 px-5 pb-4 pt-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -165,9 +218,7 @@ export function LiveSimulation() {
                 <span>Unités : {units.join(" · ") || "—"}</span>
               </div>
             </div>
-            <div className="flex w-full items-center gap-2 sm:w-auto">
-              <div className="w-full sm:w-80"><Select label="Scénario" value={scen} onChange={(v) => { setScen(v); setFollow(true); }}
-                options={plan.map((p) => ({ value: p.key, label: scenarioLabel(p, exp.config, meta) }))} /></div>
+            <div className="flex items-center gap-2">
               <ChartExportMenu getSvg={() => chartRef.current}
                 meta={{ title: planItem ? scenarioLabel(planItem, exp.config, meta) : "", filename: `${exp.short_id}-dynamique`,
                   caption: `${sc ? `Moyenne ± écart-type, ${exp.config.replicates} répétitions` : "Répétition 1 (calcul en cours)"}. Invasion ${(planItem?.invasion ?? exp.config.invasion).wild} W : ${(planItem?.invasion ?? exp.config.invasion).females} F, budget ${planItem?.budget ?? exp.config.budget} stériles, régime ${planItem?.remating ?? exp.config.remating}, graine ${exp.config.seed}. ${exp.short_id}, moteur ${exp.engine_version}.` }}
@@ -220,51 +271,9 @@ export function LiveSimulation() {
             <ReleaseCalendar schedule={schedule} seasonLength={L} cursor={day} label="Calendrier des lâchers" color={STRATEGY_COLOR[sc?.strategy_key ?? ""] ?? "#347A55"} />
           </div>
         </Panel>
+      </div>
 
-        <div className="flex flex-col gap-4">
-          <Panel className="px-5 py-4">
-            <PanelTitle sub={sc ? "Moyenne ± écart-type" : "Répétition 1"}>État au jour {day}</PanelTitle>
-            <dl className="mt-3 space-y-1.5 text-[12.5px]">
-              {["Wild_males", "Females", "Sterile_males", "Larvae", "SW_ratio"].map((v) => {
-                const s = chartSeries.find((c) => c.id === v) ? atDay(v) : null;
-                const i = sc ? sc.series.Time.indexOf(day) : day;
-                const val = s ?? (sc && i >= 0 ? { v: sc.series[v].mean[i], sd: sc.series[v].sd[i] } : liveRows[day - 1] ? { v: v === "SW_ratio" ? liveRows[day - 1].Sterile_males / Math.max(1, liveRows[day - 1].Wild_males) : liveRows[day - 1][v], sd: undefined } : null);
-                return (
-                  <div key={v} className="flex items-baseline justify-between gap-2 border-b border-line/60 pb-1">
-                    <dt className="text-muted">{VAR[v].label}</dt>
-                    <dd className="tnum">{val ? fmt(val.v, v === "SW_ratio" ? 2 : 0) : "—"}{val?.sd ? <span className="text-muted"> ± {fmt(val.sd, v === "SW_ratio" ? 2 : 0)}</span> : null}</dd>
-                  </div>
-                );
-              })}
-            </dl>
-          </Panel>
-          <Panel className="px-5 py-4">
-            <PanelTitle sub="Calculés à partir des séries moyennes">Événements du scénario</PanelTitle>
-            {sc ? (
-              <ol className="mt-3 space-y-1.5 text-[12.5px]">
-                {sc.events.map((e, i) => (
-                  <li key={i}><button type="button" onClick={() => { setDay(e.day); setFollow(false); }} className="flex w-full items-baseline gap-3 rounded px-1 py-0.5 text-left hover:bg-sage-soft">
-                    <span className="w-9 shrink-0 font-mono text-[11.5px] text-muted">J{e.day}</span><span>{e.label}</span></button></li>
-                ))}
-              </ol>
-            ) : <p className="mt-3 text-[12.5px] text-muted">Disponibles à la fin du calcul.</p>}
-          </Panel>
-          {sc && !sc.is_control && sc.vs_control && (
-            <Panel className="px-5 py-4">
-              <PanelTitle sub="Variation relative appariée (mêmes graines)">Effet vs témoin</PanelTitle>
-              <dl className="mt-3 space-y-1.5 text-[12.5px]">
-                {([["larval_damage_pct", "Dommages larvaires"], ["larvae_produced", "Larves produites"], ["wild_adults_final", `Adultes sauvages à J${L}`], ["harvested_clean_pct", "Récolte saine"]] as const).map(([k, l]) => (
-                  <div key={k} className="flex justify-between border-b border-line/60 pb-1"><dt className="text-muted">{l}</dt>
-                    <dd className="tnum">{sc.vs_control?.[k] ? `${fmt(sc.vs_control[k]!.mean, 1).replace("-", "−")} %` : "—"}<span className="text-muted"> ± {fmt(sc.vs_control?.[k]?.sd, 1)}</span></dd></div>
-                ))}
-              </dl>
-            </Panel>
-          )}
-          <Panel className="px-5 py-4">
-            <div className="flex items-center justify-between"><h3 className="text-[13.5px] font-semibold">Schéma pédagogique</h3><Badge tone="demo">non quantitatif</Badge></div>
-            <p className="mt-1 text-[11.5px] text-muted">Illustration du mécanisme, sans lien avec les valeurs calculées.</p>
-            <div className="mt-3"><ScientificProcessDiagram compact bare /></div>
-          </Panel>
+      <div className="mt-4">
           <Panel className="px-5 py-4">
             <h3 className="text-[13.5px] font-semibold">Journal d’exécution</h3>
             <ol className="mt-2 max-h-44 space-y-1 overflow-auto font-mono text-[11px] text-muted">
@@ -273,7 +282,6 @@ export function LiveSimulation() {
               {exp.finished_at && !live?.log.length && <li>{fmtDate(exp.finished_at)} — {exp.status} ({exp.duration_s} s)</li>}
             </ol>
           </Panel>
-        </div>
       </div>
 
       {res && <ExperimentAnalyses exp={exp} res={res} />}

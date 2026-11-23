@@ -32,6 +32,9 @@ les 38 tests de non-régression reproduisent toujours le notebook au bit près.
   l'archive).
 - Comparaison, liste des expériences et rapport : invasion, budget et régime de chaque scénario
   d'un plan affichés.
+- Page d'une simulation réorganisée : le scénario affiché se choisit en haut, puis quatre cartes
+  (état au jour choisi, événements, effet vs témoin, schéma pédagogique) au-dessus du graphique
+  d'évolution temporelle ; le journal d'exécution passe sous le graphique.
 
 ### Corrections
 
