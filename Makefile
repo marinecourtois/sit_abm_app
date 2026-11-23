@@ -5,7 +5,7 @@ PY := backend/.venv/bin/python
 MODELLY_SRC ?= $(HOME)/Desktop/work/Modelly
 
 install:            ## Installe le backend (venv) et le frontend
-	uv venv -q backend/.venv --python '>=3.12'
+	uv venv -q --clear --python-preference only-managed backend/.venv --python 3.12
 	uv pip install -q --python $(PY) -r backend/requirements.txt
 	@if [ -n "$(MODELLY_SRC)" ] && [ -f "$(MODELLY_SRC)/pyproject.toml" ]; then \
 		echo "modelly : construction depuis $(MODELLY_SRC)"; \
