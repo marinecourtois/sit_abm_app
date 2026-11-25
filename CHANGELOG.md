@@ -4,6 +4,22 @@ Format : une section par version de l'application (`APP_VERSION`, `backend/app/_
 Les versions du moteur (`ENGINE_VERSION`), des paramètres et du schéma sont indépendantes et
 enregistrées avec chaque expérience (voir docs/03 § 4).
 
+## 1.9.1 — 25 novembre 2026
+
+### Nouveautés
+
+- **`make doctor`** (`scripts/doctor.sh`) : vérifie les outils (git, uv, Node.js ≥ 20), le
+  dépôt, l'environnement Python (dont **SQLite**), les dépendances de l'interface, la base, le
+  port 8765, puis essaie le backend et le moteur. Répare ce qui peut l'être : installe uv,
+  recrée un environnement Python 3.12 géré par uv, installe les dépendances npm, met de côté une
+  base corrompue dans `backend/data/sauvegarde-<date>/`. Ne supprime aucune donnée et n'arrête
+  aucun processus. Testé sur une copie cassée exprès (environnement sans dépendances, modules npm
+  absents, base illisible) : trois réparations, application fonctionnelle.
+- **`make clean`** : remise à zéro de l'installation, en gardant `backend/data`.
+- `make install` est découpé en `install-backend` et `install-frontend`.
+- Vérifié : l'application fonctionne avec modelly 1.5.2 de PyPI (installation sans dépôt
+  Modelly local) ; les 44 tests de non-régression passent.
+
 ## 1.9.0 — 25 novembre 2026
 
 Sprint « tout ce que Marine voulait ». Les vues de son prototype qui restaient (Paramètres,

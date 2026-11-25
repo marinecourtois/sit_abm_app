@@ -1,6 +1,6 @@
 # Modelly TIS Research
 
-**Version 1.9.0** · [journal des versions](CHANGELOG.md)
+**Version 1.9.1** · [journal des versions](CHANGELOG.md)
 
 Application web scientifique pour **simuler, comparer et documenter des stratégies de
 Technique de l'Insecte Stérile (TIS)** sur deux systèmes agricoles : la fraise
@@ -38,6 +38,8 @@ La page Analyses utilise le plan factoriel du notebook recalculé à 20 répéti
 | Commande | Effet |
 |---|---|
 | `make install` | Installation complète (backend + frontend) |
+| `make doctor` | **Vérifie l'installation et répare ce qui est cassé** (Python sans SQLite, dépendances, base corrompue…), sans supprimer de données |
+| `make clean` | Supprime environnement Python, modules npm et interface construite (garde `backend/data`) |
 | `make serve` | Build du frontend + serveur unique sur le port 8765 |
 | `make dev` | Développement : API avec rechargement (8765) + Vite (5173, proxy `/api`) |
 | `make build` | Build du frontend seul (`frontend/dist/`) |

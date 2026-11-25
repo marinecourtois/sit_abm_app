@@ -4,15 +4,26 @@ PY := backend/.venv/bin/python
 # Vide → version publiée sur PyPI (modelly-abm). Exemple : make install MODELLY_SRC=~/Desktop/work/Modelly
 MODELLY_SRC ?= $(HOME)/Desktop/work/Modelly
 
-install:            ## Installe le backend (venv) et le frontend
+install: install-backend install-frontend   ## Installe le backend (venv) et le frontend
+
+install-backend:    ## Environnement Python 3.12 géré par uv (SQLite inclus) + dépendances + modelly
 	uv venv -q --clear --python-preference only-managed backend/.venv --python 3.12
 	uv pip install -q --python $(PY) -r backend/requirements.txt
 	@if [ -n "$(MODELLY_SRC)" ] && [ -f "$(MODELLY_SRC)/pyproject.toml" ]; then \
 		echo "modelly : construction depuis $(MODELLY_SRC)"; \
 		uv pip install -q --python $(PY) --reinstall --no-deps "$(MODELLY_SRC)"; \
 	else echo "modelly : version PyPI"; fi
+
+install-frontend:   ## Dépendances npm (interface et SmartTest)
 	cd frontend && npm install
 	npm install            # SmartTest (racine du dépôt)
+
+doctor:             ## Vérifie l'installation et répare ce qui est cassé (ne supprime aucune donnée)
+	@bash scripts/doctor.sh
+
+clean:              ## Supprime environnement Python, modules npm et interface construite (garde backend/data)
+	rm -rf backend/.venv frontend/node_modules frontend/dist frontend/tsconfig.tsbuildinfo node_modules
+	@echo "Nettoyé. Réinstaller : make install (ou make doctor)."
 
 dev:                ## API (8765) + frontend Vite (5173, proxy /api)
 	(cd backend && TIS_API_DOCS=1 .venv/bin/uvicorn app.main:app --port 8765 --reload) & (cd frontend && npm run dev)
@@ -45,4 +56,4 @@ modelly:            ## Réinstalle modelly depuis MODELLY_SRC (après une mise �
 
 REPS ?= 20
 
-.PHONY: install dev build serve test test-smart test-all factorial fixtures modelly
+.PHONY: install install-backend install-frontend doctor clean dev build serve test test-smart test-all factorial fixtures modelly
