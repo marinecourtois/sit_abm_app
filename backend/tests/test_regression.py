@@ -116,3 +116,71 @@ def test_worker_skips_seasons_of_cancelled_runs():
     with pytest.raises(Cancelled):
         worker.run_task("job", "k", 0, {}, True)
     assert sent == []
+
+
+# ---------------------------------------------------------------- 1.9.0 : séries et extensions hors notebook
+def _season(**bio):
+    t = task("strawberry", "Every 3 days", 9000, 10 * ECHELLE, "preference", 4242)
+    t["biology"] = {**t["biology"], **bio}
+    return run_season(t)
+
+
+def test_new_series_are_consistent_and_draw_nothing():
+    """Femelles fécondées ≤ femelles ; probabilité d'accouplement stérile dans [0, 1], nulle sans
+    stériles. Ces lectures ne tirent aucun nombre : les métriques restent celles du notebook
+    (vérifié par test_factorial_bit_exact et test_dynamics_bit_exact)."""
+    s = _season()["series"]
+    assert all(0 <= ff <= f for ff, f in zip(s["Fertile_females"], s["Females"]))
+    assert max(s["Fertile_females"]) > 0
+    assert all(0.0 <= p <= 1.0 for p in s["Sterile_mating_prob"])
+    for p, st in zip(s["Sterile_mating_prob"], s["Sterile_males"]):
+        if st == 0:
+            assert p == 0.0
+    t = task("strawberry", "No TIS", 0, 10 * ECHELLE, "first", 4242)
+    assert set(run_season(t)["series"]["Sterile_mating_prob"]) == {0.0}
+
+
+def test_immigration_extension():
+    base, imm = _season(), _season(immigration_wild_males=15, immigration_females=8)
+    assert base["metrics"]["immigrants"] == 0
+    assert imm["metrics"]["immigrants"] == (15 + 8) * (SEASON["strawberry"] - 1)   # de J1 à la fin de la saison
+    assert imm["metrics"]["larvae_produced"] > base["metrics"]["larvae_produced"]
+
+
+def test_carrying_capacity_extension():
+    """Sans lâcher, la population grandit ; avec K_a, une émergence n'a lieu que si W + F < K_a,
+    donc W + F ne dépasse jamais K_a (l'effectif initial, 600, est en dessous)."""
+    t = task("strawberry", "No TIS", 0, 10 * ECHELLE, "preference", 4242)
+    off = run_season(t)
+    t["biology"] = {**t["biology"], "carrying_capacity": 900}
+    on = run_season(t)
+    assert off["metrics"]["emergences_blocked"] == 0
+    assert max(w + f for w, f in zip(off["series"]["Wild_males"], off["series"]["Females"])) > 900
+    assert on["metrics"]["emergences_blocked"] > 0
+    assert max(w + f for w, f in zip(on["series"]["Wild_males"], on["series"]["Females"])) <= 900
+
+
+def test_turning_stage_extension():
+    """Avec p_y = 0 et un stade tournant qui couvre toute la phase jeune (d_t ≥ maturité max),
+    la réussite d'une ponte sur fruit jeune vaut p_t partout : identique au bit près au modèle
+    du notebook avec p_y = p_t. Un stade plus court change les résultats."""
+    ref = _season(young_puncture_probability=0.3)
+    full = _season(young_puncture_probability=0.0, turning_days=10, turning_puncture_probability=0.3)
+    assert full["metrics"] == ref["metrics"]
+    short = _season(young_puncture_probability=0.0, turning_days=1, turning_puncture_probability=0.3)
+    assert short["metrics"]["larvae_produced"] != ref["metrics"]["larvae_produced"]
+    # d_t = maturité max (4 j pour la fraise) ne couvre pas encore l'âge 0 : différent de la couverture totale
+    edge = _season(young_puncture_probability=0.0, turning_days=4, turning_puncture_probability=0.3)
+    assert edge["metrics"] != ref["metrics"]
+
+
+def test_turning_window_lasts_exactly_d_t_days():
+    """Un fruit est jeune aux âges 0 … M ; avec d_t, seuls les âges M-d_t+1 … M sont « tournants »."""
+    from tis_engine.model import CROPS, RematingModel
+    m = RematingModel(CROPS["cherry"], turning_days=3, turning_puncture_probability=1.0, young_puncture_probability=0.0, seed=1)
+    f = m.fruits[0]
+    hits = []
+    for t in range(f.maturation_age + 1):
+        m.time = t
+        hits.append(f.can_receive_oviposition())
+    assert hits == [False] * (f.maturation_age + 1 - 3) + [True] * 3

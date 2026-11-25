@@ -116,6 +116,8 @@ export function Comparison() {
   const ranked = [...sel].sort((a, b) => c.dir * (a.sc.metrics[crit].mean - b.sc.metrics[crit].mean));
   const crops = new Set(sel.map((s) => s.sc.crop));
   const budgets = new Set(sel.map((s) => s.sc.budget));
+  const invasions = new Set(sel.map((s) => { const i = s.sc.invasion ?? s.exp.config.invasion; return `${i.wild}:${i.females}`; }));
+  const regimes = new Set(sel.map((s) => s.sc.remating ?? s.exp.config.remating));
 
   return (
     <>
@@ -166,9 +168,11 @@ export function Comparison() {
                 </Panel>
               ))}
             </div>
-            {(crops.size > 1 || budgets.size > 1) && <ResearchAnnotation>
+            {(crops.size > 1 || budgets.size > 1 || invasions.size > 1 || regimes.size > 1) && <ResearchAnnotation>
               {crops.size > 1 && <>Cultures différentes : durées de saison distinctes ({[...crops].map((c) => `${CROP_LABEL[c]} ${meta?.crops[c].params.season_length} j`).join(", ")}) et dynamiques de fruits différentes{VAR[variable]?.unit === "individus" && norm === "none" ? <> ; les populations sont comparées en effectifs absolus (individus), sur des parcelles de {[...crops].map((c) => fmtInt(Number(meta?.crops[c].params.total_fruits))).join(" / ")} fruits</> : null}. </>}
               {budgets.size > 1 && <>Budgets différents entre scénarios. </>}
+              {invasions.size > 1 && <>Invasions initiales différentes entre scénarios. </>}
+              {regimes.size > 1 && <>Régimes de réaccouplement différents entre scénarios. </>}
               Utilisez la normalisation pour une comparaison relative explicite.
             </ResearchAnnotation>}
             <Panel className="px-5 py-4">

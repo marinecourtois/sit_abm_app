@@ -35,7 +35,7 @@ export interface Scenario {
   vs_control?: Record<string, { mean: number; sd: number; n: number; values: number[] } | null>;
 }
 export interface Results { experiment_id: string; schema_version: number; series_vars: string[]; scenarios: Scenario[]; computed_at: string; duration_s: number }
-export interface BiologyParam { name: string; label: string; group: string; symbol: string; unit: string; default: number; min: number; max: number; step: number; source: string; description: string; advanced: boolean }
+export interface BiologyParam { name: string; label: string; group: string; symbol: string; unit: string; default: number; min: number; max: number; step: number; source: string; description: string; advanced: boolean; /** Extension hors notebook (1.9.0), désactivée à sa valeur par défaut. */ extension?: boolean }
 export interface Meta {
   engine_version: string; params_version: string; schema_version: number;
   crops: Record<CropKey, { label: string; latin: string; summary: string; params: Record<string, number | string> }>;

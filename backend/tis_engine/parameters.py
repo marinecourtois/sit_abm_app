@@ -16,8 +16,8 @@ MAX_REPLICATES = 50
 # Valeur proposée par défaut dans le Studio (1.8.0) ; le minimum accepté reste MIN_REPLICATES
 DEFAULT_REPLICATES = 20
 
-PARAMS_VERSION = "nb-2025.10-echelle30"
-SCHEMA_VERSION = 1
+PARAMS_VERSION = "nb-2025.10-echelle30-ext1"   # ext1 (1.9.0) : + 5 paramètres d'extension, désactivés ; valeurs du notebook inchangées
+SCHEMA_VERSION = 2   # 2 (1.9.0) : plans, extensions, champs par scénario, nouvelles séries et métriques
 
 INVASION_PRESETS = {
     "faible": {"label": f"Faible ({3 * ECHELLE} W : {3 * ECHELLE} F)", "wild": 3 * ECHELLE, "females": 3 * ECHELLE},
@@ -132,7 +132,25 @@ BIOLOGY_PARAMS = {
                          "Part des fruits récoltables cueillis à chaque récolte.", True),
     "prophylaxis_fraction": ("\\phi_p", "fraction", 0.60, 0.0, 1.0, 0.01, "Cellule 4 — prophylaxis_fraction",
                              "Part des fruits pourris retirés à chaque passage de prophylaxie (fraise).", True),
+    # Extensions HORS NOTEBOOK (1.9.0, proposées par Marine Courtois). Valeur par défaut = désactivée :
+    # le moteur reproduit alors le notebook au bit près.
+    "immigration_wild_males": ("m_W", "mâles / jour", 0, 0, 1000, 1, "Extension hors notebook (EXT 1, 1.9.0)",
+                               "Mâles sauvages qui entrent dans la parcelle chaque jour à partir de J1. 0 = parcelle fermée, comme le notebook. "
+                               "Proposition de Marine : 15 / jour en fraise, 8 / jour en cerise.", True),
+    "immigration_females": ("m_F", "femelles / jour", 0, 0, 1000, 1, "Extension hors notebook (EXT 1, 1.9.0)",
+                            "Femelles déjà fécondées au champ qui entrent dans la parcelle chaque jour à partir de J1. 0 = parcelle fermée (notebook).", True),
+    "carrying_capacity": ("K_a", "adultes sauvages", 0, 0, 100000, 100, "Extension hors notebook (EXT 2, 1.9.0)",
+                          "Capacité de charge : quand les adultes sauvages (W + F) atteignent K_a, une larve qui émerge meurt au lieu "
+                          "de devenir adulte. 0 = aucune limite (notebook). Proposition de Marine : 3 000.", True),
+    "turning_days": ("d_t", "jours", 0, 0, 30, 1, "Extension hors notebook (EXT 3, 1.9.0)",
+                     "Stade « tournant » : les d_t derniers jours de la phase jeune d'un fruit (jeune aux âges 0 … M), une ponte réussit avec la probabilité p_t "
+                     "au lieu de p_y. 0 = deux stades, jeune et mûr (notebook). Maturité tirée en 2–4 j (fraise) et 10–15 j (cerise).", True),
+    "turning_puncture_probability": ("p_t", "probabilité", 0.30, 0.0, 1.0, 0.01, "Extension hors notebook (EXT 3, 1.9.0)",
+                                     "Réussite d'une ponte sur un fruit « tournant » ; n'agit que si d_t > 0. Proposition de Marine : 0,30 "
+                                     "(avec p_y = 0 pour les fruits verts).", True),
 }
+# Clés des extensions hors notebook et leur valeur « désactivée »
+EXTENSION_PARAMS = ("immigration_wild_males", "immigration_females", "carrying_capacity", "turning_days", "turning_puncture_probability")
 
 def _dec(x):
     return str(x).replace(".", ",")
@@ -179,6 +197,7 @@ PARAM_GROUPS = [
     ("ponte", "Ponte dans les fruits"),
     ("pourrissement", "Pourrissement des fruits"),
     ("recolte", "Récolte et prophylaxie"),
+    ("extensions", "Extensions hors notebook (désactivées par défaut)"),
 ]
 PARAM_UI = {
     "eta": ("Compétitivité des mâles stériles", "accouplement"),
@@ -196,7 +215,24 @@ PARAM_UI = {
     "rot_hazard_fertile": ("Taux après ponte fertile", "pourrissement"),
     "harvest_fraction": ("Part des fruits mûrs récoltés", "recolte"),
     "prophylaxis_fraction": ("Part des fruits pourris retirés", "recolte"),
+    "immigration_wild_males": ("Immigration de mâles sauvages", "extensions"),
+    "immigration_females": ("Immigration de femelles fécondées", "extensions"),
+    "carrying_capacity": ("Capacité de charge des adultes sauvages", "extensions"),
+    "turning_days": ("Durée du stade « tournant »", "extensions"),
+    "turning_puncture_probability": ("Réussite d'une ponte sur fruit tournant", "extensions"),
 }
+
+
+def active_extensions(bio: dict) -> list[str]:
+    """Extensions hors notebook actives dans un jeu de paramètres biologiques."""
+    on = []
+    if bio.get("immigration_wild_males", 0) or bio.get("immigration_females", 0):
+        on.append("immigration")
+    if bio.get("carrying_capacity", 0):
+        on.append("carrying_capacity")
+    if bio.get("turning_days", 0):
+        on.append("turning")
+    return on
 
 
 def biology_defaults() -> dict:
@@ -215,7 +251,8 @@ def registry() -> dict:
         "budget_presets": BUDGET_PRESETS,
         "biology": [
             {"name": k, "label": PARAM_UI[k][0], "group": PARAM_UI[k][1], "symbol": v[0], "unit": v[1], "default": v[2],
-             "min": v[3], "max": v[4], "step": v[5], "source": v[6], "description": v[7], "advanced": v[8]}
+             "min": v[3], "max": v[4], "step": v[5], "source": v[6], "description": v[7], "advanced": v[8],
+             "extension": k in EXTENSION_PARAMS}
             for k, v in BIOLOGY_PARAMS.items()
         ],
         "biology_groups": [{"key": k, "label": l} for k, l in PARAM_GROUPS],

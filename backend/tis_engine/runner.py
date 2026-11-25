@@ -21,6 +21,7 @@ SERIES_VARS = [
     "Wild_males", "Sterile_males", "Females", "Larvae",
     "Young_fruits", "Harvestable_fruits", "Rotten_natural", "Rotten_sterile_only", "Rotten_larvae",
     "Harvested_cumul", "Rotten_cumul",
+    "Fertile_females", "Sterile_mating_prob",   # APP 7 (1.9.0), lectures sans tirage
 ]
 
 # Stratégies du notebook (make_strategies) : clé app -> nom notebook
@@ -95,6 +96,12 @@ def run_season(task: dict, on_day: Callable[[int, dict], None] | None = None) ->
                      "female": float(bio["lifespan_cv"])},
         eta=float(bio["eta"]),
         eta_sperm_choice=float(bio["eta_sperm_choice"]),
+        # Extensions hors notebook : absentes des anciennes configurations = désactivées
+        immigration_wild_males=int(bio.get("immigration_wild_males", 0)),
+        immigration_females=int(bio.get("immigration_females", 0)),
+        carrying_capacity=int(bio.get("carrying_capacity", 0)),
+        turning_days=int(bio.get("turning_days", 0)),
+        turning_puncture_probability=float(bio.get("turning_puncture_probability", 0.30)),
         seed=int(task["seed"]),
     )
     mv = model.datacollector.model_vars
@@ -120,6 +127,8 @@ def run_season(task: dict, on_day: Callable[[int, dict], None] | None = None) ->
         "remaining_sterile_only_pct": 100 * rem[1] / tot,
         "remaining_larvae_pct": 100 * rem[2] / tot,
         "sterile_released": model.total_sterile_released,
+        "immigrants": model.total_immigrants,                       # EXT 1 (0 si désactivée)
+        "emergences_blocked": model.cumulative_emergences_blocked,  # EXT 2 (0 si désactivée)
     }
     metrics["larval_damage_pct"] = (metrics["harvested_larvae_pct"] + metrics["rotten_larvae_pct"]
                                     + metrics["remaining_larvae_pct"])
@@ -150,6 +159,10 @@ def aggregate(replicates: list[dict]) -> dict:
     for name, fn in derived.items():
         cols = [[fn(r["series"], i) for r in replicates] for i in range(n_t)]
         series[name] = _band(cols)
+    # Fruits pourris dans la journée : différence du cumul, par répétition (0 au jour 0)
+    if "Rotten_cumul" in replicates[0]["series"]:
+        cols = [[(r["series"]["Rotten_cumul"][i] - r["series"]["Rotten_cumul"][i - 1]) if i else 0 for r in replicates] for i in range(n_t)]
+        series["Rotten_daily"] = _band(cols)
     # Population relative : adultes sauvages (W + F) / leur effectif au jour 0, par répétition
     cols = [[(r["series"]["Wild_males"][i] + r["series"]["Females"][i])
              / max(1, r["series"]["Wild_males"][0] + r["series"]["Females"][0]) for r in replicates]

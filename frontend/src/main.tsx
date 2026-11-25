@@ -18,6 +18,9 @@ const Comparison = lazy(() => import("./pages/Comparison").then((m) => ({ defaul
 const Analytics = lazy(() => import("./pages/Analytics").then((m) => ({ default: m.Analytics })));
 const Protocol = lazy(() => import("./pages/Protocol").then((m) => ({ default: m.Protocol })));
 const Publications = lazy(() => import("./pages/Publications").then((m) => ({ default: m.Publications })));
+const Parameters = lazy(() => import("./pages/Parameters").then((m) => ({ default: m.Parameters })));
+const Model = lazy(() => import("./pages/Model").then((m) => ({ default: m.Model })));
+const Dynamics = lazy(() => import("./pages/Dynamics").then((m) => ({ default: m.Dynamics })));
 
 function App() {
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -43,6 +46,9 @@ function App() {
                 <Route path="/resultats" element={<Analytics />} />
                 <Route path="/protocole" element={<Protocol />} />
                 <Route path="/publications" element={<Publications />} />
+                <Route path="/parametres" element={<Parameters />} />
+                <Route path="/modele" element={<Model />} />
+                <Route path="/dynamiques" element={<Dynamics />} />
                 <Route path="*" element={<div className="mt-10"><EmptyState title="Page introuvable" /></div>} />
               </Routes>
               </Suspense>

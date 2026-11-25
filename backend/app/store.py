@@ -52,6 +52,12 @@ def init():
 def _row(r) -> dict:
     d = dict(r)
     d["config"] = json.loads(d["config"])
+    # Expériences d'avant la 1.9.0 : extensions hors notebook absentes = désactivées
+    bio = d["config"].get("biology")
+    if isinstance(bio, dict):
+        from tis_engine.parameters import EXTENSION_PARAMS, biology_defaults
+        defaults = biology_defaults()
+        d["config"]["biology"] = {**{k: defaults[k] for k in EXTENSION_PARAMS if k not in bio}, **bio}
     d["tags"] = json.loads(d["tags"] or "[]")
     d["runtime"] = json.loads(d["runtime"]) if d.get("runtime") else None
     d["has_results"] = (RESULTS / f"{d['id']}.json.gz").exists()

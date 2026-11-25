@@ -9,6 +9,7 @@ import traceback
 from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 
 from tis_engine.model import CROPS
+from tis_engine.parameters import SCHEMA_VERSION
 from tis_engine.runner import SERIES_VARS, Cancelled, aggregate, build_schedule
 
 from . import store, worker
@@ -283,6 +284,6 @@ def build_results(eid, cfg: ExperimentConfig, plan, results):
                 "harvested_clean_pct": _paired_change(reps, ctrl, m("harvested_clean_pct")),
             }
         scenarios.append(sc)
-    return {"experiment_id": eid, "schema_version": 1, "series_vars": ["Time", *SERIES_VARS,
-            "Wild_adults", "SW_ratio", "Wild_adults_relative", "Wild_adults_vs_control"], "scenarios": scenarios,
+    return {"experiment_id": eid, "schema_version": SCHEMA_VERSION, "series_vars": ["Time", *SERIES_VARS,
+            "Wild_adults", "SW_ratio", "Rotten_daily", "Wild_adults_relative", "Wild_adults_vs_control"], "scenarios": scenarios,
             "computed_at": store.now()}

@@ -18,6 +18,19 @@ sont marquées « APP » et ne changent aucun nombre quand les valeurs par défa
           durée de vie naturelle : pour eux `check_status` ne fait aucun tirage aléatoire et se
           réduit à « mûr si âge ≥ maturation ». Même ordre de tirages, mêmes nombres ; ≈ 2× plus
           rapide sur la cerise (90 000 fruits vérifiés chaque jour).
+  APP 7 : séries supplémentaires lues sans aucun tirage (application 1.9.0) : femelles fécondées
+          (capables de pondre des œufs viables selon leur régime) et probabilité qu'un
+          accouplement soit stérile, η·S / (W + η·S).
+
+Extensions HORS NOTEBOOK (application 1.9.0, proposées par Marine Courtois). Désactivées par
+défaut : avec leurs valeurs par défaut (0), aucune ligne de code supplémentaire ne s'exécute et
+aucun tirage n'est ajouté, donc les résultats restent identiques au notebook au bit près.
+  EXT 1 : immigration quotidienne (à partir de J1) de mâles sauvages et de femelles déjà fécondées.
+  EXT 2 : capacité de charge K_a des adultes sauvages : une larve qui émerge alors que W + F ≥ K_a
+          meurt au lieu de devenir adulte (régulation densité-dépendante à l'émergence).
+  EXT 3 : stade « tournant » : les d_t derniers jours de la phase jeune (un fruit est jeune aux
+          âges 0 … M, M = âge de maturité), une ponte tentée réussit avec la probabilité p_t au
+          lieu de p_y (même nombre de tirages).
 """
 from __future__ import annotations
 
@@ -26,7 +39,7 @@ from dataclasses import dataclass, asdict
 
 import modelly
 
-ENGINE_VERSION = "1.2.0"          # version de l'extraction (ce module)
+ENGINE_VERSION = "1.3.0"          # version de l'extraction (ce module)
 NOTEBOOK_REFERENCE = "Notebook_ABM_TIS_Optimise_Modelly.ipynb"
 ECHELLE = 30
 
@@ -176,6 +189,10 @@ class Larvae_Agent(modelly.Agent):
             return
         if self.model.time >= self.emergence_date:
             self.kill()
+            m = self.model
+            if m.carrying_capacity and m.pop_wild_males + m.pop_females >= m.carrying_capacity:   # EXT 2
+                m.cumulative_emergences_blocked += 1
+                return
             if self.model.random.random() < self.sex_ratio:
                 WildMales_Agent(self.model)
             else:
@@ -315,7 +332,11 @@ class Fruit_Agent:
     def can_receive_oviposition(self):
         if not self.has_space(): return False
         rng = self.model.random
-        if self.status == "young": return rng.random() < self.young_puncture_probability
+        if self.status == "young":
+            td = self.model.turning_days   # EXT 3
+            if td and self.model.time - self.creation_date > self.maturation_age - td:   # âges M-d_t+1 … M : d_t jours
+                return rng.random() < self.model.turning_puncture_probability
+            return rng.random() < self.young_puncture_probability
         if self.status == "rotten": return rng.random() < self.rotten_puncture_probability
         return self.status == "harvestable"
 
@@ -391,12 +412,20 @@ class RematingModel(modelly.Model):
         harvest_fraction=0.90, prophylaxis_fraction=0.60, seed=None,
         # APP 1 / APP 2 (défauts = constantes du notebook)
         lifespan_means=None, lifespan_cv=None, eta=0.8, eta_sperm_choice=0.59,
+        # Extensions hors notebook (désactivées par défaut)
+        immigration_wild_males=0, immigration_females=0, carrying_capacity=0,
+        turning_days=0, turning_puncture_probability=0.30,
     ):
         super().__init__(rng=seed)
         self.random = modelly.FastRandom(seed)
         self.lifespan_means = dict(LIFESPAN_MEANS if lifespan_means is None else lifespan_means)
         self.lifespan_cv = dict(LIFESPAN_CV if lifespan_cv is None else lifespan_cv)
         self.eta, self.eta_sperm_choice = eta, eta_sperm_choice
+        self.immigration_wild_males, self.immigration_females = int(immigration_wild_males), int(immigration_females)   # EXT 1
+        self.total_immigrants = 0
+        self.carrying_capacity = int(carrying_capacity)   # EXT 2
+        self.cumulative_emergences_blocked = 0
+        self.turning_days, self.turning_puncture_probability = int(turning_days), float(turning_puncture_probability)   # EXT 3
         self.cumulative_fertile_ovipositions = 0   # APP 3
         self.cumulative_sterile_ovipositions = 0   # APP 3
         self._fruit_id_counter = 0
@@ -442,9 +471,27 @@ class RematingModel(modelly.Model):
                 "Rotten_larvae": lambda m: m._census[4],
                 "Harvested_cumul": lambda m: m.cumulative_harvested_fruits,
                 "Rotten_cumul": lambda m: m.cumulative_rotten_fruits,
+                # APP 7 : lectures sans tirage
+                "Fertile_females": lambda m: m.fertile_females(),
+                "Sterile_mating_prob": lambda m: (m.eta * m.pop_sterile_males / (m.pop_wild_males + m.eta * m.pop_sterile_males)
+                                                  if m.pop_wild_males + m.eta * m.pop_sterile_males > 0 else 0.0),
             }
         )
         self.collect_data()
+
+    def fertile_females(self):
+        """APP 7 : femelles vivantes capables de pondre des œufs viables dans leur régime
+        (au moins un accouplement fertile ; en « first » / « last », celui qui compte est fertile)."""
+        n = 0
+        for f in self.agents_by_type.get(Females_Agent, ()):
+            if f.fertile_matings == 0:
+                continue
+            if f.sperm_selection == "first" and f.first_mating != 1:
+                continue
+            if f.sperm_selection == "last" and f.last_mating != 1:
+                continue
+            n += 1
+        return n
 
     def next_fruit_id(self):
         uid = self._fruit_id_counter
@@ -517,6 +564,10 @@ class RematingModel(modelly.Model):
         self.total_sterile_released += n_ster
         n_fem = int(self.female_releases.get(self.time, 0))
         for _ in range(n_fem): Females_Agent(self, self.sperm_selection, initial_mating_status=self.female_release_mating_status)
+        if self.time > 0 and (self.immigration_wild_males or self.immigration_females):   # EXT 1, à partir de J1
+            for _ in range(self.immigration_wild_males): WildMales_Agent(self)
+            for _ in range(self.immigration_females): Females_Agent(self, self.sperm_selection, initial_mating_status="fertile")
+            self.total_immigrants += self.immigration_wild_males + self.immigration_females
 
         agents = [a for bucket in self.agents_by_type.values() for a in bucket]
         self.random.shuffle(agents)

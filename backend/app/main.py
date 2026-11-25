@@ -18,7 +18,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from tis_engine.parameters import MIN_REPLICATES, INVASION_PRESETS, biology_defaults, registry
+from tis_engine.parameters import MIN_REPLICATES, INVASION_PRESETS, SCHEMA_VERSION, biology_defaults, registry
 from tis_engine.runner import STRATEGIES
 
 from . import APP_VERSION, jobs, store
@@ -310,7 +310,7 @@ def export(eid: str, format: str = Query("json")):
 
 
 def _protocol_json(e) -> str:
-    doc = {"format": "modelly-tis-protocol", "schema_version": 1, "name": e["name"], "config": e["config"],
+    doc = {"format": "modelly-tis-protocol", "schema_version": SCHEMA_VERSION, "name": e["name"], "config": e["config"],
            "source_experiment": e["short_id"], "versions": versions()}
     return json.dumps(doc, indent=2, ensure_ascii=False)
 

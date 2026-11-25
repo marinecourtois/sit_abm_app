@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Activity, BarChart3, BookOpen, FlaskConical, Home, Layers, Menu, Play, Search, X, Download, Plus } from "../icons";
+import { Activity, BarChart3, BookOpen, Bug, FlaskConical, Settings, Home, Layers, Menu, Play, Search, X, Download, Plus } from "../icons";
 import { FieldLandscape, LeafMark, SeedlingIcon } from "../illustrations";
 import { api, type ActiveRun } from "../lib/api";
 import { useMeta } from "../lib/meta";
@@ -59,6 +59,9 @@ export function ActivityIndicator({ onNavigate }: { onNavigate?: () => void }) {
 
 const NAV = [
   { to: "/", label: "Vue d’ensemble", icon: Home, key: "g o" },
+  { to: "/parametres", label: "Paramètres", icon: Settings, key: "g a" },
+  { to: "/modele", label: "Modèle", icon: Bug, key: "g m" },
+  { to: "/dynamiques", label: "Dynamiques", icon: Activity, key: "g d" },
   { to: "/experiences", label: "Expériences", icon: FlaskConical, key: "g e" },
   { to: "/simulation", label: "Simulation", icon: Play, key: "g s" },
   { to: "/comparaison", label: "Comparaison", icon: BarChart3, key: "g c" },
@@ -225,7 +228,9 @@ export function StudyHeader({ crumb, title, subtitle, actions }: { crumb: string
 
 const TABS = [
   { to: "/", label: "Vue d’ensemble" },
+  { to: "/modele", label: "Modèle" },
   { to: "/protocole", label: "Protocole" },
+  { to: "/dynamiques", label: "Dynamiques" },
   { to: "/comparaison", label: "Comparaison" },
   { to: "/resultats", label: "Analyses" },
 ];

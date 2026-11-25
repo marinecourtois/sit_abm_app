@@ -8,8 +8,8 @@ make test          # tout, directement : pytest (backend) puis Vitest (frontend)
 
 | Suite | Outil | Fichiers | Tests |
 |---|---|---|---|
-| Backend : non-régression, API, contrat | pytest (`backend/tests/`) | 3 | 54 |
-| Frontend : unitaires, composants, contrat | Vitest + Testing Library (`frontend/src/**/*.test.ts(x)`) | 13 | 95 |
+| Backend : non-régression, API, contrat | pytest (`backend/tests/`) | 3 | 61 |
+| Frontend : unitaires, composants, contrat | Vitest + Testing Library (`frontend/src/**/*.test.ts(x)`) | 14 | 100 |
 
 ## SmartTest : ne lancer que les tests affectés
 
@@ -74,6 +74,16 @@ Les graines utilisées sont celles du notebook (`42 + 1000·rep + 7·B + 13·len
 19·len(invasion)` pour le plan factoriel, `42 + 1000·rep + 17·len(stratégie)` pour les
 dynamiques).
 
+### Séries et extensions hors notebook (1.9.0, `tests/test_regression.py`)
+
+| Test | Vérifie |
+|---|---|
+| `test_new_series_are_consistent_and_draw_nothing` | Femelles fécondées ≤ femelles ; probabilité d'accouplement stérile dans [0, 1], nulle sans stériles. Les tests bit à bit ci-dessus prouvent qu'elles ne tirent aucun nombre |
+| `test_immigration_extension` | `immigrants` = (m_W + m_F) × jours ; plus de larves qu'en parcelle fermée |
+| `test_carrying_capacity_extension` | Émergences bloquées > 0 et W + F ≤ K_a, sur un témoin dont la population dépasse K_a sans l'extension |
+| `test_turning_stage_extension` | p_y = 0 et d_t ≥ maturité max avec p_t = 0,3 est **identique au bit près** au modèle du notebook avec p_y = 0,3 ; un stade plus court change les résultats |
+| `test_turning_window_lasts_exactly_d_t_days` | Un fruit jeune aux âges 0 … M n'est « tournant » qu'aux d_t derniers (M − d_t + 1 … M) |
+
 ### `tests/test_frontend_contract.py` — contrat backend → frontend
 
 | Test | Vérifie |
@@ -97,6 +107,7 @@ dynamiques).
 | `lib/format.test.ts` | Format français, tiret (jamais zéro) pour une valeur absente, signes |
 | `lib/indicators.test.ts` | Chaque indicateur en % précise son dénominateur ; somme des fruits infestés ; écarts en points de % ; écart-type n − 1 |
 | `components/charts/exportChart.test.ts` | CSV : échappement et précision complète |
+| `pages/Model.test.tsx` | Page Modèle : les cinq classes d'agents du moteur et leurs valeurs lues dans le registre ; les trois mécanismes absents du notebook marqués « option hors notebook » |
 | `pages/Protocol.test.ts` | Export JSON des paramètres : chaque paramètre biologique avec sa valeur du notebook, sa plage, son unité et sa source |
 | `lib/analysis.test.ts` | Synthèse décisionnelle (classement, écart au témoin, sens de l'indicateur, écart inférieur à la variabilité, réponses aux deux questions) ; jeu de données des analyses d'une expérience : une ligne par saison aux colonnes du CSV du notebook, valeurs non modifiées ; invasion et régime propres à chaque scénario d'un plan ; variantes d'une même stratégie distinctes ; noms du notebook → clés du moteur ; libellés de scénario ; front de Pareto |
 
@@ -118,7 +129,9 @@ indicateur que le moteur ne calcule pas fait échouer le test Vitest **et** le t
 | `test_reproducibility_archive` | L'archive contient les 5 fichiers attendus, chaque SHA-256 du LISEZMOI correspond, le protocole se réimporte à l'identique |
 | `test_health_reports_app_version` | `/api/health` renvoie `app_version` |
 | `test_plan_crosses_budgets_invasions_and_regimes` | Plan 2 invasions × 2 régimes × 2 budgets : chaque scénario est **identique au bit près** à un appel direct du moteur (répétitions 0 et 9), graines communes, effet apparié calculé contre le témoin de sa cellule, colonnes du CSV |
-| `test_plan_limits_and_legacy_hash` | Plan trop grand ou valeurs en double refusés ; une configuration sans plan garde l'empreinte d'avant la 1.7.0 |
+| `test_plan_limits_and_legacy_hash` | Plan trop grand ou valeurs en double refusés ; une configuration sans plan garde l'empreinte d'avant la 1.7.0 ; liste à une valeur = valeur unique |
+| `test_configs_before_extensions_still_validate_and_run_identically` | Une configuration d'avant la 1.9.0 (sans clés d'extension) est acceptée, garde son empreinte et donne exactement les mêmes nombres |
+| `test_active_extension_is_flagged` | Une extension active et un stade « tournant » couvrant toute la phase jeune produisent les avertissements attendus |
 
 Les tests de l'API utilisent une base et un dossier de résultats temporaires : ils ne
 touchent pas `data/app.db`.

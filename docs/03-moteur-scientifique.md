@@ -19,7 +19,7 @@ pour les modifications les plus courantes.
 | 5 — calendriers | `schedules.py` | `continuous_schedule`, `periodic_schedule`, `front_loaded_schedule`, `make_strategies` |
 | 5 — `_run_factorial_season` | `runner.py` | Métriques de fin de saison |
 
-Six ajouts, marqués `APP 1` à `APP 6` dans `model.py`, ne changent **aucun
+Sept ajouts, marqués `APP 1` à `APP 7` dans `model.py`, ne changent **aucun
 nombre** avec les valeurs par défaut :
 
 | Marque | Ajout | Pourquoi |
@@ -30,6 +30,28 @@ nombre** avec les valeurs par défaut :
 | APP 4 | `CropParameters.final_harvest` remplace le test `crop.name == "cherry"` | Comportement identique, généralisable à d'autres cultures |
 | APP 5 | Constantes fixes nommées (`EGGS_POISSON_MEAN`, `RF_FERTILE`, `LARVAL_MORTALITY`, `SEX_RATIO`…) | **Source unique** : le code les utilise et l'interface les affiche (page Protocole), sans recopie |
 | APP 6 | `Fruit_Agent.__slots__` ; dans `advance_day`, statut des fruits **jamais piqués** et encore dans leur durée de vie naturelle mis à jour directement (« mûr si âge ≥ maturation ») au lieu d'appeler `check_status` | Performance (11 à 21 % par saison). Pour ces fruits, `check_status` ne tire aucun nombre aléatoire : l'ordre des tirages est identique. Tout autre fruit passe toujours par `check_status` |
+| APP 7 | Séries `Fertile_females` (femelles vivantes capables de pondre des œufs viables dans leur régime) et `Sterile_mating_prob` (η·S / (W + η·S)) dans le `DataCollector` | Page Dynamiques (1.9.0). Lectures sans aucun tirage : métriques et séries existantes identiques |
+
+### Extensions hors notebook (EXT 1 à 3, désactivées par défaut)
+
+Depuis la 1.9.0, trois mécanismes proposés par Marine Courtois peuvent être activés en Mode
+Avancé (groupe « Extensions hors notebook »). Ils **n'existent pas dans le notebook**. À leur
+valeur par défaut (0), aucune ligne supplémentaire ne s'exécute et aucun tirage n'est ajouté :
+le moteur reproduit le notebook au bit près (`test_factorial_bit_exact`, `test_dynamics_bit_exact`).
+
+| Marque | Paramètres | Règle |
+|---|---|---|
+| EXT 1 | `immigration_wild_males` (m_W), `immigration_females` (m_F) | Chaque jour à partir de J1, après les lâchers, m_W mâles sauvages et m_F femelles **déjà fécondées** entrent dans la parcelle, à l'âge 0 (J0 est l'invasion initiale). Métrique `immigrants` = (m_W + m_F) × (jours − 1). |
+| EXT 2 | `carrying_capacity` (K_a) | Une larve qui émerge alors que W + F ≥ K_a meurt au lieu de devenir adulte (sans tirage du sexe). W + F ne dépasse donc K_a que par l'effectif initial ou l'immigration. Métrique `emergences_blocked`. |
+| EXT 3 | `turning_days` (d_t), `turning_puncture_probability` (p_t) | Un fruit est jeune aux âges 0 … M (M = âge de maturité tiré). Aux d_t derniers de ces âges (M − d_t + 1 … M), une ponte tentée réussit avec p_t au lieu de p_y. Même nombre de tirages. La maturité est tirée en 2–4 j (fraise) et 10–15 j (cerise) ; avec d_t > maturité max, toute la phase jeune est « tournante » (la validation l'indique). |
+
+Propositions de Marine (dans son prototype) : immigration 15 / jour en fraise et 8 / jour en
+cerise, K = 3 000 adultes, stades vert (0 %), tournant (30 %), mûr (100 %). Les stades de son
+prototype (J0–12, J12–17, J17–22) ne correspondent pas aux maturités du modèle : avec EXT 3, on
+obtient « vert à 0 %, tournant à 30 % » par p_y = 0, p_t = 0,30 et un d_t choisi dans la plage de
+maturité de la culture. Une expérience avec une extension active porte un avertissement partout
+(validation, page de la simulation, page Dynamiques) : ses résultats ne sont pas comparables au
+plan factoriel de référence.
 
 ### Source unique de vérité
 
@@ -129,7 +151,14 @@ Trois numéros de version accompagnent chaque expérience :
 Les expériences existantes conservent les versions avec lesquelles elles ont été calculées.
 
 Historique de `ENGINE_VERSION` : **1.1.0** (extraction du notebook, APP 1 à 5) → **1.2.0**
-(application 1.6.0, APP 6, performance seule : mêmes nombres au bit près).
+(application 1.6.0, APP 6, performance seule : mêmes nombres au bit près) → **1.3.0**
+(application 1.9.0, APP 7 et extensions EXT 1 à 3 désactivées par défaut : mêmes nombres au bit
+près). `PARAMS_VERSION` : `nb-2025.10-echelle30` → `nb-2025.10-echelle30-ext1` (cinq paramètres
+d'extension ajoutés, valeurs du notebook inchangées). `SCHEMA_VERSION` : 1 → **2** (plans,
+paramètres d'extension, `invasion`/`remating`/`strategy_id` par scénario, séries
+`Fertile_females`, `Sterile_mating_prob`, `Rotten_daily`, métriques `immigrants`,
+`emergences_blocked`). Les configurations d'avant la 1.9.0, sans clés d'extension, restent
+acceptées : les extensions y sont désactivées et leur empreinte (`config_hash`) est inchangée.
 
 La version de l'**application** (`APP_VERSION`, `backend/app/__init__.py`) est distincte : elle
 suit les évolutions de l'interface et de l'API (voir `CHANGELOG.md`) et est enregistrée dans

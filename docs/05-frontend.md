@@ -62,6 +62,9 @@ frontend/src/
 | `/resultats` | Research Analytics | `pages/Analytics.tsx` |
 | `/protocole` | Protocole scientifique | `pages/Protocol.tsx` |
 | `/publications` | Rapport et exports (`?exp=<id>`) | `pages/Publications.tsx` |
+| `/parametres` | Paramètres du modèle : réglages, catalogue (symbole, valeur, plage, source), cultures, constantes, export JSON, « Ouvrir dans le Studio » | `pages/Parameters.tsx` |
+| `/modele` | Modèle et hypothèses : les cinq agents (règles et valeurs lues dans le registre), une journée simulée, hypothèses H1–H8 (notebook ou option) | `pages/Model.tsx` |
+| `/dynamiques` | Dynamiques des agents (`?exp=<id>`) : insectes avec femelles fécondées, état des fruits, pourris par jour, compétition sexuelle, pics, témoin superposé | `pages/Dynamics.tsx` |
 
 ## Design system « Scientific Botanical Editorial »
 
@@ -135,15 +138,24 @@ Les libellés scientifiques (paramètres, stratégies, cultures) viennent du bac
 (`tis_engine/parameters.py`) : les modifier là-bas pour qu'ils restent cohérents partout.
 Les autres textes sont directement dans les pages.
 
-## Paramètres (Studio)
+## Paramètres (Studio et page Paramètres)
 
-`pages/Studio.tsx` :
+`components/parameters.tsx` (partagé par le Studio et la page Paramètres) :
 
 - `ParameterField` : libellé court (`label` du registre), symbole KaTeX, curseur avec **repère
   de la valeur du notebook**, champ numérique exact avec unité, plage admise, état « modifié »
   mis en évidence et bouton « Rétablir ».
 - `ParameterGroups` : regroupe les paramètres par thème (`group`, ordre de `biology_groups`),
   avec un « Rétablir ce groupe ». En Mode Essentiel, seuls les paramètres `advanced: false`.
+- Les paramètres `extension: true` (groupe « Extensions hors notebook ») portent un badge
+  « hors notebook », affichent « désactivé à 0 » au lieu de la valeur du notebook, et leur groupe
+  rappelle qu'activés ils changent le modèle.
+- La page Paramètres garde les valeurs choisies pour la session (`sessionStorage`) ; « Ouvrir
+  dans le Studio » les transmet (`navigate("/simulation", { state: { biology } })`) et passe en
+  Mode Avancé si un paramètre avancé est modifié.
+
+`pages/Studio.tsx` :
+
 - `RematingSelector` : cartes des régimes avec leur formule ; polyandrie et monandrie (plan du
   notebook) en Mode Essentiel, les quatre régimes en Mode Avancé.
 

@@ -5,10 +5,11 @@ import hashlib
 import json
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from tis_engine.model import CROPS
-from tis_engine.parameters import MAX_REPLICATES, MIN_REPLICATES, BIOLOGY_PARAMS, INVASION_PRESETS, STRATEGY_META, biology_defaults
+from tis_engine.parameters import (MAX_REPLICATES, MIN_REPLICATES, BIOLOGY_PARAMS, EXTENSION_PARAMS, INVASION_PRESETS, STRATEGY_META,
+                                   active_extensions, biology_defaults)
 from tis_engine.runner import REMATING_MODES, STRATEGY_PRESETS, build_schedule
 
 
@@ -43,6 +44,13 @@ class ExperimentConfig(BaseModel):
     invasions: Optional[list[Invasion]] = None
     rematings: Optional[list[str]] = None
 
+    @field_validator("biology")
+    @classmethod
+    def _extensions_off_when_absent(cls, bio: dict) -> dict:
+        # Configurations d'avant la 1.9.0 : les extensions hors notebook absentes sont désactivées
+        defaults = biology_defaults()
+        return {**{k: defaults[k] for k in EXTENSION_PARAMS if k not in bio}, **bio}
+
 
 class ExperimentCreate(BaseModel):
     name: str
@@ -75,14 +83,31 @@ def strategy_label(s: StrategySpec) -> str:
 
 
 PLAN_FIELDS = ("budgets", "invasions", "rematings")
+# Paramètres biologiques entiers (le moteur les utilise via int())
+INTEGER_PARAMS = ("fruit_capacity", "immigration_wild_males", "immigration_females", "carrying_capacity", "turning_days")
 MAX_SEASONS = 10_000
 
 
 def config_hash(cfg: ExperimentConfig) -> str:
     d = cfg.model_dump()
-    for k in PLAN_FIELDS:   # champs de plan absents : même empreinte qu'avant la 1.7.0
-        if d[k] is None:
-            del d[k]
+    # Plan normalisé : une liste vide ou à une valeur équivaut à la valeur unique ; une liste à
+    # plusieurs valeurs rend la valeur unique sans effet. Sans plan : même empreinte qu'avant la 1.7.0.
+    for lst, one in (("budgets", "budget"), ("invasions", "invasion"), ("rematings", "remating")):
+        v = d[lst]
+        if v is not None and len(v) <= 1:
+            if v:
+                d[one] = v[0]
+            v = None
+        if v is None:
+            del d[lst]
+        else:
+            del d[one]
+    defaults = biology_defaults()
+    for k in EXTENSION_PARAMS:   # extensions désactivées : même empreinte qu'avant la 1.9.0
+        if d["biology"].get(k) == defaults[k]:
+            del d["biology"][k]
+    if not d["biology"].get("turning_days"):   # p_t sans effet quand le stade tournant est désactivé
+        d["biology"].pop("turning_puncture_probability", None)
     return hashlib.sha256(json.dumps(d, sort_keys=True).encode()).hexdigest()[:16]
 
 
@@ -166,10 +191,23 @@ def validate_config(cfg: ExperimentConfig, history: list[dict] | None = None) ->
             v = cfg.biology[k]
             if not isinstance(v, (int, float)) or isinstance(v, bool):
                 errors.append(f"{k} : valeur numérique attendue ({meta[1]}).")
+            elif k in INTEGER_PARAMS and v != int(v):
+                errors.append(f"{k} = {v} : valeur entière attendue ({meta[1]}).")
             elif not meta[3] <= v <= meta[4]:
                 errors.append(f"{k} = {v} hors de la plage admise [{meta[3]} ; {meta[4]}] ({meta[1]}).")
-            elif v != meta[2]:
+            elif v != meta[2] and k not in EXTENSION_PARAMS:
                 warnings.append(f"{k} = {v} {meta[1]} (valeur du notebook : {meta[2]}).")
+    ext = active_extensions(cfg.biology)
+    if ext:
+        names = {"immigration": "immigration quotidienne", "carrying_capacity": "capacité de charge", "turning": "stade « tournant »"}
+        warnings.append("Extension hors notebook active : " + ", ".join(names[e] for e in ext)
+                        + ". Les résultats ne sont plus comparables au notebook ni au plan factoriel de référence.")
+    td = cfg.biology.get("turning_days", 0)
+    for c in cfg.crops:
+        # un fruit est jeune aux âges 0 … M : d_t > M_max couvre toute la phase jeune
+        if isinstance(td, (int, float)) and not isinstance(td, bool) and td and c in CROPS and td > CROPS[c].maturation_max:
+            warnings.append(f"{crop_label(c)} : d_t = {td} j couvre toute la phase jeune (maturité en {CROPS[c].maturation_min}–"
+                            f"{CROPS[c].maturation_max} j) ; tous les fruits jeunes sont « tournants ».")
 
     scenarios = []
     if not errors:
@@ -203,7 +241,7 @@ def validate_config(cfg: ExperimentConfig, history: list[dict] | None = None) ->
                         days = ", ".join(f"J{d}" for d in sorted(int(k) for k, v in sched.items() if v))
                         warnings.append(f"{crop_label(crop)} · {strategy_label(s)} : seulement {n_days} lâcher{'s' if n_days > 1 else ''} "
                                         f"sur une saison de {L} jours ({days}).")
-                    scenarios.append({"crop": crop, "strategy": strategy_label(s), "strategy_key": s.key, "budget": budget,
+                    scenarios.append({"crop": crop, "strategy": strategy_label(s), "strategy_key": s.key, "budget": 0 if s.key == "no_tis" else budget,
                                       "release_days": n_days, "total_released": sum(sched.values()), "season_length": L,
                                       "schedule": {str(k): v for k, v in sched.items() if v}})
                     if s.key == "no_tis":

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
-import { BarChart3, BookOpen, FileText, FlaskConical, Home, Layers, Play, Plus, Search } from "../icons";
+import { Activity, BarChart3, BookOpen, Bug, FileText, FlaskConical, Home, Layers, Play, Plus, Search, Settings } from "../icons";
 import { api, type Experiment } from "../lib/api";
 import { CROP_LABEL, STATUS_LABEL } from "../lib/format";
 
@@ -15,6 +15,9 @@ const PAGES: PaletteItem[] = [
   { id: "p-r", group: "Pages", label: "Résultats et analyses", to: "/resultats", icon: Layers, hint: "g r", keywords: "factoriel heatmap pareto" },
   { id: "p-p", group: "Pages", label: "Publications", to: "/publications", icon: BookOpen, hint: "g p", keywords: "rapport pdf export" },
   { id: "p-pr", group: "Pages", label: "Protocole", to: "/protocole", icon: FileText, keywords: "équations hypothèses paramètres" },
+  { id: "p-pa", group: "Pages", label: "Paramètres du modèle", to: "/parametres", icon: Settings, hint: "g a", keywords: "valeurs sources plages json immigration capacité" },
+  { id: "p-mo", group: "Pages", label: "Modèle et hypothèses", to: "/modele", icon: Bug, hint: "g m", keywords: "agents architecture femelle larve fruit" },
+  { id: "p-dy", group: "Pages", label: "Dynamiques des agents", to: "/dynamiques", icon: Activity, hint: "g d", keywords: "populations femelles fécondées témoin pics" },
 ];
 
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();

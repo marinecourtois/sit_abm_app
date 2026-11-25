@@ -7,7 +7,7 @@ import { useMeta } from "../lib/meta";
 import { CROP_LABEL, fmt, fmtDate, fmtInt } from "../lib/format";
 import { CROP_COLOR, STRATEGY_COLOR } from "../lib/colors";
 import { METRIC } from "../lib/variables";
-import { invasionLabel, planSize, scenarioLabel } from "../lib/analysis";
+import { invasionLabel, invasionShort, planSize, scenarioLabel } from "../lib/analysis";
 import { StudyHeader } from "../components/layout";
 import { Button, EmptyState, Panel, PanelTitle, Select, Skeleton } from "../components/ui";
 import { TimeSeriesChart } from "../components/charts/TimeSeriesChart";
@@ -31,8 +31,17 @@ export function ExportDialog({ exp }: { exp: Experiment }) {
   );
 }
 
-function describe(res: Results, crop: string) {
-  const sc = res.scenarios.filter((s) => s.crop === crop);
+/** Cellules d'un plan : culture × invasion × régime. Chaque cellule a son propre témoin. */
+function cellsOf(res: Results, crop: string): Scenario[][] {
+  const by = new Map<string, Scenario[]>();
+  for (const s of res.scenarios.filter((x) => x.crop === crop)) {
+    const k = `${s.invasion?.wild ?? ""}:${s.invasion?.females ?? ""}|${s.remating ?? ""}`;
+    by.set(k, [...(by.get(k) ?? []), s]);
+  }
+  return [...by.values()];
+}
+
+function describe(sc: Scenario[]) {
   const ctrl = sc.find((s) => s.is_control); const tis = sc.filter((s) => !s.is_control);
   if (!tis.length) return null;
   const by = (k: string) => [...tis].sort((a, b) => a.metrics[k].mean - b.metrics[k].mean);
@@ -110,13 +119,17 @@ export function Publications() {
             {crops.map((c) => <figure key={c} className="mt-3 font-sans">
               <TimeSeriesChart height={240} xLabel="Jour de saison" yLabel="Population relative" zoomable={false} ariaLabel={`Population relative, ${c}`}
                 series={res.scenarios.filter((s) => s.crop === c).map((s) => ({ id: s.key, label: scenarioLabel(s, exp.config, meta).split(" · ").slice(1).join(" · "), color: STRATEGY_COLOR[s.strategy_key] ?? "#547B91", dash: s.is_control ? "4 3" : undefined, x: s.series.Time, y: s.series.Wild_adults_relative.mean, sd: s.series.Wild_adults_relative.sd }))} />
-              <figcaption className="text-[11.5px] text-muted">Figure — {meta.crops[c].label} : adultes sauvages (W + F) rapportés à J0, moyenne ± écart-type ({exp.config.replicates} répétitions). Témoin en tirets. {res.scenarios.filter((s) => s.crop === c).map((s) => <span key={s.key} className="mr-2 inline-flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full" style={{ background: STRATEGY_COLOR[s.strategy_key] }} />{s.strategy_label}</span>)}</figcaption>
+              <figcaption className="text-[11.5px] text-muted">Figure — {meta.crops[c].label} : adultes sauvages (W + F) rapportés à J0, moyenne ± écart-type ({exp.config.replicates} répétitions). Témoin en tirets. {res.scenarios.filter((s) => s.crop === c).map((s) => <span key={s.key} className="mr-2 inline-flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full" style={{ background: STRATEGY_COLOR[s.strategy_key] }} />{scenarioLabel(s, exp.config, meta).split(" · ").slice(1).join(" · ")}</span>)}</figcaption>
             </figure>)}</>}
-          {has("Comparaisons") && <>{H("Comparaisons")}{crops.map((c) => <p key={c}><strong>{meta.crops[c].label}.</strong> Variation des dommages larvaires par rapport au témoin (appariée) : {res.scenarios.filter((s) => s.crop === c && s.vs_control).map((s) => `${s.strategy_label} ${fmt(s.vs_control!.larval_damage_pct?.mean, 1)} %`).join(" ; ")}.</p>)}</>}
+          {has("Comparaisons") && <>{H("Comparaisons")}{crops.map((c) => <p key={c}><strong>{meta.crops[c].label}.</strong> Variation des dommages larvaires par rapport au témoin (appariée) : {res.scenarios.filter((s) => s.crop === c && s.vs_control).map((s) => `${scenarioLabel(s, exp.config, meta).split(" · ").slice(1).join(" · ")} ${fmt(s.vs_control!.larval_damage_pct?.mean, 1)} %`).join(" ; ")}.</p>)}</>}
           {has("Analyse des incertitudes") && <>{H("Analyse des incertitudes")}<p>Les incertitudes reflètent uniquement la variabilité stochastique entre {exp.config.replicates} répétitions (écart-type corrigé). L’écart-type des dommages larvaires varie de {fmt(Math.min(...res.scenarios.map((s) => s.metrics.larval_damage_pct.sd)), 2)} à {fmt(Math.max(...res.scenarios.map((s) => s.metrics.larval_damage_pct.sd)), 2)} point. L’incertitude sur les paramètres n’est pas évaluée et aucun test statistique n’est appliqué.</p></>}
           {has("Limites") && <>{H("Limites")}<p>Modèle sans espace, paramètres non calibrés dans ce document, budget exprimé en nombre d’insectes, {exp.config.replicates} répétition{exp.config.replicates > 1 ? "s" : ""} par scénario dans cette expérience. Voir l’annexe pour le détail.</p></>}
-          {has("Conclusion descriptive") && <>{H("Conclusion descriptive")}{crops.map((c) => { const d = describe(res, c); if (!d) return null; return (
-            <p key={c}><strong>{meta.crops[c].label}.</strong> Sur ces {d.n} répétitions, les dommages larvaires moyens les plus faibles sont observés avec « {d.lo.strategy_label} » ({fmt(d.lo.metrics.larval_damage_pct.mean, 2)} % des fruits) et les plus élevés parmi les stratégies TIS avec « {d.hi.strategy_label} » ({fmt(d.hi.metrics.larval_damage_pct.mean, 2)} %){d.ctrl ? `, contre ${fmt(d.ctrl.metrics.larval_damage_pct.mean, 2)} % pour le témoin` : ""}. Les pourris par piqûres stériles seules vont de {fmt(d.stLo.metrics.rotten_sterile_only_pct.mean, 2)} % (« {d.stLo.strategy_label} ») à {fmt(d.stHi.metrics.rotten_sterile_only_pct.mean, 2)} % (« {d.stHi.strategy_label} »). Ces constats sont descriptifs et propres aux hypothèses du modèle.</p>); })}</>}
+          {has("Conclusion descriptive") && <>{H("Conclusion descriptive")}{crops.flatMap((c) => cellsOf(res, c).map((cell, ci) => { const d = describe(cell); if (!d) return null;
+            const L = (x: Scenario) => scenarioLabel(x, exp.config, meta).split(" · ").slice(1).join(" · ");
+            const c0 = cell[0];
+            const where = cellsOf(res, c).length > 1 ? ` (${[c0.invasion && planSize(exp.config).invasions.length > 1 ? `invasion ${invasionShort(invasionLabel(c0.invasion, meta)).toLowerCase()}` : "", c0.remating && planSize(exp.config).rematings.length > 1 ? meta.remating[c0.remating]?.short.toLowerCase() : ""].filter(Boolean).join(", ")})` : "";
+            return (
+            <p key={c + ci}><strong>{meta.crops[c].label}{where}.</strong> Sur ces {d.n} répétitions, les dommages larvaires moyens les plus faibles sont observés avec « {L(d.lo)} » ({fmt(d.lo.metrics.larval_damage_pct.mean, 2)} % des fruits) et les plus élevés parmi les stratégies TIS avec « {L(d.hi)} » ({fmt(d.hi.metrics.larval_damage_pct.mean, 2)} %){d.ctrl ? `, contre ${fmt(d.ctrl.metrics.larval_damage_pct.mean, 2)} % pour le témoin de la même ${planSize(exp.config).invasions.length > 1 || planSize(exp.config).rematings.length > 1 ? "cellule" : "expérience"}` : ""}. Les pourris par piqûres stériles seules vont de {fmt(d.stLo.metrics.rotten_sterile_only_pct.mean, 2)} % (« {L(d.stLo)} ») à {fmt(d.stHi.metrics.rotten_sterile_only_pct.mean, 2)} % (« {L(d.stHi)} »). Ces constats sont descriptifs et propres aux hypothèses du modèle.</p>); }))}</>}
           {has("Métadonnées de reproductibilité") && <>{H("Métadonnées de reproductibilité")}
             <dl className="grid grid-cols-[200px_1fr] gap-x-3 font-sans text-[12px]">
               {([["Expérience", `${exp.short_id} (${exp.id})`], ["Empreinte de configuration", exp.config_hash], ["Moteur", exp.engine_version], ["Paramètres", exp.params_version], ["Schéma", `v${exp.schema_version}`], ["modelly / Python", exp.runtime ? `${exp.runtime.modelly_version} / ${exp.runtime.python}` : "non enregistré"], ["Origine de modelly", String(exp.runtime?.modelly_source ?? "non enregistrée")], ["Graine de base", String(exp.seed)], ["Exécution", `${fmtDate(exp.started_at)} → ${fmtDate(exp.finished_at)} (${exp.duration_s} s)`]] as [string, string][]).map(([k, v]) => <Fragment key={k}><dt className="text-muted">{k}</dt><dd className="font-mono">{v}</dd></Fragment>)}

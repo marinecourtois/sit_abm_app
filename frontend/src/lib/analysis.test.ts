@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Experiment, ExperimentConfig, Meta, Results, Scenario } from "./api";
-import { METRIC_COLUMN, datasetFromReference, datasetFromResults, paretoFront, planSize, scenarioLabel, synthesize } from "./analysis";
+import { METRIC_COLUMN, activeExtensions, datasetFromReference, datasetFromResults, invasionShort, paretoFront, planSize, scenarioLabel, synthesize } from "./analysis";
 import { INDICATOR } from "./indicators";
 import metaJson from "../test/fixtures/meta.json";
 
@@ -118,5 +118,21 @@ describe("synthèse décisionnelle", () => {
   it("le sens de l'indicateur est respecté (plus bas = meilleur)", () => {
     const low = synthesize(data, INDICATOR.harvested_clean_pct.value, false, "Moyenne (300 W : 300 F)", 9000, (c) => c, (r) => r);
     expect(low.cells.find((c) => c.crop === "strawberry" && c.remating === "preference")!.ranking[0].strategy.id).toBe("front_100");
+  });
+});
+
+describe("extensions hors notebook et libellés d'invasion", () => {
+  it("activeExtensions ne signale rien aux valeurs par défaut", () => {
+    expect(activeExtensions(meta.biology_defaults)).toEqual([]);
+    expect(activeExtensions({ ...meta.biology_defaults, immigration_females: 8, turning_days: 3 })).toHaveLength(2);
+  });
+  it("chaque paramètre d'extension est désactivé par défaut et marqué comme tel", () => {
+    const ext = meta.biology.filter((p) => p.extension);
+    expect(ext.map((p) => p.name).sort()).toEqual(["carrying_capacity", "immigration_females", "immigration_wild_males", "turning_days", "turning_puncture_probability"]);
+    for (const p of ext) expect(p.group).toBe("extensions");
+  });
+  it("deux invasions personnalisées gardent des noms courts distincts", () => {
+    expect(invasionShort("Personnalisée (120 W : 150 F)")).toBe("120 W : 150 F");
+    expect(invasionShort("Moyenne (300 W : 300 F)")).toBe("Moyenne");
   });
 });

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import type { Meta } from "../../lib/api";
 import { CROP_LABEL, fmt, fmtInt } from "../../lib/format";
 import { INDICATOR, INDICATORS, diffUnit, stats, type Indicator, type Row } from "../../lib/indicators";
-import { paretoFront, synthesize, type AnalysisDataset, type AnalysisStrategy } from "../../lib/analysis";
+import { invasionShort, paretoFront, synthesize, type AnalysisDataset, type AnalysisStrategy } from "../../lib/analysis";
 import { CROP_COLOR } from "../../lib/colors";
 import { Panel, PanelTitle, ScientificTooltip, Segmented, Select } from "../ui";
 import { Heatmap } from "../charts/Heatmap";
@@ -14,7 +14,7 @@ import { ChartExportMenu } from "../charts/ChartExportMenu";
 const MARKERS = ["circle", "square", "triangle", "diamond"] as const;
 
 export interface AnalysisSelection { crop: string; remating: string; invasion: string; budget: number; metric: string }
-const short = (inv: string) => inv.split(" (")[0];
+const short = invasionShort;
 
 /**
  * Graphiques d'analyse d'un plan (cultures × invasions × budgets × stratégies × régimes) :

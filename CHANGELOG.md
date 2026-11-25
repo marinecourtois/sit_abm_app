@@ -4,6 +4,70 @@ Format : une section par version de l'application (`APP_VERSION`, `backend/app/_
 Les versions du moteur (`ENGINE_VERSION`), des paramètres et du schéma sont indépendantes et
 enregistrées avec chaque expérience (voir docs/03 § 4).
 
+## 1.9.0 — 25 novembre 2026
+
+Sprint « tout ce que Marine voulait ». Les vues de son prototype qui restaient (Paramètres,
+Modèle & Hypothèses, Dynamiques Agents) et ses trois mécanismes (immigration, capacité de charge,
+stade « tournant »), sur le vrai moteur. Les mécanismes sont **optionnels et désactivés par
+défaut** : le moteur reproduit toujours le notebook au bit près (38 tests de non-régression).
+
+### Nouveautés
+
+- **Page Paramètres** (`/parametres`) : tous les paramètres par catégorie, avec curseur et repère
+  de la valeur du notebook ; catalogue (symbole, valeur, valeur du notebook, plage, unité,
+  source) ; paramètres des cultures, invasions et constantes fixes ; export JSON avec les valeurs
+  choisies ; **« Ouvrir dans le Studio »** lance une expérience avec ces valeurs.
+- **Page Modèle** (`/modele`) : les cinq agents (rôle, état, ce qu'ils font chaque jour, valeurs
+  lues dans le registre du moteur), une journée simulée en cinq étapes, et les hypothèses H1–H8
+  en distinguant le notebook des options.
+- **Page Dynamiques** (`/dynamiques`) : pour un scénario de n'importe quelle expérience, quatre
+  graphiques (insectes avec **femelles fécondées**, état des fruits, fruits pourris par jour,
+  probabilité d'accouplement stérile), les pics (adultes sauvages, stériles, larves, comparés au
+  témoin) et le témoin superposé en tirets.
+- **Extensions hors notebook** (Mode Avancé, désactivées par défaut, `ENGINE_VERSION` 1.3.0) :
+  - immigration quotidienne (à partir de J1) de mâles sauvages et de femelles fécondées
+    (métrique `immigrants`) ;
+  - capacité de charge K_a des adultes sauvages : une larve qui émerge au-delà meurt (métrique
+    `emergences_blocked`) ;
+  - stade « tournant » : réussite de ponte p_t pendant les d_t derniers jours de la phase jeune.
+  
+  Une expérience qui en active une porte un avertissement (validation, page de la simulation,
+  Dynamiques). Les stades de Gemini (J0–12, J12–17, J17–22) ne correspondent pas aux maturités du
+  modèle (2–4 j fraise, 10–15 j cerise) : la validation prévient si d_t couvre toute la phase jeune.
+- **Nouvelles séries** (lectures sans tirage) : femelles fécondées, probabilité d'accouplement
+  stérile η·S / (W + η·S), fruits pourris dans la journée. Disponibles aussi sur le graphique
+  d'une simulation.
+- Navigation : Paramètres, Modèle et Dynamiques dans la barre latérale (`g a`, `g m`, `g d`), les
+  onglets d'étude et la palette de commandes.
+
+### Corrections (revue de code indépendante des versions 1.7 et 1.8)
+
+- Rapport (Publications) d'un plan : la conclusion et les comparaisons mélangeaient les cellules
+  (même stratégie citée comme meilleure et pire, témoin d'une autre cellule). Elles sont faites
+  par culture × invasion × régime, avec le témoin de la même cellule et des libellés qui précisent
+  budget, invasion et régime.
+- Comparaison : avertissement quand les scénarios choisis n'ont pas la même invasion ou le même
+  régime (il ne couvrait que culture et budget).
+- Deux invasions personnalisées avaient le même nom court (« Personnalisée ») : elles affichent
+  maintenant leurs effectifs.
+- Empreinte de configuration normalisée : une liste de plan vide ou à une valeur équivaut à la
+  valeur unique, et la valeur unique remplacée par une liste n'y entre plus.
+- Aperçu du Studio : un témoin listé explicitement affichait un budget au lieu de 0.
+- Page Paramètres et Studio : valeur masquée par les unités longues dans les champs numériques.
+- Seconde revue indépendante (1.9.0, avant publication) : stade « tournant » d'un jour trop long
+  (corrigé avant toute expérience) ; expériences d'avant la 1.9.0 affichées avec des paramètres
+  « modifiés » vides dans le rapport et le Studio (les clés d'extension sont complétées à la
+  lecture) ; titres de cellule vides dans le rapport d'un plan sans témoin ; résultat d'une autre
+  expérience affiché après un changement rapide sur la page Dynamiques ; valeurs non entières
+  acceptées pour des paramètres entiers ; erreur 500 sur une valeur non numérique ; immigrants de
+  J0 traités comme la population initiale (l'immigration commence à J1).
+
+### Versions
+
+`ENGINE_VERSION` 1.3.0, `PARAMS_VERSION` `nb-2025.10-echelle30-ext1`, `SCHEMA_VERSION` 2.
+Les configurations d'avant la 1.9.0 restent acceptées (extensions désactivées, même empreinte) ;
+les expériences déjà calculées gardent leurs versions.
+
 ## 1.8.0 — 25 novembre 2026
 
 Sprint « reprise des ajouts de Marine ». Marine avait prototypé avec Gemini, dans son dépôt

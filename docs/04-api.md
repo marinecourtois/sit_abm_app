@@ -27,10 +27,13 @@ En production (`make serve`), elle est désactivée : aucune documentation n'est
   "invasion": { "preset": "moyenne", "wild": 300, "females": 300 },
   "budget": 9000,                             // mâles stériles lâchés par saison (aucune unité monétaire)
   "remating": "preference",                   // preference | first | last | mixed
-  "replicates": 10,                           // 10 (minimum de l'étude) à 50
+  "replicates": 20,                           // 10 (minimum de l'étude) à 50 ; le Studio propose 20
   "seed": 42,                                 // graine de base ; répétition r → seed + 1000·r
   "include_control": true,                    // ajoute le témoin sans TIS (même graines)
   "biology": { "eta": 0.8, "lifespan_sterile": 7.0, "...": "..." },  // TOUTES les clés de /api/meta
+  // dont, depuis la 1.9.0, les extensions hors notebook (0 = désactivée) :
+  // immigration_wild_males, immigration_females, carrying_capacity, turning_days, turning_puncture_probability.
+  // Absentes (configuration d'avant la 1.9.0) : désactivées automatiquement.
 
   // Plan (1.7.0, facultatif) : listes croisées dans la même expérience. Absentes ou null :
   // la valeur unique ci-dessus. Une liste remplace la valeur unique correspondante.
@@ -45,7 +48,9 @@ budget) : le témoin (budget 0) est calculé une fois par culture, invasion et r
 référence appariée à tous les budgets de sa cellule. Toutes les cellules utilisent les mêmes
 graines (`seed + 1000·r`). Validation : valeurs en double refusées, au plus `MAX_SEASONS`
 (10 000) saisons par expérience (`backend/app/schemas.py`). Une configuration sans champ de plan
-garde l'empreinte (`config_hash`) et les clés de scénario d'avant la 1.7.0.
+garde l'empreinte (`config_hash`) et les clés de scénario d'avant la 1.7.0. L'empreinte est
+normalisée : une liste vide ou à une seule valeur équivaut à la valeur unique, et une valeur
+unique remplacée par une liste n'y entre plus ; les extensions désactivées n'y entrent pas.
 
 Clés de stratégie : `no_tis`, `daily`, `every_3`, `every_7`, `front_70`, `front_100`
 (stratégies du notebook) et `periodic`, `front_loaded` (calendriers personnalisés).
@@ -56,7 +61,7 @@ Clés de stratégie : `no_tis`, `daily`, `every_3`, `every_7`, `front_70`, `fron
 |---|---|---|
 | GET | `/health` | État du serveur et versions : `app_version` (application), moteur, paramètres, schéma, modelly, Python |
 | GET | `/queue` | Exécutions en file ou en cours : `{workers, active: [{id, short_id, name, status, progress, done, total, elapsed_s, eta_s}]}` |
-| GET | `/meta` | Registre complet : cultures, stratégies (avec leurs paramètres), régimes de réaccouplement (libellé, formule LaTeX, description), préréglages d'invasion et de budget, paramètres biologiques (libellé, groupe, symbole, unité, défaut, plage, source), groupes, constantes fixes du modèle, limites (répétitions 10 – 50), répétitions proposées par défaut (`default_replicates`, 20), résumé du plan factoriel servi, versions |
+| GET | `/meta` | Registre complet : cultures, stratégies (avec leurs paramètres), régimes de réaccouplement (libellé, formule LaTeX, description), préréglages d'invasion et de budget, paramètres biologiques (libellé, groupe, symbole, unité, défaut, plage, source), groupes, constantes fixes du modèle, limites (répétitions 10 – 50), répétitions proposées par défaut (`default_replicates`, 20), résumé du plan factoriel servi, versions. Chaque paramètre biologique porte `extension: true` s'il s'agit d'une extension hors notebook (groupe `extensions`) |
 | POST | `/validate` | Corps : `ExperimentConfig`. Renvoie `{ok, errors, warnings, scenarios[], estimate}` ; `scenarios` contient le calendrier calculé de chaque culture × stratégie |
 
 ## Expériences
@@ -100,7 +105,8 @@ Statuts : `ready`, `queued`, `running`, `completed`, `cancelled`, `error`.
 ```jsonc
 {
   "experiment_id": "…", "schema_version": 1, "computed_at": "…", "duration_s": 7.1,
-  "series_vars": ["Time", "Wild_males", …, "Wild_adults_vs_control"],
+  "series_vars": ["Time", "Wild_males", …, "Fertile_females", "Sterile_mating_prob", "Wild_adults", "SW_ratio", "Rotten_daily", …, "Wild_adults_vs_control"],
+  // depuis le schéma 2 (1.9.0) : Fertile_females, Sterile_mating_prob (moteur), Rotten_daily (différence du cumul, par répétition)
   "scenarios": [{
     "key": "strawberry::every_3", "crop": "strawberry",   // plan : "strawberry::inv=90:90::rem=first::b=4500::every_3"
     "strategy": {"key": "every_3"}, "strategy_key": "every_3", "strategy_id": "every_3", "strategy_label": "J+3",
@@ -108,7 +114,8 @@ Statuts : `ready`, `queued`, `running`, `completed`, `cancelled`, `error`.
     "invasion": {"preset": "moyenne", "wild": 300, "females": 300}, "remating": "preference",   // depuis 1.7.0
     "schedule": {"0": 265, "3": 265, …},
     "seeds": [42, 1042, 2042],
-    "metrics": { "larval_damage_pct": {"mean", "sd", "min", "max", "n", "values": [...]}, … },
+    "metrics": { "larval_damage_pct": {"mean", "sd", "min", "max", "n", "values": [...]}, …,
+                 "immigrants": …, "emergences_blocked": … },   // schéma 2 : 0 si les extensions sont désactivées
     "series":  { "Time": [0, 1, …], "Wild_males": {"mean": [...], "sd": [...]}, … },
     "events":  [{"type": "release" | "harvest_start" | "harvest_end" | "peak" | "larvae_peak" | "threshold" | "threshold_down", "day", "label"}],
     "vs_control": { "larval_damage_pct": {"mean", "sd", "n", "values"}, "larvae_produced": …, "rotten_pct": …,

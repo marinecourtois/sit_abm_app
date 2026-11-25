@@ -28,6 +28,9 @@ export interface AnalysisDataset {
 
 const invasionCount = (label: string) => parseInt(label.split("(")[1] ?? "0", 10) || 0;
 
+/** Nom court d'une invasion : « Moyenne », ou les effectifs pour une invasion personnalisée. */
+export const invasionShort = (label: string) => (label.startsWith("Personnalisée") ? label.replace("Personnalisée (", "").replace(")", "") : label.split(" (")[0]);
+
 /** « Moyenne (300 W : 300 F) » : même libellé que le CSV du notebook, trié par effectif. */
 export function invasionLabel(inv: { preset?: string | null; wild: number; females: number }, meta: Meta | null): string {
   const p = inv.preset ? meta?.invasions[inv.preset] : undefined;
@@ -110,7 +113,7 @@ export function scenarioLabel(
 ): string {
   const d = planSize(cfg);
   const parts = [CROP_LABEL[p.crop] ?? p.crop, p.strategy_label];
-  if (d.invasions.length > 1 && p.invasion) parts.push(`invasion ${invasionLabel(p.invasion, meta).split(" (")[0].toLowerCase()}`);
+  if (d.invasions.length > 1 && p.invasion) parts.push(`invasion ${invasionShort(invasionLabel(p.invasion, meta)).toLowerCase()}`);
   if (d.budgets.length > 1 && !p.is_control) parts.push(`${fmtInt(p.budget)} stériles`);
   if (d.rematings.length > 1 && p.remating) parts.push(meta?.remating[p.remating]?.short ?? p.remating);
   return parts.join(" · ");
@@ -184,4 +187,14 @@ export function synthesize(data: AnalysisDataset, value: (r: Row) => number, hig
     if (parts.length) byRegime = parts.join(" ; ") + ".";
   }
   return { cells, byCrop, byRegime };
+}
+
+/** Extensions hors notebook actives dans des paramètres biologiques (miroir de parameters.active_extensions). */
+export function activeExtensions(bio: Record<string, number> | undefined): string[] {
+  if (!bio) return [];
+  const on: string[] = [];
+  if ((bio.immigration_wild_males ?? 0) || (bio.immigration_females ?? 0)) on.push(`immigration (${bio.immigration_wild_males ?? 0} mâles et ${bio.immigration_females ?? 0} femelles / jour)`);
+  if (bio.carrying_capacity ?? 0) on.push(`capacité de charge K_a = ${bio.carrying_capacity}`);
+  if (bio.turning_days ?? 0) on.push(`stade « tournant » (${bio.turning_days} j, p_t = ${bio.turning_puncture_probability})`);
+  return on;
 }

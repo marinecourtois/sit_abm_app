@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, CircleX, Download, Play, Plus, RotateCcw, Save, Trash2, Upload } from "../icons";
 import { api, type BiologyParam, type CropKey, type ExperimentConfig, type Invasion, type StrategySpec, type Validation } from "../lib/api";
 import { invasionLabel, planSize } from "../lib/analysis";
@@ -11,67 +11,13 @@ import { Badge, Button, NumberField, Panel, PanelTitle, ScientificTooltip, Segme
 import { ReleaseCalendar } from "../components/SimulationTimeline";
 import { downloadText } from "../components/charts/exportChart";
 import { CherryDot, StrawberryDot } from "./Overview";
+import { ParameterGroups } from "../components/parameters";
 
 const PRESETS: StrategySpec["key"][] = ["daily", "every_3", "every_7", "front_70", "front_100"];
 
 function useMode(): ["essentiel" | "avance", (m: "essentiel" | "avance") => void] {
   const [m, setM] = useState<"essentiel" | "avance">(() => { try { return (localStorage.getItem("tis-mode") as "avance") || "essentiel"; } catch { return "essentiel"; } });
   return [m, (v) => { setM(v); try { localStorage.setItem("tis-mode", v); } catch { /* */ } }];
-}
-
-const dec = (v: number) => String(v).replace(".", ",");
-
-/** Un paramètre biologique : nom clair, symbole, unité, curseur avec repère de la valeur du notebook. */
-export function ParameterField({ p, value, onChange }: { p: BiologyParam; value: number; onChange: (v: number) => void }) {
-  const modified = value !== p.default;
-  const invalid = !Number.isFinite(value) || value < p.min || value > p.max;
-  const pos = (v: number) => `${((v - p.min) / (p.max - p.min)) * 100}%`;
-  return (
-    <div className={`rounded-md border px-3 pb-2.5 pt-2 transition-colors ${invalid ? "border-cherry/50 bg-blush/40" : modified ? "border-terracotta/35 bg-[#FCF4EF]" : "border-line bg-white"}`}>
-      <div className="flex items-start justify-between gap-2">
-        <label htmlFor={`bio-${p.name}`} className="text-[13px] font-medium leading-snug text-ink">
-          {p.label} <span className="ml-0.5 font-normal text-muted"><Tex>{p.symbol}</Tex></span>
-        </label>
-        <ScientificTooltip content={<div className="space-y-1"><div>{p.description}</div><div className="text-muted">Source : {p.source}</div></div>} />
-      </div>
-      <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_128px] items-center gap-3">
-        <div className="relative h-6">
-          <input type="range" aria-label={`${p.label} (curseur)`} min={p.min} max={p.max} step={p.step} value={Number.isFinite(value) ? value : p.default}
-            onChange={(e) => onChange(Number(e.target.value))} className="absolute inset-x-0 top-1/2 w-full -translate-y-1/2 accent-[#347A55]" />
-          <span aria-hidden title={`Valeur du notebook : ${dec(p.default)}`} className="pointer-events-none absolute top-0 h-6 w-px bg-ink/45" style={{ left: pos(p.default) }} />
-        </div>
-        <NumberField id={`bio-${p.name}`} label={p.label} value={value} onChange={onChange} min={p.min} max={p.max} step={p.step} invalid={invalid} unit={p.unit === "sans dimension" ? undefined : p.unit} />
-      </div>
-      <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-muted">
-        <span className="tnum">plage {dec(p.min)} – {dec(p.max)}{p.unit !== "sans dimension" ? ` ${p.unit}` : ""} · notebook {dec(p.default)}</span>
-        {modified && <button type="button" onClick={() => onChange(p.default)} className="inline-flex items-center gap-1 font-medium text-terracotta hover:underline"><RotateCcw size={11} />Rétablir</button>}
-      </div>
-    </div>
-  );
-}
-
-/** Paramètres regroupés par thème, avec compteur et rétablissement par groupe. */
-function ParameterGroups({ params, values, onChange }: { params: BiologyParam[]; values: Record<string, number>; onChange: (v: Record<string, number>) => void }) {
-  const meta = useMeta();
-  return (
-    <div className="space-y-4">
-      {(meta?.biology_groups ?? []).map((g) => {
-        const items = params.filter((p) => p.group === g.key);
-        if (!items.length) return null;
-        const mod = items.filter((p) => values[p.name] !== p.default);
-        return (
-          <section key={g.key} aria-label={g.label}>
-            <div className="mb-1.5 flex items-center justify-between">
-              <h4 className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-forest">{g.label}</h4>
-              {mod.length > 0 && <button type="button" className="text-[11px] text-terracotta hover:underline"
-                onClick={() => onChange({ ...values, ...Object.fromEntries(mod.map((p) => [p.name, p.default])) })}>Rétablir ce groupe ({mod.length})</button>}
-            </div>
-            <div className="space-y-2">{items.map((p) => <ParameterField key={p.name} p={p} value={values[p.name]} onChange={(v) => onChange({ ...values, [p.name]: v })} />)}</div>
-          </section>
-        );
-      })}
-    </div>
-  );
 }
 
 /** Choix du régime d'utilisation du sperme (polyandrie / monandrie…), avec sa formule. */
@@ -209,6 +155,7 @@ export function SimulationConfigurator() {
   const nav = useNavigate();
   const toast = useToast();
   const [sp] = useSearchParams();
+  const loc = useLocation();
   const [mode, setMode] = useMode();
   const [name, setName] = useState("Nouvelle expérience");
   const [project, setProject] = useState("Étude 01");
@@ -224,7 +171,15 @@ export function SimulationConfigurator() {
     const base: ExperimentConfig = { crops: ["strawberry", "cherry"], strategies: [{ key: "every_3" }, { key: "every_7" }],
       invasion: { preset: "moyenne", wild: meta.invasions.moyenne.wild, females: meta.invasions.moyenne.females },
       budget: 9000, remating: "preference", replicates: meta.default_replicates ?? meta.limits.replicates[0], seed: 42, include_control: true, biology: { ...meta.biology_defaults } };
-    if (from) api.experiment(from).then((e) => { setCfg(e.config); setName(`${e.name} (variante)`); setProject(e.project); setParent(e.id); if (planSize(e.config).budgets.length > 1 || e.config.invasions?.length || e.config.rematings?.length) setPlanOpen(true); }).catch(() => setCfg(base));
+    const lab = (loc.state as { biology?: Record<string, number> } | null)?.biology;
+    if (lab && !from) {   // valeurs reprises de la page Paramètres
+      const biology = { ...meta.biology_defaults, ...lab };
+      setCfg({ ...base, biology });
+      if (meta.biology.some((p) => p.advanced && biology[p.name] !== p.default)) setMode("avance");
+      toast("Paramètres repris de la page Paramètres.", "info");
+      return;
+    }
+    if (from) api.experiment(from).then((e) => { setCfg({ ...e.config, biology: { ...meta.biology_defaults, ...e.config.biology } }); setName(`${e.name} (variante)`); setProject(e.project); setParent(e.id); if (planSize(e.config).budgets.length > 1 || e.config.invasions?.length || e.config.rematings?.length) setPlanOpen(true); }).catch(() => setCfg(base));
     else setCfg(base);
   }, [meta]);
 
@@ -250,9 +205,9 @@ export function SimulationConfigurator() {
       nav(run ? `/simulation/${e.id}` : `/experiences?id=${e.id}`);
     } catch (err) { toast((err as Error).message, "error"); } finally { setBusy(false); }
   };
-  const exportProtocol = () => downloadText(JSON.stringify({ format: "modelly-tis-protocol", schema_version: 1, name, config: cfg, versions: meta.versions }, null, 2), `${name.replace(/\W+/g, "-")}-protocole.json`, "application/json");
+  const exportProtocol = () => downloadText(JSON.stringify({ format: "modelly-tis-protocol", schema_version: meta.schema_version, name, config: cfg, versions: meta.versions }, null, 2), `${name.replace(/\W+/g, "-")}-protocole.json`, "application/json");
   const importProtocol = async (f: File) => {
-    try { const doc = JSON.parse(await f.text()); if (doc.format !== "modelly-tis-protocol") throw new Error("Format « modelly-tis-protocol » attendu."); setCfg(doc.config); setName(doc.name ?? name); toast("Protocole importé : vérifiez la validation avant de lancer.", "info"); }
+    try { const doc = JSON.parse(await f.text()); if (doc.format !== "modelly-tis-protocol") throw new Error("Format « modelly-tis-protocol » attendu."); setCfg({ ...doc.config, biology: { ...meta.biology_defaults, ...(doc.config?.biology ?? {}) } }); setName(doc.name ?? name); toast("Protocole importé : vérifiez la validation avant de lancer.", "info"); }
     catch (e) { toast(`Import impossible : ${(e as Error).message}`, "error"); }
   };
 

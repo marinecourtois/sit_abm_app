@@ -1,7 +1,7 @@
 {
-  "engine_version": "1.2.0",
-  "params_version": "nb-2025.10-echelle30",
-  "schema_version": 1,
+  "engine_version": "1.3.0",
+  "params_version": "nb-2025.10-echelle30-ext1",
+  "schema_version": 2,
   "crops": {
     "strawberry": {
       "label": "Fraise",
@@ -164,7 +164,8 @@
       "step": 0.01,
       "source": "Cellule 3 — Females_Agent.eta",
       "description": "Compétitivité d'accouplement des mâles stériles relativement aux sauvages. P(accouplement fertile) = W / (W + η·S).",
-      "advanced": false
+      "advanced": false,
+      "extension": false
     },
     {
       "name": "eta_sperm_choice",
@@ -178,7 +179,8 @@
       "step": 0.01,
       "source": "Cellule 3 — Females_Agent.eta_sperm_choice",
       "description": "Poids du sperme stérile dans le choix de la femelle (régime « preference »).",
-      "advanced": true
+      "advanced": true,
+      "extension": false
     },
     {
       "name": "lifespan_sterile",
@@ -192,7 +194,8 @@
       "step": 0.5,
       "source": "Cellule 3 — LIFESPAN_MEANS['sterile']",
       "description": "Durée de vie moyenne des mâles stériles (loi normale tronquée à 1 j).",
-      "advanced": false
+      "advanced": false,
+      "extension": false
     },
     {
       "name": "lifespan_wild",
@@ -206,7 +209,8 @@
       "step": 0.5,
       "source": "Cellule 3 — LIFESPAN_MEANS['wild']",
       "description": "Durée de vie moyenne des mâles sauvages.",
-      "advanced": true
+      "advanced": true,
+      "extension": false
     },
     {
       "name": "lifespan_female",
@@ -220,7 +224,8 @@
       "step": 0.5,
       "source": "Cellule 3 — LIFESPAN_MEANS['female']",
       "description": "Durée de vie moyenne des femelles.",
-      "advanced": true
+      "advanced": true,
+      "extension": false
     },
     {
       "name": "lifespan_cv",
@@ -234,7 +239,8 @@
       "step": 0.01,
       "source": "Cellule 3 — LIFESPAN_CV",
       "description": "Coefficient de variation des durées de vie (commun aux trois groupes).",
-      "advanced": true
+      "advanced": true,
+      "extension": false
     },
     {
       "name": "fruit_capacity",
@@ -248,7 +254,8 @@
       "step": 1,
       "source": "Cellule 4 — RematingModel(fruit_capacity)",
       "description": "Nombre maximal de pontes (fertiles ou stériles) par fruit.",
-      "advanced": true
+      "advanced": true,
+      "extension": false
     },
     {
       "name": "young_puncture_probability",
@@ -262,7 +269,8 @@
       "step": 0.01,
       "source": "Cellule 4 — young_puncture_probability",
       "description": "Probabilité qu'une ponte tentée sur un fruit jeune réussisse.",
-      "advanced": true
+      "advanced": true,
+      "extension": false
     },
     {
       "name": "rotten_puncture_probability",
@@ -276,7 +284,8 @@
       "step": 0.01,
       "source": "Cellule 5 — rotten_puncture_probability=0.10",
       "description": "Probabilité qu'une ponte tentée sur un fruit pourri réussisse.",
-      "advanced": true
+      "advanced": true,
+      "extension": false
     },
     {
       "name": "rotten_threshold",
@@ -290,7 +299,8 @@
       "step": 0.5,
       "source": "Cellule 4 — rotten_threshold",
       "description": "Seuil du score larvaire S(t) au-delà duquel le fruit pourrit.",
-      "advanced": true
+      "advanced": true,
+      "extension": false
     },
     {
       "name": "larva_age_weight",
@@ -304,7 +314,8 @@
       "step": 0.05,
       "source": "Cellule 4 — larva_age_weight",
       "description": "Poids de l'âge des larves dans le score S(t).",
-      "advanced": true
+      "advanced": true,
+      "extension": false
     },
     {
       "name": "rot_hazard_sterile",
@@ -318,7 +329,8 @@
       "step": 0.001,
       "source": "Cellule 4 — rot_hazard_sterile",
       "description": "Taux de pourrissement journalier d'un fruit piqué uniquement par des pontes stériles.",
-      "advanced": true
+      "advanced": true,
+      "extension": false
     },
     {
       "name": "rot_hazard_fertile",
@@ -332,7 +344,8 @@
       "step": 0.001,
       "source": "Cellule 4 — rot_hazard_fertile",
       "description": "Taux de pourrissement journalier d'un fruit portant au moins une ponte fertile.",
-      "advanced": true
+      "advanced": true,
+      "extension": false
     },
     {
       "name": "harvest_fraction",
@@ -346,7 +359,8 @@
       "step": 0.01,
       "source": "Cellule 4 — harvest_fraction",
       "description": "Part des fruits récoltables cueillis à chaque récolte.",
-      "advanced": true
+      "advanced": true,
+      "extension": false
     },
     {
       "name": "prophylaxis_fraction",
@@ -360,7 +374,83 @@
       "step": 0.01,
       "source": "Cellule 4 — prophylaxis_fraction",
       "description": "Part des fruits pourris retirés à chaque passage de prophylaxie (fraise).",
-      "advanced": true
+      "advanced": true,
+      "extension": false
+    },
+    {
+      "name": "immigration_wild_males",
+      "label": "Immigration de mâles sauvages",
+      "group": "extensions",
+      "symbol": "m_W",
+      "unit": "mâles / jour",
+      "default": 0,
+      "min": 0,
+      "max": 1000,
+      "step": 1,
+      "source": "Extension hors notebook (EXT 1, 1.9.0)",
+      "description": "Mâles sauvages qui entrent dans la parcelle chaque jour à partir de J1. 0 = parcelle fermée, comme le notebook. Proposition de Marine : 15 / jour en fraise, 8 / jour en cerise.",
+      "advanced": true,
+      "extension": true
+    },
+    {
+      "name": "immigration_females",
+      "label": "Immigration de femelles fécondées",
+      "group": "extensions",
+      "symbol": "m_F",
+      "unit": "femelles / jour",
+      "default": 0,
+      "min": 0,
+      "max": 1000,
+      "step": 1,
+      "source": "Extension hors notebook (EXT 1, 1.9.0)",
+      "description": "Femelles déjà fécondées au champ qui entrent dans la parcelle chaque jour à partir de J1. 0 = parcelle fermée (notebook).",
+      "advanced": true,
+      "extension": true
+    },
+    {
+      "name": "carrying_capacity",
+      "label": "Capacité de charge des adultes sauvages",
+      "group": "extensions",
+      "symbol": "K_a",
+      "unit": "adultes sauvages",
+      "default": 0,
+      "min": 0,
+      "max": 100000,
+      "step": 100,
+      "source": "Extension hors notebook (EXT 2, 1.9.0)",
+      "description": "Capacité de charge : quand les adultes sauvages (W + F) atteignent K_a, une larve qui émerge meurt au lieu de devenir adulte. 0 = aucune limite (notebook). Proposition de Marine : 3 000.",
+      "advanced": true,
+      "extension": true
+    },
+    {
+      "name": "turning_days",
+      "label": "Durée du stade « tournant »",
+      "group": "extensions",
+      "symbol": "d_t",
+      "unit": "jours",
+      "default": 0,
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "source": "Extension hors notebook (EXT 3, 1.9.0)",
+      "description": "Stade « tournant » : les d_t derniers jours de la phase jeune d'un fruit (jeune aux âges 0 … M), une ponte réussit avec la probabilité p_t au lieu de p_y. 0 = deux stades, jeune et mûr (notebook). Maturité tirée en 2–4 j (fraise) et 10–15 j (cerise).",
+      "advanced": true,
+      "extension": true
+    },
+    {
+      "name": "turning_puncture_probability",
+      "label": "Réussite d'une ponte sur fruit tournant",
+      "group": "extensions",
+      "symbol": "p_t",
+      "unit": "probabilité",
+      "default": 0.3,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "source": "Extension hors notebook (EXT 3, 1.9.0)",
+      "description": "Réussite d'une ponte sur un fruit « tournant » ; n'agit que si d_t > 0. Proposition de Marine : 0,30 (avec p_y = 0 pour les fruits verts).",
+      "advanced": true,
+      "extension": true
     }
   ],
   "biology_groups": [
@@ -383,6 +473,10 @@
     {
       "key": "recolte",
       "label": "Récolte et prophylaxie"
+    },
+    {
+      "key": "extensions",
+      "label": "Extensions hors notebook (désactivées par défaut)"
     }
   ],
   "fixed_constants": [
@@ -519,10 +613,10 @@
     ]
   },
   "versions": {
-    "app_version": "1.8.0",
-    "engine_version": "1.2.0",
-    "params_version": "nb-2025.10-echelle30",
-    "schema_version": 1,
+    "app_version": "1.9.0",
+    "engine_version": "1.3.0",
+    "params_version": "nb-2025.10-echelle30-ext1",
+    "schema_version": 2,
     "modelly_version": "1.5.1",
     "modelly_source": "source locale /home/tkmremi/Desktop/work/Modelly",
     "python": "3.15.0"
@@ -542,7 +636,12 @@
     "rot_hazard_sterile": 0.231,
     "rot_hazard_fertile": 0.3054,
     "harvest_fraction": 0.9,
-    "prophylaxis_fraction": 0.6
+    "prophylaxis_fraction": 0.6,
+    "immigration_wild_males": 0,
+    "immigration_females": 0,
+    "carrying_capacity": 0,
+    "turning_days": 0,
+    "turning_puncture_probability": 0.3
   },
   "reference_plan": {
     "crops": 2,
@@ -562,11 +661,11 @@
       "preference"
     ],
     "strategies": 6,
-    "replicates": 10,
-    "seasons": 1920,
-    "sha256": "223d8bdbb3024d0b161c052641e1f67b8185819bc209c178b49e40c1f0ebb14f",
+    "replicates": 20,
+    "seasons": 3840,
+    "sha256": "6dfe998f29aab43dc1226aa1ba71587c8e484a27669e808493f217b74d182cec",
     "origin": "application",
-    "file": "factorial_r10.csv"
+    "file": "factorial_r20.csv"
   },
   "strategy_nb_names": {
     "no_tis": "No TIS",

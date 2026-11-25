@@ -227,4 +227,37 @@ def test_plan_limits_and_legacy_hash(client):
     # une configuration sans plan garde l'empreinte d'avant la 1.7.0
     legacy = cfg(client)
     import hashlib, json
-    assert config_hash(ExperimentConfig(**legacy)) == hashlib.sha256(json.dumps(ExperimentConfig(**legacy).model_dump(exclude={"budgets", "invasions", "rematings"}), sort_keys=True).encode()).hexdigest()[:16]
+    from tis_engine.parameters import EXTENSION_PARAMS
+    dump = ExperimentConfig(**legacy).model_dump(exclude={"budgets", "invasions", "rematings"})
+    for k in EXTENSION_PARAMS:   # forme d'une configuration d'avant la 1.9.0 (sans extensions)
+        dump["biology"].pop(k)
+    assert config_hash(ExperimentConfig(**legacy)) == hashlib.sha256(json.dumps(dump, sort_keys=True).encode()).hexdigest()[:16]
+    # une liste à une valeur ou vide équivaut à la valeur unique
+    assert config_hash(ExperimentConfig(**cfg(client, budgets=[3000]))) == config_hash(ExperimentConfig(**legacy))
+
+
+def test_configs_before_extensions_still_validate_and_run_identically(client):
+    """Une configuration d'avant la 1.9.0 (biologie sans les clés d'extension) est acceptée,
+    garde son empreinte et donne exactement les mêmes nombres qu'avec les extensions à 0."""
+    from app.schemas import ExperimentConfig, config_hash
+    from tis_engine.parameters import EXTENSION_PARAMS
+    new = cfg(client, crops=["strawberry"], strategies=[{"key": "every_3"}], replicates=10)
+    old = {**new, "biology": {k: v for k, v in new["biology"].items() if k not in EXTENSION_PARAMS}}
+    assert client.post("/api/validate", json=old).json()["ok"]
+    assert config_hash(ExperimentConfig(**old)) == config_hash(ExperimentConfig(**new))
+    a = wait(client, client.post("/api/experiments", json={"name": "avant 1.9", "config": old}).json()["id"])
+    b = wait(client, client.post("/api/experiments", json={"name": "1.9", "config": new}).json()["id"])
+    ra, rb = (client.get(f"/api/experiments/{x['id']}/results").json() for x in (a, b))
+    for sa, sb in zip(ra["scenarios"], rb["scenarios"]):
+        assert sa["metrics"] == sb["metrics"]
+
+
+def test_active_extension_is_flagged(client):
+    v = client.post("/api/validate", json=cfg(client, crops=["strawberry"], biology={**cfg(client)["biology"], "turning_days": 5, "immigration_females": 8})).json()
+    assert v["ok"]
+    assert any("Extension hors notebook active" in w for w in v["warnings"])
+    assert any("couvre toute la phase jeune" in w for w in v["warnings"])
+    frac = client.post("/api/validate", json=cfg(client, biology={**cfg(client)["biology"], "immigration_females": 0.5})).json()
+    assert not frac["ok"] and any("entière" in e for e in frac["errors"])
+    bad = client.post("/api/validate", json=cfg(client, biology={**cfg(client)["biology"], "turning_days": "trois"}))
+    assert bad.status_code == 200 and not bad.json()["ok"]   # erreur explicite, pas de 500

@@ -14,7 +14,7 @@ import { ChartExportMenu } from "../components/charts/ChartExportMenu";
 import { ReleaseCalendar, SimulationTimeline } from "../components/SimulationTimeline";
 import { downloadText, toCsv } from "../components/charts/exportChart";
 import { AnalysisSuite, PlanHint, type AnalysisSelection } from "../components/analysis/AnalysisSuite";
-import { datasetFromResults, invasionLabel, planSize, scenarioLabel } from "../lib/analysis";
+import { activeExtensions, datasetFromResults, invasionLabel, planSize, scenarioLabel } from "../lib/analysis";
 
 const DEFAULT_VARS = ["Wild_males", "Females", "Sterile_males", "Larvae"];
 const GROUPS = [{ key: "insectes", label: "Insectes" }, { key: "fruits", label: "Fruits" }, { key: "dérivées", label: "Dérivées" }] as const;
@@ -105,8 +105,9 @@ export function LiveSimulation() {
     // en direct : répétition 1, valeurs brutes reçues jour par jour (pas de moyenne)
     const init = initialRow(planItem?.invasion ?? exp?.config.invasion, Number(meta?.crops[crop]?.params.initial_fruits ?? 0));
     const rows = [init, ...liveRows];
-    const val = (r: Record<string, number>) => v === "Wild_adults" ? r.Wild_males + r.Females : v === "SW_ratio" ? r.Sterile_males / Math.max(1, r.Wild_males)
-      : v === "Wild_adults_relative" ? (r.Wild_males + r.Females) / Math.max(1, init.Wild_males + init.Females) : r[v];
+    const val = (r: Record<string, number>, i: number) => v === "Wild_adults" ? r.Wild_males + r.Females : v === "SW_ratio" ? r.Sterile_males / Math.max(1, r.Wild_males)
+      : v === "Wild_adults_relative" ? (r.Wild_males + r.Females) / Math.max(1, init.Wild_males + init.Females)
+      : v === "Rotten_daily" ? (i ? (r.Rotten_cumul ?? 0) - (rows[i - 1].Rotten_cumul ?? 0) : 0) : r[v] ?? 0;
     return { id: v, label: m.label, color: m.color, dash: m.dash, x: rows.map((_, i) => i), y: rows.map(val) };
   }), [vars, sc, liveRows.length, exp, crop, meta]);
   // Témoin sans TIS de la même cellule (culture, invasion, régime), mêmes graines
@@ -160,6 +161,7 @@ export function LiveSimulation() {
       )}
       {status === "error" && <div className="mt-4"><ResearchAnnotation tone="warning"><strong>Simulation en erreur.</strong> {exp.error}</ResearchAnnotation></div>}
       {status === "cancelled" && <div className="mt-4"><ResearchAnnotation tone="warning"><strong>Simulation interrompue.</strong> {exp.error} — aucun résultat partiel n’est enregistré. Une relance crée une nouvelle exécution identifiable.</ResearchAnnotation></div>}
+      {activeExtensions(exp.config.biology).length > 0 && <div className="mt-4"><ResearchAnnotation tone="warning"><strong>Extensions hors notebook actives :</strong> {activeExtensions(exp.config.biology).join(" ; ")}. Ces mécanismes n’existent pas dans le modèle du notebook : les résultats ne sont pas comparables au plan factoriel de référence.</ResearchAnnotation></div>}
       {status === "ready" && <div className="mt-4"><ResearchAnnotation>Simulation prête : la configuration est enregistrée ({exp.short_id}) et peut être lancée.</ResearchAnnotation></div>}
 
       <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -247,7 +249,7 @@ export function LiveSimulation() {
                 })}
               </div>
               <div className="flex min-w-0 basis-full flex-wrap gap-1.5 sm:basis-0 sm:flex-1" role="tabpanel">
-                {VARIABLES.filter((v) => v.group === group).map((v) => {
+                {VARIABLES.filter((v) => v.group === group && (!sc || !!sc.series[v.key])).map((v) => {
                   const on = vars.includes(v.key);
                   return (
                     <button key={v.key} type="button" aria-pressed={on} onClick={() => setVars(on ? vars.filter((x) => x !== v.key) : [...vars, v.key])}
@@ -352,5 +354,5 @@ function cap(s: string) { return s.charAt(0).toUpperCase() + s.slice(1); }
 function initialRow(inv: { wild: number; females: number } | undefined, initialFruits: number) {
   // État à J0 (avant le premier jour) : effectifs initiaux de la configuration et stock initial de fruits (CropParameters.initial_fruits)
   const w = inv?.wild ?? 0, f = inv?.females ?? 0;
-  return { Wild_males: w, Females: f, Sterile_males: 0, Larvae: 0, Young_fruits: initialFruits, Harvestable_fruits: 0, Rotten_natural: 0, Rotten_sterile_only: 0, Rotten_larvae: 0, Harvested_cumul: 0, Rotten_cumul: 0 } as Record<string, number>;
+  return { Wild_males: w, Females: f, Sterile_males: 0, Larvae: 0, Young_fruits: initialFruits, Harvestable_fruits: 0, Rotten_natural: 0, Rotten_sterile_only: 0, Rotten_larvae: 0, Harvested_cumul: 0, Rotten_cumul: 0, Fertile_females: 0, Sterile_mating_prob: 0 } as Record<string, number>;
 }
