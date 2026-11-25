@@ -52,7 +52,7 @@ export function ParameterGroups({ params, values, onChange }: { params: BiologyP
                 onClick={() => onChange({ ...values, ...Object.fromEntries(mod.map((p) => [p.name, p.default])) })}>Rétablir ce groupe ({mod.length})</button>}
             </div>
             {g.key === "extensions" && <p className="mb-2 rounded border border-terracotta/30 bg-[#FCF4EF] px-2.5 py-1.5 text-[11.5px] leading-snug text-[#6B4E16]">
-              Mécanismes absents du notebook, proposés par Marine. Désactivés à leur valeur par défaut : le moteur reproduit alors le notebook au bit près.
+              Mécanismes absents du notebook. Désactivés à leur valeur par défaut : le moteur reproduit alors le notebook au bit près.
               Activés, ils changent le modèle : les résultats ne sont plus comparables au plan factoriel de référence.</p>}
             <div className="space-y-2">{items.map((p) => <ParameterField key={p.name} p={p} value={values[p.name]} onChange={(v) => onChange({ ...values, [p.name]: v })} />)}</div>
           </section>

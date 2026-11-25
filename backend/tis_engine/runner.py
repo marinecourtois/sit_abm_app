@@ -99,6 +99,7 @@ def run_season(task: dict, on_day: Callable[[int, dict], None] | None = None) ->
         # Extensions hors notebook : absentes des anciennes configurations = désactivées
         immigration_wild_males=int(bio.get("immigration_wild_males", 0)),
         immigration_females=int(bio.get("immigration_females", 0)),
+        immigration_every=int(bio.get("immigration_every", 1)),
         carrying_capacity=int(bio.get("carrying_capacity", 0)),
         turning_days=int(bio.get("turning_days", 0)),
         turning_puncture_probability=float(bio.get("turning_puncture_probability", 0.30)),

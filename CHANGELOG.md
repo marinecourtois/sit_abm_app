@@ -4,6 +4,48 @@ Format : une section par version de l'application (`APP_VERSION`, `backend/app/_
 Les versions du moteur (`ENGINE_VERSION`), des paramètres et du schéma sont indépendantes et
 enregistrées avec chaque expérience (voir docs/03 § 4).
 
+## 1.11.0 — 26 novembre 2026
+
+### Changements
+
+- **L'immigration fait partie du modèle et du notebook** (plus « hors notebook »). Par
+  culture : nombre de **mâles sauvages**, nombre de **femelles fécondées** et **fréquence**
+  (une arrivée tous les X jours, à partir de J1). Désactivée par défaut : parcelle fermée, les
+  résultats du notebook ne changent pas. Le notebook
+  `Notebook_ABM_TIS_Optimise_Modelly.ipynb` (dépôt Modelly) a reçu le même mécanisme
+  (`RematingModel(immigration_males, immigration_females, immigration_every)` et un dictionnaire
+  `IMMIGRATION` par culture, à 0 par défaut) : il donne exactement les mêmes nombres que le
+  moteur de l'application, avec et sans immigration (vérifié, y compris tous les 3 jours).
+  Copie d'avant la modification : `Notebook_ABM_TIS_Optimise_Modelly.avant-immigration.ipynb`.
+- **Comparer avec et sans immigration** dans une même expérience (case du Studio) : chaque
+  scénario est calculé dans les deux conditions avec les mêmes graines, et apparié au témoin de
+  sa condition. Les analyses ajoutent un sélecteur « Immigration : sans / avec », une section
+  « Avec ou sans immigration » (répétitions des deux conditions par stratégie, écart
+  avec − sans) et une réponse de la synthèse : *l'optimum change-t-il avec l'immigration ?*
+- Les valeurs pré-remplies ne sont plus attribuées dans l'interface.
+- Le message « Extension hors notebook active » ne concerne plus que la capacité de charge et
+  le stade « tournant » ; l'immigration active est signalée à part (résultats non comparables au
+  plan factoriel de référence, calculé sans immigration).
+
+### Corrections (revue indépendante avant publication)
+
+- Immigration sur une seule culture (sans comparaison) : les analyses séparaient les cultures
+  entre « avec » et « sans » et vidaient les graphiques de l'autre culture. La dimension
+  avec / sans n'existe plus que dans une comparaison.
+- Intervalle d'arrivée égal à la durée de la saison : aucune arrivée n'avait lieu ; il est
+  maintenant limité à la durée − 1 (99 j fraise, 24 j cerise).
+- Studio : une culture ajoutée affichait des valeurs d'immigration qui n'étaient pas dans la
+  configuration ; la comparaison ne pouvait plus être décochée quand les apports passaient à 0.
+- Exports des figures : la condition (avec / sans immigration) est indiquée dans le nom et la
+  légende ; CSV : colonne `immigration_every` ; Comparaison : avertissement si l'immigration
+  diffère ; textes : première arrivée « dès JX ».
+
+### Versions
+
+`PARAMS_VERSION` `nb-2025.10-echelle30-ext3`, `SCHEMA_VERSION` 4 (`immigration.every`,
+`immigration_compare`). Moteur inchangé dans ses résultats (1.3.0 ; `immigration_every`
+ajouté, 1 par défaut). Empreintes inchangées pour « tous les jours » et sans comparaison.
+
 ## 1.10.0 — 25 novembre 2026
 
 Retours de Marine (et de son encadrante) après essai de la 1.9.

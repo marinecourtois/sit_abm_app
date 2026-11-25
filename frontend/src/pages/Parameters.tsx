@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useMeta } from "../lib/meta";
 import type { Meta } from "../lib/api";
 import { CROP_LABEL, fmtInt } from "../lib/format";
+import { everyText } from "../lib/analysis";
 import { StudyHeader, StudyTabs } from "../components/layout";
 import { Badge, Button, Panel, PanelTitle, Tex } from "../components/ui";
 import { ResearchAnnotation } from "../components/science";
@@ -143,10 +144,10 @@ export function Parameters() {
                 : <div className="tnum text-muted">{fmtInt(v.wild)} mâles sauvages, {fmtInt(v.females)} femelles à J0</div>}
             </div>
           ))}</div>
-          <h3 className="mt-4 text-[13.5px] font-semibold">Immigration quotidienne proposée <span className="font-normal text-muted">(hors notebook, désactivée par défaut ; à activer dans le Studio)</span></h3>
+          <h3 className="mt-4 text-[13.5px] font-semibold">Immigration pré-remplie <span className="font-normal text-muted">(désactivée par défaut ; à activer et régler dans le Studio)</span></h3>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">{Object.entries(meta.immigration_defaults ?? {}).map(([c, n]) => (
             <div key={c} className="rounded-md border border-line bg-white px-3 py-2 text-[12.5px]"><strong>{CROP_LABEL[c]}</strong>
-              <div className="tnum text-muted">{n.wild} mâles sauvages et {n.females} femelles fécondées par jour, à partir de J1</div></div>
+              <div className="tnum text-muted">{n.wild} mâles sauvages et {n.females} femelles fécondées {everyText(n.every)}, à partir de J1</div></div>
           ))}</div>
         </Panel>
       )}

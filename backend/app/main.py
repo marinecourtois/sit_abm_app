@@ -319,7 +319,7 @@ def _results_json(e, r) -> str:
     return json.dumps({"metadata": _metadata(e), "config": e["config"], "versions": versions(), "results": r}, ensure_ascii=False)
 
 
-_CELL_COLS = ["crop", "invasion", "wild", "females", "remating", "strategy", "budget", "immigration_wild", "immigration_females"]
+_CELL_COLS = ["crop", "invasion", "wild", "females", "remating", "strategy", "budget", "immigration_wild", "immigration_females", "immigration_every"]
 
 
 def _cell(sc, cfg) -> list:
@@ -329,7 +329,7 @@ def _cell(sc, cfg) -> list:
     bio = cfg.get("biology") or {}   # immigration globale (1.9.0) si le scénario n'a pas la sienne
     return [sc["crop"], invasion_name(Invasion(**inv)), inv["wild"], inv["females"], sc.get("remating") or cfg["remating"],
             sc["strategy_label"], sc["budget"], imm.get("wild", bio.get("immigration_wild_males", 0)),
-            imm.get("females", bio.get("immigration_females", 0))]
+            imm.get("females", bio.get("immigration_females", 0)), imm.get("every", bio.get("immigration_every", 1))]
 
 
 def _metrics_csv(name, r, cfg) -> str:

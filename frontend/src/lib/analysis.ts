@@ -2,7 +2,7 @@
 // polyandrie vs monandrie) : une ligne par saison simulée, aux colonnes du CSV du plan factoriel
 // du notebook. Deux sources : le plan factoriel de référence (page Analyses) et les répétitions
 // d'une expérience de l'application (page Simulation).
-import type { Counts, Experiment, ExperimentConfig, Invasion, Meta, Results, Scenario } from "./api";
+import type { CropKey, Counts, Experiment, ExperimentConfig, Invasion, Meta, Results, Scenario } from "./api";
 import { CROP_LABEL, fmtInt } from "./format";
 import type { Row } from "./indicators";
 import { SERIES_PALETTE, STRATEGY_COLOR, STRATEGY_ORDER } from "./colors";
@@ -23,6 +23,8 @@ export interface AnalysisDataset {
   rows: Row[];
   strategies: AnalysisStrategy[];     // témoin d'abord, puis l'ordre de l'étude
   crops: string[]; invasions: string[]; budgets: number[]; regimes: string[];
+  /** « sans » et/ou « avec » immigration (comparaison 1.11.0). Les lignes portent la colonne Immigration. */
+  immigrations: string[];
   nRep: number;
 }
 
@@ -53,6 +55,7 @@ function dimensions(rows: Row[]) {
     invasions: uniq((r) => String(r.Invasion)).sort((a, b) => invasionCount(a) - invasionCount(b) || a.localeCompare(b)),
     budgets: uniq((r) => Number(r.Budget)).sort((a, b) => a - b),
     regimes: ["preference", "first", "last", "mixed"].filter((g) => rows.some((r) => r.Remating === g)),
+    immigrations: ["sans", "avec"].filter((m) => rows.some((r) => (r.Immigration ?? "sans") === m)),
     nRep: uniq((r) => r.Replicate).length,
   };
 }
@@ -94,6 +97,9 @@ export function datasetFromResults(res: Results, exp: Experiment, meta: Meta | n
     const n = s.seeds.length;
     for (let i = 0; i < n; i++) {
       const r: Row = { Crop: s.crop, Invasion: inv, Budget: s.budget, Remating: remating, Strategy: id, Replicate: i, Seed: s.seeds[i] };
+      // La condition « avec / sans » n'est une dimension que dans une comparaison : sinon l'immigration
+      // propre à une culture séparerait les cultures entre « avec » et « sans ».
+      if (exp.config.immigration_compare) r.Immigration = s.immigration ? "avec" : "sans";
       for (const [k, col] of Object.entries(METRIC_COLUMN)) if (s.metrics[k]) r[col] = s.metrics[k].values[i];
       rows.push(r);
     }
@@ -119,7 +125,7 @@ export function planSize(cfg: ExperimentConfig) {
 
 /** « Fraise · J+3 », complété par l'invasion, le budget et le régime quand le plan les fait varier. */
 export function scenarioLabel(
-  p: { crop: string; strategy_label: string; is_control: boolean; budget: number; invasion?: Invasion; remating?: string },
+  p: { crop: string; strategy_label: string; is_control: boolean; budget: number; invasion?: Invasion; remating?: string; immigration?: Counts | null },
   cfg: ExperimentConfig, meta: Meta | null,
 ): string {
   const d = planSize(cfg);
@@ -127,6 +133,7 @@ export function scenarioLabel(
   if (d.invasions.length > 1 && p.invasion) parts.push(`inoculum ${invasionShort(invasionLabel(p.invasion, meta)).toLowerCase()}`);
   if (d.budgets.length > 1 && !p.is_control) parts.push(`${fmtInt(p.budget)} stériles`);
   if (d.rematings.length > 1 && p.remating) parts.push(meta?.remating[p.remating]?.short ?? p.remating);
+  if (cfg.immigration_compare) parts.push(p.immigration ? "avec immigration" : "sans immigration");
   return parts.join(" · ");
 }
 
@@ -201,12 +208,26 @@ export function synthesize(data: AnalysisDataset, value: (r: Row) => number, hig
 }
 
 /** Extensions hors notebook actives dans des paramètres biologiques (miroir de parameters.active_extensions). */
+/** « tous les jours », « tous les 3 jours ». */
+export const everyText = (n?: number) => (!n || n <= 1 ? "tous les jours" : `tous les ${n} jours`);
+
+/** Immigration d'une expérience, en clair ; null si la parcelle est fermée. Fait partie du modèle
+ *  (et du notebook) depuis la 1.11.0, désactivée par défaut. */
+export function immigrationSummary(cfg: ExperimentConfig): string | null {
+  const imm = Object.entries(cfg.immigration ?? {}).filter(([crop, c]) => (c.wild || c.females) && cfg.crops.includes(crop as CropKey));
+  const bio = cfg.biology ?? {};
+  const text = imm.length
+    ? imm.map(([crop, c]) => `${CROP_LABEL[crop] ?? crop} : ${c.wild} mâles sauvages et ${c.females} femelles fécondées ${everyText(c.every)} (dès J${Math.max(1, c.every ?? 1)})`).join(" ; ")
+    : (bio.immigration_wild_males ?? 0) || (bio.immigration_females ?? 0)
+      ? `${bio.immigration_wild_males ?? 0} mâles sauvages et ${bio.immigration_females ?? 0} femelles fécondées ${everyText(bio.immigration_every)} (dès J${Math.max(1, bio.immigration_every ?? 1)})` : null;
+  return text && cfg.immigration_compare ? `${text} (comparée à sans immigration)` : text;
+}
+
+/** Extensions hors notebook actives (capacité de charge, stade « tournant ») ; l'immigration n'en fait plus partie. */
 export function activeExtensions(bio: Record<string, number> | undefined, immigration?: Record<string, Counts> | null, crops?: string[]): string[] {
   if (!bio) return [];
   const on: string[] = [];
-  const imm = Object.entries(immigration ?? {}).filter(([crop, c]) => (c.wild || c.females) && (!crops || crops.includes(crop)));
-  if (imm.length) on.push(`immigration quotidienne (${imm.map(([crop, c]) => `${CROP_LABEL[crop] ?? crop} : ${c.wild} mâles et ${c.females} femelles / jour`).join(" ; ")})`);
-  else if ((bio.immigration_wild_males ?? 0) || (bio.immigration_females ?? 0)) on.push(`immigration (${bio.immigration_wild_males ?? 0} mâles et ${bio.immigration_females ?? 0} femelles / jour)`);
+  void immigration; void crops;
   if (bio.carrying_capacity ?? 0) on.push(`capacité de charge K_a = ${bio.carrying_capacity}`);
   if (bio.turning_days ?? 0) on.push(`stade « tournant » (${bio.turning_days} j, p_t = ${bio.turning_puncture_probability})`);
   return on;
@@ -237,4 +258,10 @@ export function normalizeLoadedConfig(cfg: ExperimentConfig, defaults: Record<st
       immigration: Object.fromEntries(cfg.crops.map((c) => [c, { wild: w, females: f }])) };
   }
   return { ...cfg, biology };
+}
+
+/** Même cellule : culture, inoculum, régime et présence d'immigration (le témoin apparié en dépend). */
+export function sameCell(a: Scenario, b: Scenario): boolean {
+  return a.crop === b.crop && a.remating === b.remating && !!a.immigration === !!b.immigration
+    && (a.invasion?.wild ?? -1) === (b.invasion?.wild ?? -1) && (a.invasion?.females ?? -1) === (b.invasion?.females ?? -1);
 }

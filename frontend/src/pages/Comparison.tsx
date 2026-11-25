@@ -5,7 +5,7 @@ import { useAsync } from "../lib/useAsync";
 import { useMeta } from "../lib/meta";
 import { CROP_LABEL, fmt, fmtInt } from "../lib/format";
 import { DASHES, SERIES_PALETTE } from "../lib/colors";
-import { invasionLabel, scenarioLabel } from "../lib/analysis";
+import { invasionLabel, sameCell, scenarioLabel } from "../lib/analysis";
 import { METRIC, METRICS, VAR, VARIABLES } from "../lib/variables";
 import { StudyHeader, StudyTabs } from "../components/layout";
 import { EmptyState, Panel, PanelTitle, ScientificTooltip, Segmented, Select, Skeleton } from "../components/ui";
@@ -107,7 +107,7 @@ export function Comparison() {
     const exp = done.find((e) => e.id === eid); const r = results[eid];
     const sc = r?.scenarios.find((s) => s.key === skey);
     if (!exp || !sc) return null;
-    const ctrl = r.scenarios.find((s) => s.is_control && s.crop === sc.crop && (s.invasion?.wild ?? 0) === (sc.invasion?.wild ?? 0) && (s.invasion?.females ?? 0) === (sc.invasion?.females ?? 0) && s.remating === sc.remating);
+    const ctrl = r.scenarios.find((s) => s.is_control && sameCell(s, sc));
     return { exp, sc, ctrl, color: SERIES_PALETTE[i % SERIES_PALETTE.length], dash: DASHES[i % DASHES.length], name: `${scenarioLabel(sc, exp.config, meta)}${new Set(picked.map((p) => p.split("::")[0])).size > 1 ? ` · ${exp.short_id}` : ""}` };
   }).filter(Boolean) as Sel[];
   const toggle = (k: string) => setPicked((p) => (p.includes(k) ? p.filter((x) => x !== k) : p.length >= 4 ? p : [...p, k]));
@@ -118,6 +118,7 @@ export function Comparison() {
   const budgets = new Set(sel.map((s) => s.sc.budget));
   const invasions = new Set(sel.map((s) => { const i = s.sc.invasion ?? s.exp.config.invasion; return `${i.wild}:${i.females}`; }));
   const regimes = new Set(sel.map((s) => s.sc.remating ?? s.exp.config.remating));
+  const immigrations = new Set(sel.map((s) => JSON.stringify(s.sc.immigration ?? s.exp.config.immigration?.[s.sc.crop] ?? null)));
 
   return (
     <>
@@ -168,11 +169,12 @@ export function Comparison() {
                 </Panel>
               ))}
             </div>
-            {(crops.size > 1 || budgets.size > 1 || invasions.size > 1 || regimes.size > 1) && <ResearchAnnotation>
+            {(crops.size > 1 || budgets.size > 1 || invasions.size > 1 || regimes.size > 1 || immigrations.size > 1) && <ResearchAnnotation>
               {crops.size > 1 && <>Cultures différentes : durées de saison distinctes ({[...crops].map((c) => `${CROP_LABEL[c]} ${meta?.crops[c].params.season_length} j`).join(", ")}) et dynamiques de fruits différentes{VAR[variable]?.unit === "individus" && norm === "none" ? <> ; les populations sont comparées en effectifs absolus (individus), sur des parcelles de {[...crops].map((c) => fmtInt(Number(meta?.crops[c].params.total_fruits))).join(" / ")} fruits</> : null}. </>}
               {budgets.size > 1 && <>Budgets différents entre scénarios. </>}
               {invasions.size > 1 && <>Inoculums de départ différents entre scénarios. </>}
               {regimes.size > 1 && <>Régimes de réaccouplement différents entre scénarios. </>}
+              {immigrations.size > 1 && <>Immigration différente entre scénarios. </>}
               Utilisez la normalisation pour une comparaison relative explicite.
             </ResearchAnnotation>}
             <Panel className="px-5 py-4">

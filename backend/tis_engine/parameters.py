@@ -16,8 +16,8 @@ MAX_REPLICATES = 50
 # Valeur proposée par défaut dans le Studio (1.8.0) ; le minimum accepté reste MIN_REPLICATES
 DEFAULT_REPLICATES = 20
 
-PARAMS_VERSION = "nb-2025.10-echelle30-ext2"   # ext1 (1.9.0) : + 5 paramètres d'extension ; ext2 (1.10.0) : inoculum fort par culture, immigration par culture
-SCHEMA_VERSION = 3   # 2 (1.9.0) : plans, extensions… ; 3 (1.10.0) : invasion.by_crop, immigration par culture
+PARAMS_VERSION = "nb-2025.10-echelle30-ext3"   # ext1 (1.9.0) : + 5 paramètres d'extension ; ext2 (1.10.0) : inoculum fort et immigration par culture ; ext3 (1.11.0) : immigration tous les X jours
+SCHEMA_VERSION = 4   # 2 (1.9.0) : plans, extensions… ; 3 (1.10.0) : invasion.by_crop, immigration par culture ; 4 (1.11.0) : immigration.every, immigration_compare
 
 # Inoculum fort par culture (1.10.0) : population d'adultes sauvages du témoin sans lâcher en fin de
 # saison, partie de l'inoculum modéré (moyenne de 20 répétitions) — voir tis_engine/calibration.py.
@@ -39,8 +39,9 @@ INVASION_PRESETS = {
                              "l'inoculum modéré (moyenne de 20 répétitions), propre à chaque culture."},
 }
 
-# Immigration quotidienne proposée par Marine (extension hors notebook, désactivée par défaut)
-IMMIGRATION_DEFAULTS = {"strawberry": {"wild": 15, "females": 15}, "cherry": {"wild": 8, "females": 8}}
+# Immigration (1.11.0 : dans le modèle et le notebook, désactivée par défaut) : valeurs pré-remplies
+# quand on l'active — mâles sauvages et femelles fécondées par arrivée, une arrivée tous les « every » jours.
+IMMIGRATION_DEFAULTS = {"strawberry": {"wild": 15, "females": 15, "every": 1}, "cherry": {"wild": 8, "females": 8, "every": 1}}
 
 BUDGET_PRESETS = [b * ECHELLE for b in (0, 150, 300, 600)]  # cellule 6 : BUDGETS
 
@@ -151,20 +152,19 @@ BIOLOGY_PARAMS = {
                              "Part des fruits pourris retirés à chaque passage de prophylaxie (fraise).", True),
     # Extensions HORS NOTEBOOK (1.9.0, proposées par Marine Courtois). Valeur par défaut = désactivée :
     # le moteur reproduit alors le notebook au bit près.
-    "immigration_wild_males": ("m_W", "mâles / jour", 0, 0, 1000, 1, "Extension hors notebook (EXT 1, 1.9.0)",
+    "immigration_wild_males": ("m_W", "mâles / arrivée", 0, 0, 1000, 1, "Modèle et notebook (1.11.0) — immigration",
                                "Mâles sauvages qui entrent dans la parcelle chaque jour à partir de J1. 0 = parcelle fermée, comme le notebook. "
-                               "Proposition de Marine : 15 / jour en fraise, 8 / jour en cerise.", True),
-    "immigration_females": ("m_F", "femelles / jour", 0, 0, 1000, 1, "Extension hors notebook (EXT 1, 1.9.0)",
+                               "Réglée par culture dans le Studio (section « Immigration quotidienne »).", True),
+    "immigration_females": ("m_F", "femelles / arrivée", 0, 0, 1000, 1, "Modèle et notebook (1.11.0) — immigration",
                             "Femelles déjà fécondées au champ qui entrent dans la parcelle chaque jour à partir de J1. 0 = parcelle fermée (notebook).", True),
     "carrying_capacity": ("K_a", "adultes sauvages", 0, 0, 100000, 100, "Extension hors notebook (EXT 2, 1.9.0)",
                           "Capacité de charge : quand les adultes sauvages (W + F) atteignent K_a, une larve qui émerge meurt au lieu "
-                          "de devenir adulte. 0 = aucune limite (notebook). Proposition de Marine : 3 000.", True),
+                          "de devenir adulte. 0 = aucune limite (notebook).", True),
     "turning_days": ("d_t", "jours", 0, 0, 30, 1, "Extension hors notebook (EXT 3, 1.9.0)",
                      "Stade « tournant » : les d_t derniers jours de la phase jeune d'un fruit (jeune aux âges 0 … M), une ponte réussit avec la probabilité p_t "
                      "au lieu de p_y. 0 = deux stades, jeune et mûr (notebook). Maturité tirée en 2–4 j (fraise) et 10–15 j (cerise).", True),
     "turning_puncture_probability": ("p_t", "probabilité", 0.30, 0.0, 1.0, 0.01, "Extension hors notebook (EXT 3, 1.9.0)",
-                                     "Réussite d'une ponte sur un fruit « tournant » ; n'agit que si d_t > 0. Proposition de Marine : 0,30 "
-                                     "(avec p_y = 0 pour les fruits verts).", True),
+                                     "Réussite d'une ponte sur un fruit « tournant » ; n'agit que si d_t > 0.", True),
 }
 # Clés des extensions hors notebook et leur valeur « désactivée »
 EXTENSION_PARAMS = ("immigration_wild_males", "immigration_females", "carrying_capacity", "turning_days", "turning_puncture_probability")

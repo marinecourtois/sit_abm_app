@@ -96,7 +96,7 @@ def test_exports_and_protocol_roundtrip(client):
     rows = list(csv.DictReader(io.StringIO(client.get(f"/api/experiments/{e['id']}/export?format=csv-metrics").text)))
     assert rows and "larval_damage_pct" in rows[0]
     series = client.get(f"/api/experiments/{e['id']}/export?format=csv-series").text.splitlines()
-    assert series[0].startswith("experiment,crop,invasion,wild,females,remating,strategy,budget,immigration_wild,immigration_females,day")
+    assert series[0].startswith("experiment,crop,invasion,wild,females,remating,strategy,budget,immigration_wild,immigration_females,immigration_every,day")
     proto = client.get(f"/api/experiments/{e['id']}/export?format=protocol").json()
     imp = client.post("/api/protocol/import", json=proto).json()
     assert imp["config"] == e["config"] and imp["status"] == "ready"
@@ -228,7 +228,7 @@ def test_plan_limits_and_legacy_hash(client):
     legacy = cfg(client)
     import hashlib, json
     from tis_engine.parameters import EXTENSION_PARAMS
-    dump = ExperimentConfig(**legacy).model_dump(exclude={"budgets", "invasions", "rematings", "immigration"})
+    dump = ExperimentConfig(**legacy).model_dump(exclude={"budgets", "invasions", "rematings", "immigration", "immigration_compare"})
     dump["invasion"].pop("by_crop")   # champ 1.10.0
     for k in EXTENSION_PARAMS:   # forme d'une configuration d'avant la 1.9.0 (sans extensions)
         dump["biology"].pop(k)
@@ -277,7 +277,7 @@ def test_strong_inoculum_per_crop_and_immigration_per_crop(client):
                  immigration=IMMIGRATION_DEFAULTS)
     v = client.post("/api/validate", json=config).json()
     assert v["ok"], v["errors"]
-    assert any("immigration quotidienne" in w for w in v["warnings"])
+    assert any("Immigration active" in w for w in v["warnings"])
     assert not any("diffèrent du préréglage" in w for w in v["warnings"])
     e = wait(client, client.post("/api/experiments", json={"name": "fort + immigration", "config": config}).json()["id"], timeout=300)
     assert e["status"] == "completed"
@@ -313,3 +313,35 @@ def test_inoculum_and_immigration_edge_cases(client):
     assert ExperimentConfig(**other).immigration is None
     assert config_hash(ExperimentConfig(**other)) == config_hash(ExperimentConfig(**base))
     assert not any("immigration" in w for w in client.post("/api/validate", json=other).json()["warnings"])
+
+
+def test_compare_with_and_without_immigration(client):
+    """1.11.0 : une expérience calcule chaque scénario avec et sans immigration, mêmes graines.
+    « Sans » est identique au bit près au moteur sans immigration ; chaque scénario est apparié
+    au témoin de la même condition."""
+    from tis_engine.runner import build_schedule, run_season
+    config = cfg(client, crops=["strawberry"], strategies=[{"key": "every_3"}], replicates=10,
+                 immigration={"strawberry": {"wild": 15, "females": 15}}, immigration_compare=True)
+    v = client.post("/api/validate", json=config).json()
+    assert v["ok"], v["errors"]
+    assert v["estimate"]["seasons"] == 2 * 2 * 10
+    e = wait(client, client.post("/api/experiments", json={"name": "avec / sans immigration", "config": config}).json()["id"], timeout=300)
+    assert e["status"] == "completed"
+    scs = client.get(f"/api/experiments/{e['id']}/results").json()["scenarios"]
+    assert sorted(s["key"] for s in scs) == ["strawberry::imm=avec::every_3", "strawberry::imm=avec::no_tis",
+                                             "strawberry::imm=sans::every_3", "strawberry::imm=sans::no_tis"]
+    by = {s["key"]: s for s in scs}
+    sans = by["strawberry::imm=sans::every_3"]
+    assert sans["immigration"] is None and by["strawberry::imm=avec::every_3"]["immigration"] == {"wild": 15, "females": 15, "every": 1}
+    direct = run_season({"crop": "strawberry", "wild": 120, "females": 150, "remating": "first", "seed": sans["seeds"][0],
+                         "schedule": build_schedule({"key": "every_3"}, 3000, 100), "biology": config["biology"]})["metrics"]
+    for k, val in direct.items():
+        assert sans["metrics"][k]["values"][0] == val, k
+    for mode in ("avec", "sans"):
+        s, c = by[f"strawberry::imm={mode}::every_3"], by[f"strawberry::imm={mode}::no_tis"]
+        lv = lambda x: x["metrics"]["larvae_produced"]["values"]
+        assert s["vs_control"]["larvae_produced"]["values"] == pytest.approx([100 * (a - b) / b for a, b in zip(lv(s), lv(c))])
+    assert not client.post("/api/validate", json=cfg(client, immigration_compare=True)).json()["ok"]
+    # une arrivée tous les 100 jours en fraise (jours simulés 0 … 99) n'arriverait jamais : refusé
+    late = client.post("/api/validate", json=cfg(client, crops=["strawberry"], immigration={"strawberry": {"wild": 5, "females": 5, "every": 100}})).json()
+    assert not late["ok"] and any("tous les 1 à 99 jours" in e for e in late["errors"])

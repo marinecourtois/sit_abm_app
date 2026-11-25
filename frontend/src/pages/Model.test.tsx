@@ -15,7 +15,7 @@ describe("page Modèle : agents et hypothèses lus dans le registre du moteur", 
   });
   it("les mécanismes absents du notebook sont marqués comme options", () => {
     render(<MetaContext.Provider value={META}><MemoryRouter><Model /></MemoryRouter></MetaContext.Provider>);
-    expect(screen.getAllByText("option hors notebook")).toHaveLength(3);
+    expect(screen.getAllByText("option hors notebook")).toHaveLength(2);   // capacité de charge, stade « tournant » (l'immigration fait partie du modèle)
     expect(screen.getAllByText("notebook").length).toBeGreaterThanOrEqual(5);
   });
 });

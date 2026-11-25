@@ -68,7 +68,7 @@ def _listen():
 
 
 def scenario_plan(cfg: ExperimentConfig):
-    """Liste ordonnée des scénarios : culture × invasion × régime × (témoin + stratégie × budget).
+    """Liste ordonnée des scénarios : culture × invasion × régime × immigration × (témoin + stratégie × budget).
 
     Le témoin (budget 0) est commun à tous les budgets d'une même culture, invasion et régime.
     La clé d'un scénario ne mentionne que les dimensions que le plan fait varier : une expérience
@@ -80,11 +80,15 @@ def scenario_plan(cfg: ExperimentConfig):
     out = []
     for crop in cfg.crops:
         L = CROPS[crop].season_length
-        imm = (cfg.immigration or {}).get(crop)
-        if imm is not None and not (imm.wild or imm.females):
-            imm = None
+        imm_crop = (cfg.immigration or {}).get(crop)
+        if imm_crop is not None and not (imm_crop.wild or imm_crop.females):
+            imm_crop = None
+        compare = bool(cfg.immigration_compare and cfg.immigration)
+        # « avec » et « sans » immigration croisés (même graines) quand la comparaison est demandée
+        modes = [None, imm_crop] if compare else [imm_crop]
         for inv in invasions:
             for rem in rematings:
+              for imm in modes:
                 for s in strategies:
                     for budget in ([0] if s.key == "no_tis" else budgets):
                         sched = build_schedule(s.model_dump(exclude_none=True), budget, L)
@@ -94,6 +98,8 @@ def scenario_plan(cfg: ExperimentConfig):
                             parts.append(f"inv={w}:{f}")
                         if len(rematings) > 1:
                             parts.append(f"rem={rem}")
+                        if compare:
+                            parts.append("imm=avec" if imm else "imm=sans")
                         if len(budgets) > 1 and s.key != "no_tis":
                             parts.append(f"b={budget}")
                         sid = strategy_id(s)
@@ -169,7 +175,8 @@ def _run(eid, cfg: ExperimentConfig, plan):
         for p, rep in order:
             bio = cfg.biology
             if p["immigration"]:   # immigration propre à la culture (extension hors notebook)
-                bio = {**bio, "immigration_wild_males": p["immigration"]["wild"], "immigration_females": p["immigration"]["females"]}
+                bio = {**bio, "immigration_wild_males": p["immigration"]["wild"], "immigration_females": p["immigration"]["females"],
+                       "immigration_every": p["immigration"].get("every", 1)}
             task = {"crop": p["crop"], "wild": p["invasion"]["wild"], "females": p["invasion"]["females"],
                     "remating": p["remating"], "seed": replicate_seed(cfg.seed, rep),
                     "schedule": p["schedule"], "biology": bio}
@@ -269,7 +276,7 @@ def _events(crop, series, schedule):
 
 def build_results(eid, cfg: ExperimentConfig, plan, results):
     scenarios = []
-    cell = lambda p: (p["crop"], p["invasion"]["wild"], p["invasion"]["females"], p["remating"])
+    cell = lambda p: (p["crop"], p["invasion"]["wild"], p["invasion"]["females"], p["remating"], bool(p.get("immigration")))
     ctrl_by_cell = {cell(p): results[p["key"]] for p in plan if p["is_control"]}
     for p in plan:
         reps = results[p["key"]]

@@ -44,16 +44,21 @@ En production (`make serve`), elle est désactivée : aucune documentation n'est
   "rematings": ["preference", "first"],
 
   // Immigration quotidienne par culture (1.10.0, extension hors notebook). Absente ou null : aucune.
-  "immigration": { "strawberry": {"wild": 15, "females": 15}, "cherry": {"wild": 8, "females": 8} }
+  "immigration": { "strawberry": {"wild": 15, "females": 15, "every": 1}, "cherry": {"wild": 8, "females": 8, "every": 3} },
+  // Comparer avec et sans immigration (1.11.0) : chaque scénario calculé dans les deux conditions, mêmes graines
+  "immigration_compare": true
 }
 ```
 
 **Inoculum de départ.** `by_crop` donne les effectifs de chaque culture (préréglage « forte » :
 pic du témoin, voir `tis_engine/calibration.py`) ; sans `by_crop`, `wild`/`females` valent pour
 toutes les cultures. Chaque scénario des résultats porte les effectifs de sa culture.
-**Immigration.** `immigration[culture]` fixe les mâles sauvages et femelles fécondées qui entrent
-chaque jour à partir de J1 dans les saisons de cette culture ; ne pas la combiner avec
-`biology.immigration_*` (refusé).
+**Immigration.** `immigration[culture]` fixe les mâles sauvages (`wild`) et femelles fécondées
+(`females`) qui entrent tous les `every` jours (1 par défaut) à partir de J1 dans les saisons de
+cette culture ; seules les cultures sélectionnées avec un apport non nul comptent ; ne pas la
+combiner avec `biology.immigration_*` (refusé). Avec `immigration_compare`, chaque scénario existe
+avec et sans immigration (clés `…::imm=avec::…` / `…::imm=sans::…`), chacun apparié au témoin de
+sa condition ; il faut alors un apport non nul pour chaque culture.
 
 **Plan d'expérience.** Les scénarios sont culture × inoculum × régime × (témoin + stratégie ×
 budget) : le témoin (budget 0) est calculé une fois par culture, inoculum et régime, et sert de

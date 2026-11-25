@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Experiment, ExperimentConfig, Meta, Results, Scenario } from "./api";
-import { METRIC_COLUMN, activeExtensions, datasetFromReference, datasetFromResults, invasionCounts, invasionFor, invasionLabel, invasionShort, normalizeLoadedConfig, paretoFront, planSize, presetInvasion, scenarioLabel, synthesize } from "./analysis";
+import { METRIC_COLUMN, activeExtensions, immigrationSummary, datasetFromReference, datasetFromResults, invasionCounts, invasionFor, invasionLabel, invasionShort, normalizeLoadedConfig, paretoFront, planSize, presetInvasion, sameCell, scenarioLabel, synthesize } from "./analysis";
 import { INDICATOR } from "./indicators";
 import metaJson from "../test/fixtures/meta.json";
 
@@ -96,7 +96,7 @@ describe("synthèse décisionnelle", () => {
       ...rows("strawberry", "preference", "every_3", 4500, [99, 99]),
     ],
     strategies: [S("no_tis", true), S("every_3"), S("front_100")],
-    crops: ["strawberry", "cherry"], invasions: ["Moyenne (300 W : 300 F)"], budgets: [0, 4500, 9000], regimes: ["preference", "first"], nRep: 2,
+    crops: ["strawberry", "cherry"], invasions: ["Moyenne (300 W : 300 F)"], budgets: [0, 4500, 9000], regimes: ["preference", "first"], immigrations: ["sans"], nRep: 2,
   };
   const syn = synthesize(data, INDICATOR.harvested_clean_pct.value, true, "Moyenne (300 W : 300 F)", 9000, (c) => c, (r) => r);
 
@@ -124,7 +124,8 @@ describe("synthèse décisionnelle", () => {
 describe("extensions hors notebook et libellés d'invasion", () => {
   it("activeExtensions ne signale rien aux valeurs par défaut", () => {
     expect(activeExtensions(meta.biology_defaults)).toEqual([]);
-    expect(activeExtensions({ ...meta.biology_defaults, immigration_females: 8, turning_days: 3 })).toHaveLength(2);
+    expect(activeExtensions({ ...meta.biology_defaults, carrying_capacity: 3000, turning_days: 3 })).toHaveLength(2);
+    expect(activeExtensions({ ...meta.biology_defaults, immigration_females: 8 })).toEqual([]);   // l'immigration fait partie du modèle (1.11.0)
   });
   it("chaque paramètre d'extension est désactivé par défaut et marqué comme tel", () => {
     const ext = meta.biology.filter((p) => p.extension);
@@ -151,11 +152,10 @@ describe("inoculum de départ (1.10.0)", () => {
     expect(invasionLabel({ preset: null, wild: 120, females: 150 }, meta)).toBe("Personnalisé (120 W : 150 F)");
     expect(invasionShort("Personnalisé (120 W : 150 F)")).toBe("120 W : 150 F");
   });
-  it("l'immigration par culture est signalée comme extension active", () => {
-    expect(activeExtensions(meta.biology_defaults, null)).toEqual([]);
-    const on = activeExtensions(meta.biology_defaults, { strawberry: { wild: 15, females: 15 }, cherry: { wild: 8, females: 8 } });
-    expect(on).toHaveLength(1);
-    expect(on[0]).toContain("Fraise : 15 mâles et 15 femelles");
+  it("l'immigration par culture est résumée en clair, avec sa fréquence", () => {
+    expect(immigrationSummary(config)).toBeNull();
+    const s = immigrationSummary({ ...config, crops: ["strawberry", "cherry"], immigration: { strawberry: { wild: 15, females: 15 }, cherry: { wild: 8, females: 4, every: 3 } } });
+    expect(s).toBe("Fraise : 15 mâles sauvages et 15 femelles fécondées tous les jours (dès J1) ; Cerise : 8 mâles sauvages et 4 femelles fécondées tous les 3 jours (dès J3)");
   });
 });
 
@@ -178,6 +178,33 @@ describe("corrections de la revue 1.10.0", () => {
     expect([n.biology.immigration_wild_males, n.biology.immigration_females]).toEqual([0, 0]);
   });
   it("l'immigration d'une culture non sélectionnée n'est pas signalée", () => {
-    expect(activeExtensions(meta.biology_defaults, { cherry: { wild: 8, females: 8 } }, ["strawberry"])).toEqual([]);
+    expect(immigrationSummary({ ...config, crops: ["strawberry"], immigration: { cherry: { wild: 8, females: 8 } } })).toBeNull();
+  });
+});
+
+describe("avec / sans immigration (1.11.0)", () => {
+  it("les lignes portent la condition, et le libellé du scénario la mentionne", () => {
+    const res = { scenarios: [
+      scenario({ key: "strawberry::imm=sans::every_3", immigration: null }),
+      scenario({ key: "strawberry::imm=avec::every_3", immigration: { wild: 15, females: 15 } }),
+    ] } as unknown as Results;
+    const cfgCmp = { ...config, immigration: { strawberry: { wild: 15, females: 15 } }, immigration_compare: true };
+    const d = datasetFromResults(res, { config: cfgCmp } as unknown as Experiment, meta);
+    expect(d.immigrations).toEqual(["sans", "avec"]);
+    expect(d.rows.filter((r) => r.Immigration === "avec")).toHaveLength(2);
+    expect(scenarioLabel({ ...res.scenarios[1] }, cfgCmp, meta)).toBe("Fraise · J+3 · avec immigration");
+    expect(sameCell(res.scenarios[0], res.scenarios[1])).toBe(false);
+  });
+});
+
+describe("immigration sur une seule culture, sans comparaison", () => {
+  it("ne crée pas de dimension « avec / sans » (les cultures restent ensemble dans les analyses)", () => {
+    const res = { scenarios: [
+      scenario({ key: "strawberry::every_3", immigration: { wild: 15, females: 15 } }),
+      scenario({ key: "cherry::every_3", crop: "cherry", immigration: null }),
+    ] } as unknown as Results;
+    const d = datasetFromResults(res, { config: { ...config, crops: ["strawberry", "cherry"], immigration: { strawberry: { wild: 15, females: 15 } } } } as unknown as Experiment, meta);
+    expect(d.immigrations).toEqual(["sans"]);
+    expect(d.crops).toEqual(["strawberry", "cherry"]);
   });
 });

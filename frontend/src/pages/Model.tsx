@@ -91,10 +91,10 @@ function hypotheses(meta: Meta): Hyp[] {
       text: <>Fraise : {s.season_length} j, {fmtInt(s.daily_fruit_production)} fruits produits par jour, maturité en {s.maturation_min}–{s.maturation_max} j, récolte tous les {s.harvest_frequency} j. Cerise : {c.season_length} j, {fmtInt(c.initial_fruits)} fruits présents dès J0, maturité en {c.maturation_min}–{c.maturation_max} j, récolte unique en fin de saison.</> },
     { id: "H5", status: "notebook", title: "Budget exprimé en insectes",
       text: "Le budget est un nombre de mâles stériles lâchés par saison ; le modèle ne contient aucun coût monétaire." },
-    { id: "H6", status: "extension", title: "Population fermée — ou immigration (option)",
-      text: <>Dans le notebook, aucun insecte n’entre ni ne sort de la parcelle. Option hors notebook : immigration quotidienne (à partir de J1) de mâles sauvages et de femelles fécondées, réglée par culture dans le Studio (proposition de Marine : 15 + 15 par jour en fraise, 8 + 8 en cerise).</> },
+    { id: "H6", status: "notebook", title: "Population fermée par défaut — immigration possible",
+      text: <>Par défaut, aucun insecte n’entre ni ne sort de la parcelle. L’immigration fait partie du modèle et du notebook : tous les X jours à partir de J1, un nombre choisi de mâles sauvages et de femelles déjà fécondées entrent dans la parcelle, réglé par culture dans le Studio, avec une comparaison avec / sans immigration dans la même expérience.</> },
     { id: "H7", status: "extension", title: "Pas de capacité de charge — ou plafond K_a (option)",
-      text: <>Dans le notebook, rien ne limite la population d’adultes. Option hors notebook : une larve qui émerge alors que W + F ≥ <Tex>{"K_a"}</Tex> meurt (proposition : 3 000).</> },
+      text: <>Dans le notebook, rien ne limite la population d’adultes. Option hors notebook : une larve qui émerge alors que W + F ≥ <Tex>{"K_a"}</Tex> meurt.</> },
     { id: "H8", status: "extension", title: "Deux stades de fruit — ou stade « tournant » (option)",
       text: <>Dans le notebook, un fruit est jeune (ponte réussie avec <Tex>{"p_y"}</Tex>) puis mûr (toujours réussie). Option hors notebook : les <Tex>{"d_t"}</Tex> derniers jours de la phase jeune, réussite avec <Tex>{"p_t"}</Tex>.</> },
   ];

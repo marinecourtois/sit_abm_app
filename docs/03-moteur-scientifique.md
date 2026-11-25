@@ -41,7 +41,7 @@ le moteur reproduit le notebook au bit près (`test_factorial_bit_exact`, `test_
 
 | Marque | Paramètres | Règle |
 |---|---|---|
-| EXT 1 | `immigration_wild_males` (m_W), `immigration_females` (m_F) ; depuis la 1.10.0, réglés **par culture** via `config.immigration` (le Studio n'expose plus le réglage global) | Chaque jour à partir de J1, après les lâchers, m_W mâles sauvages et m_F femelles **déjà fécondées** entrent dans la parcelle, à l'âge 0 (J0 est l'invasion initiale). Métrique `immigrants` = (m_W + m_F) × (jours − 1). |
+| EXT 1 → modèle (1.11.0) | `immigration_wild_males` (m_W), `immigration_females` (m_F), `immigration_every` (X) ; réglés **par culture** via `config.immigration` ; présents aussi dans le notebook (`RematingModel`, dictionnaire `IMMIGRATION`) | Les jours X, 2X, 3X… (à partir de J1), après les lâchers, m_W mâles sauvages et m_F femelles **déjà fécondées** entrent dans la parcelle, à l'âge 0 (J0 est l'inoculum de départ). Métrique `immigrants` = (m_W + m_F) × ⌊(jours − 1) / X⌋. Le notebook modifié donne exactement les mêmes nombres. |
 | EXT 2 | `carrying_capacity` (K_a) | Une larve qui émerge alors que W + F ≥ K_a meurt au lieu de devenir adulte (sans tirage du sexe). W + F ne dépasse donc K_a que par l'effectif initial ou l'immigration. Métrique `emergences_blocked`. |
 | EXT 3 | `turning_days` (d_t), `turning_puncture_probability` (p_t) | Un fruit est jeune aux âges 0 … M (M = âge de maturité tiré). Aux d_t derniers de ces âges (M − d_t + 1 … M), une ponte tentée réussit avec p_t au lieu de p_y. Même nombre de tirages. La maturité est tirée en 2–4 j (fraise) et 10–15 j (cerise) ; avec d_t > maturité max, toute la phase jeune est « tournante » (la validation l'indique). |
 

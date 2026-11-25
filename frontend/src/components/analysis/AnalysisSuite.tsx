@@ -13,7 +13,7 @@ import { ChartExportMenu } from "../charts/ChartExportMenu";
 
 const MARKERS = ["circle", "square", "triangle", "diamond"] as const;
 
-export interface AnalysisSelection { crop: string; remating: string; invasion: string; budget: number; metric: string }
+export interface AnalysisSelection { crop: string; remating: string; invasion: string; budget: number; metric: string; immigration: string | null }
 const short = invasionShort;
 
 /**
@@ -34,7 +34,14 @@ export function AnalysisSuite({ data, meta, source, exportPrefix, planHint, asid
   aside?: ReactNode | ((sel: AnalysisSelection) => ReactNode);
   sticky?: boolean;
 }) {
-  const { rows, strategies, crops, invasions, budgets, regimes, nRep } = data;
+  const { strategies, crops, invasions, budgets, regimes, immigrations, nRep } = data;
+  const [imm, setImm] = useState(immigrations.includes("avec") ? "avec" : immigrations[0] ?? "sans");
+  useEffect(() => { if (!immigrations.includes(imm) && immigrations[0]) setImm(immigrations[0]); }, [immigrations.join()]);
+  // Avec / sans immigration (comparaison 1.11.0) : tous les graphiques portent sur la condition choisie
+  const dataImm = useMemo(() => (immigrations.length > 1 ? { ...data, rows: data.rows.filter((r) => (r.Immigration ?? "sans") === imm), immigrations: [imm] } : data), [data, imm]);
+  const rows = dataImm.rows;
+  // Exports et légendes : la condition affichée est nommée quand l'expérience compare avec / sans immigration
+  if (immigrations.length > 1) { source = `${source}, ${imm} immigration`; exportPrefix = `${exportPrefix}${imm}-immigration-`; }
   const [crop, setCrop] = useState(crops[0] ?? "strawberry");
   const [metric, setMetric] = useState("harvested_clean_pct");
   const [remating, setRemating] = useState(regimes.includes("preference") ? "preference" : regimes[0] ?? "preference");
@@ -87,6 +94,7 @@ export function AnalysisSuite({ data, meta, source, exportPrefix, planHint, asid
     invasions.length === 1 && `inoculum ${short(invasions[0]).toLowerCase()}`,
     tis.length === 1 && `budget ${fmtInt(tis[0])}`,
     regimes.length === 1 && `régime ${meta.remating[regimes[0]]?.short ?? regimes[0]}`,
+    immigrations.length === 1 && immigrations[0] === "avec" && "avec immigration",
   ].filter(Boolean) as string[];
 
   return (
@@ -101,6 +109,8 @@ export function AnalysisSuite({ data, meta, source, exportPrefix, planHint, asid
             {regimes.length > 1 && <div className="w-64 text-[12px]"><span className="text-muted">Réaccouplement (heatmap, dose-réponse, Pareto)</span>
               <Segmented size="sm" label="Régime de réaccouplement" value={remating} onChange={setRemating}
                 options={regimes.map((k) => ({ value: k, label: meta.remating[k]?.short ?? k }))} /></div>}
+            {immigrations.length > 1 && <div className="w-56 text-[12px]"><span className="text-muted">Immigration</span>
+              <Segmented size="sm" label="Immigration" value={imm} onChange={setImm} options={[{ value: "sans", label: "Sans" }, { value: "avec", label: "Avec" }]} /></div>}
             {fixed.length > 0 && <p className="pb-1 text-[12px] text-muted">Fixés dans ce plan : {fixed.join(" · ")}{crops.length === 1 && ` · culture ${CROP_LABEL[crops[0]]}`}</p>}
           </div>
           <p className="rounded bg-[#F3F5EF] px-3 py-1.5 text-[12px] leading-snug text-ink">
@@ -110,7 +120,7 @@ export function AnalysisSuite({ data, meta, source, exportPrefix, planHint, asid
         </div>
       </Panel>
 
-      <DecisionSynthesis data={data} meta={meta} metric={metric} invasion={inv} setInvasion={setInvasion} budget={budget} setBudget={setBudget} budgets={tis} planHint={planHint} />
+      <DecisionSynthesis data={dataImm} both={immigrations.length > 1 ? data : undefined} meta={meta} metric={metric} invasion={inv} setInvasion={setInvasion} budget={budget} setBudget={setBudget} budgets={tis} planHint={planHint} />
 
       <Panel className="mt-4 px-5 py-4">
         <PanelTitle sub={`${CROP_LABEL[crop]} · régime ${remating} · moyenne ± écart-type (n = ${nRep} répétitions par case)${control ? " · témoin : budget 0" : ""}`}
@@ -125,7 +135,7 @@ export function AnalysisSuite({ data, meta, source, exportPrefix, planHint, asid
         {hmRows.length === 1 && <Missing>Une seule ligne : ce plan n’a qu’un inoculum de départ et qu’un budget. {planHint}</Missing>}
       </Panel>
 
-      {crops.length > 1 && <CropComparison data={data} meta={meta} metric={metric} remating={remating} invasion={inv} budget={budget} exportPrefix={exportPrefix} source={source} />}
+      {crops.length > 1 && <CropComparison data={dataImm} meta={meta} metric={metric} remating={remating} invasion={inv} budget={budget} exportPrefix={exportPrefix} source={source} />}
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
         <Panel className="px-5 py-4">
@@ -162,7 +172,7 @@ export function AnalysisSuite({ data, meta, source, exportPrefix, planHint, asid
           <StripPlot ref={stRef} data={strip.map(({ s, vals }) => ({ label: s.control ? "Témoin" : s.short, color: s.color, values: vals }))} unit={m.unit} />
           <p className="text-[11.5px] text-muted">Avec {nRep} répétitions, ni quartiles ni intervalles de confiance ne sont calculés : les valeurs individuelles sont affichées.</p>
         </Panel>
-        {typeof aside === "function" ? aside({ crop, remating, invasion: inv, budget, metric }) : aside}
+        {typeof aside === "function" ? aside({ crop, remating, invasion: inv, budget, metric, immigration: immigrations.length > 1 ? imm : null }) : aside}
       </div>
 
       {regimes.includes("preference") && regimes.includes("first")
@@ -173,6 +183,8 @@ export function AnalysisSuite({ data, meta, source, exportPrefix, planHint, asid
             <Missing>Cette comparaison demande les deux régimes de réaccouplement (polyandrie et monandrie) dans le même plan ; celui-ci n’utilise que « {meta.remating[regimes[0]]?.label ?? regimes[0]} ». {planHint}</Missing>
           </Panel>
         )}
+
+      {immigrations.length > 1 && <ImmigrationSection rows={data.rows} meta={meta} metric={metric} crops={crops} remating={remating} invasions={invasions} budgets={tis} strategies={cols} nRep={nRep} exportPrefix={exportPrefix} />}
 
       <Panel className="mt-4 px-5 py-4">
         <PanelTitle>Méthodes statistiques appliquées</PanelTitle>
@@ -316,7 +328,11 @@ function PolyMonoSection({ rows, meta, metric, crops, invasions, budgets, strate
   );
 }
 
-function DodgedStrip({ crop, data, ind, title, exportPrefix }: { crop: string; data: { s: AnalysisStrategy; regimes: ReturnType<typeof stats>[] }[]; ind: Indicator; title: string; exportPrefix: string }) {
+type Cond = { key: string; color: string; shape: "circle" | "triangle" };
+function DodgedStrip({ crop, data, ind, title, exportPrefix, conds = REGIMES, file = "polyandrie-monandrie", legend = "Cercles : polyandrie (preference) ; triangles : monandrie (first)." }: {
+  crop: string; data: { s: AnalysisStrategy; regimes: ReturnType<typeof stats>[] }[]; ind: Indicator; title: string; exportPrefix: string;
+  conds?: Cond[]; file?: string; legend?: string;
+}) {
   const ref = useRef<SVGSVGElement>(null);
   const I = ind;
   const W = 640, H = 250, L = 58, B = 34, T = 10, R = 8;
@@ -329,7 +345,7 @@ function DodgedStrip({ crop, data, ind, title, exportPrefix }: { crop: string; d
   const ctrlIdx = data.findIndex((d) => d.s.control);
   return (
     <figure className="mt-1">
-      <div className="flex justify-end"><ChartExportMenu getSvg={() => ref.current} meta={{ title, filename: `${exportPrefix}polyandrie-monandrie-${crop}`, caption: `${I.label} (${I.unit}). Points : répétitions ; trait : moyenne. Cercles : polyandrie (preference) ; triangles : monandrie (first).` }} /></div>
+      <div className="flex justify-end"><ChartExportMenu getSvg={() => ref.current} meta={{ title, filename: `${exportPrefix}${file}-${crop}`, caption: `${I.label} (${I.unit}). Points : répétitions ; trait : moyenne. ${legend}` }} /></div>
       <svg ref={ref} viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={title}>
         {ticks.map((t) => <g key={t}><line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="#E3E8E1" /><text x={L - 8} y={y(t)} dy="0.32em" textAnchor="end" fontSize={11} className="tnum" fill="#1B201C">{fmt(t, 0)}</text></g>)}
         <line x1={L} x2={L} y1={T} y2={H - B} stroke="#1B201C" /><line x1={L} x2={W - R} y1={H - B} y2={H - B} stroke="#1B201C" />
@@ -338,7 +354,7 @@ function DodgedStrip({ crop, data, ind, title, exportPrefix }: { crop: string; d
             {ctrlIdx === 0 && i === 1 && <line x1={L + bw * i} x2={L + bw * i} y1={T} y2={H - B} stroke="#9AA59D" strokeDasharray="3 3" />}
             {d.regimes.map((g, j) => {
               const cx = L + bw * (i + 0.5) + (j === 0 ? -bw * 0.18 : bw * 0.18);
-              const reg = REGIMES[j];
+              const reg = conds[j];
               return (
                 <g key={j}>
                   {g.values.map((v, n) => {
@@ -361,8 +377,8 @@ function DodgedStrip({ crop, data, ind, title, exportPrefix }: { crop: string; d
 }
 
 /* ---------------------------------------------------------------- Synthèse décisionnelle */
-function DecisionSynthesis({ data, meta, metric, invasion, setInvasion, budget, setBudget, budgets, planHint }: {
-  data: AnalysisDataset; meta: Meta; metric: string; invasion: string; setInvasion: (v: string) => void;
+function DecisionSynthesis({ data, both, meta, metric, invasion, setInvasion, budget, setBudget, budgets, planHint }: {
+  data: AnalysisDataset; both?: AnalysisDataset; meta: Meta; metric: string; invasion: string; setInvasion: (v: string) => void;
   budget: number; setBudget: (v: number) => void; budgets: number[]; planHint?: ReactNode;
 }) {
   const ind = INDICATOR[metric];
@@ -370,6 +386,22 @@ function DecisionSynthesis({ data, meta, metric, invasion, setInvasion, budget, 
   const syn = useMemo(() => synthesize(data, (r) => ind.value(r), ind.higherIsBetter, invasion, budget,
     (c) => CROP_LABEL[c] ?? c, (r) => meta.remating[r]?.short ?? r), [data, metric, invasion, budget]);
   const v = (x: number) => fmt(x, pct ? 1 : 0);
+  // Stratégie en tête avec et sans immigration, par culture (même régime, inoculum et budget)
+  const byImm = useMemo(() => {
+    if (!both) return null;
+    const lead = (m: string) => {
+      const d = { ...both, rows: both.rows.filter((r) => (r.Immigration ?? "sans") === m), immigrations: [m] };
+      return synthesize(d, (r) => ind.value(r), ind.higherIsBetter, invasion, budget, (c) => CROP_LABEL[c] ?? c, (r) => r);
+    };
+    const avec = lead("avec"), sans = lead("sans");
+    const main = data.regimes.includes("preference") ? "preference" : data.regimes[0];
+    const parts = data.crops.map((crop) => {
+      const a = avec.cells.find((c) => c.crop === crop && c.remating === main)?.ranking[0], s = sans.cells.find((c) => c.crop === crop && c.remating === main)?.ranking[0];
+      if (!a || !s) return null;
+      return a.strategy.id === s.strategy.id ? `${CROP_LABEL[crop]} : même stratégie en tête (${a.strategy.label})` : `${CROP_LABEL[crop]} : ${s.strategy.label} sans immigration, ${a.strategy.label} avec`;
+    }).filter(Boolean);
+    return parts.length ? `${parts.join(" ; ")} (${meta.remating[main]?.short ?? main}).` : null;
+  }, [both, metric, invasion, budget]);
   const gainTxt = (g: number) => `${g > 0 ? "+" : g < 0 ? "−" : ""}${v(Math.abs(g))}${pct ? " pt" : ""}`;
   const good = (g: number) => (ind.higherIsBetter ? g > 0 : g < 0);
   return (
@@ -387,7 +419,7 @@ function DecisionSynthesis({ data, meta, metric, invasion, setInvasion, budget, 
         </div>
       </div>
 
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
+      <div className={`mt-3 grid gap-3 ${byImm ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
         <div className="rounded-md border border-line bg-white px-3.5 py-2.5">
           <div className="text-[11.5px] font-semibold uppercase tracking-wider text-muted">Fraise et cerise : même optimum ?</div>
           <p className="mt-1 text-[13px] leading-snug">{syn.byCrop ?? (data.crops.length < 2 ? <>Une seule culture dans ces données. {planHint}</> : "Pas assez de données à ce budget.")}</p>
@@ -396,6 +428,10 @@ function DecisionSynthesis({ data, meta, metric, invasion, setInvasion, budget, 
           <div className="text-[11.5px] font-semibold uppercase tracking-wider text-muted">Monandrie ou polyandrie : l’optimum change-t-il ?</div>
           <p className="mt-1 text-[13px] leading-snug">{syn.byRegime ?? <>Les deux régimes (polyandrie et monandrie) sont nécessaires dans le même plan. {planHint}</>}</p>
         </div>
+        {byImm && <div className="rounded-md border border-line bg-white px-3.5 py-2.5">
+          <div className="text-[11.5px] font-semibold uppercase tracking-wider text-muted">Avec ou sans immigration : l’optimum change-t-il ?</div>
+          <p className="mt-1 text-[13px] leading-snug">{byImm}</p>
+        </div>}
       </div>
 
       <div className="mt-3 overflow-x-auto">
@@ -483,6 +519,85 @@ function CropComparison({ data, meta, metric, remating, invasion, budget, export
         <text transform={`translate(14,${(H - B) / 2}) rotate(-90)`} textAnchor="middle" fontSize={11.5} fill="#1B201C">{ind.unit}</text>
       </svg>
       {!pct && <p className="text-[11.5px] text-muted">Attention : valeur absolue, les deux cultures ne produisent pas le même nombre de fruits ni sur la même durée.</p>}
+    </Panel>
+  );
+}
+
+/* ---------------------------------------------------------------- Avec vs sans immigration
+ * Même plan, mêmes graines : chaque stratégie avec et sans immigration quotidienne, au régime,
+ * à l'inoculum et au budget choisis. Le témoin a lui aussi ses deux conditions. */
+const IMM_CONDS: Cond[] = [
+  { key: "sans", color: "#547B91", shape: "circle" },
+  { key: "avec", color: "#A83D36", shape: "triangle" },
+];
+
+function ImmigrationSection({ rows, meta, metric, crops, remating, invasions, budgets, strategies, nRep, exportPrefix }: {
+  rows: Row[]; meta: Meta; metric: string; crops: string[]; remating: string; invasions: string[]; budgets: number[]; strategies: AnalysisStrategy[]; nRep: number; exportPrefix: string;
+}) {
+  const [inv, setInv] = useState("");
+  const [budget, setBudget] = useState(9000);
+  const ind = INDICATOR[metric];
+  const invasion = invasions.includes(inv) ? inv : invasions[Math.min(1, invasions.length - 1)] ?? "";
+  const b = budgets.includes(budget) ? budget : budgets.includes(9000) ? 9000 : budgets[0];
+  const isPct = ind.unit.startsWith("%");
+  const data = (crop: string) => strategies.map((s) => ({
+    s,
+    regimes: IMM_CONDS.map((g) => stats(rows.filter((r) => r.Crop === crop && r.Remating === remating && (r.Immigration ?? "sans") === g.key && r.Invasion === invasion
+      && r.Strategy === s.id && (s.control || Number(r.Budget) === b)).map((r) => ind.value(r)))),
+  }));
+  return (
+    <Panel className="mt-4 px-5 py-4" aria-labelledby="immig-h">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 id="immig-h" className="font-serif text-[21px] font-semibold">Avec ou sans immigration</h2>
+          <p className="font-serif text-[13.5px] text-muted">Effet de l’immigration sur « {ind.label} » · mêmes graines · {nRep} répétitions par point · régime {meta.remating[remating]?.short ?? remating}</p>
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          {invasions.length > 1 && <div className="w-64 text-[12px]"><span className="text-muted">Inoculum de départ</span>
+            <Segmented size="sm" label="Inoculum de départ (immigration)" value={invasion} onChange={setInv} options={invasions.map((i) => ({ value: i, label: short(i) }))} /></div>}
+          {budgets.length > 1 && <div className="w-64 text-[12px]"><span className="text-muted">Budget (mâles stériles / saison)</span>
+            <Segmented size="sm" label="Budget (immigration)" value={String(b)} onChange={(x) => setBudget(Number(x))} options={budgets.map((x) => ({ value: String(x), label: fmtInt(x) }))} /></div>}
+        </div>
+      </div>
+      <div className={`mt-4 grid gap-6 ${crops.length > 1 ? "xl:grid-cols-2" : ""}`}>
+        {crops.map((crop) => {
+          const d = data(crop);
+          const c = meta.crops[crop as "strawberry"];
+          return (
+            <section key={crop} aria-label={c.label}>
+              <h3 className="font-serif text-[17px] font-semibold">{c.label} <span className="text-[13px] font-normal italic text-muted">{c.latin}</span></h3>
+              <DodgedStrip crop={crop} data={d} ind={ind} exportPrefix={exportPrefix} conds={IMM_CONDS} file="avec-sans-immigration"
+                legend="Cercles bleus : sans immigration ; triangles rouges : avec immigration."
+                title={`${ind.label} — ${c.label}, inoculum ${short(invasion).toLowerCase()}, budget ${fmtInt(b)}, avec et sans immigration`} />
+              <table className="mt-2 w-full text-[12.5px]">
+                <caption className="sr-only">Moyennes avec et sans immigration et écart</caption>
+                <thead><tr className="border-b border-line text-left text-[11.5px] text-muted">
+                  <th className="py-1.5 font-medium">Stratégie</th>
+                  <th className="py-1.5 text-right font-medium">Sans<div className="font-normal">moy. ± é.-t.</div></th>
+                  <th className="py-1.5 text-right font-medium">Avec<div className="font-normal">moy. ± é.-t.</div></th>
+                  <th className="py-1.5 text-right font-medium">Écart avec − sans<div className="font-normal">{diffUnit(ind)}</div></th>
+                </tr></thead>
+                <tbody>{d.map(({ s, regimes: [sans, avec] }) => {
+                  const diff = avec.mean - sans.mean;
+                  const worse = ind.higherIsBetter ? diff < 0 : diff > 0;
+                  return (
+                    <tr key={s.id} className="border-b border-line/60">
+                      <td className="py-1.5">{s.label}</td>
+                      <td className="py-1.5 text-right tnum">{sans.n ? fmt(sans.mean, isPct ? 1 : 0) : "—"}{sans.n > 0 && <span className="text-muted"> ± {fmt(sans.sd, 1)}</span>}</td>
+                      <td className="py-1.5 text-right tnum">{avec.n ? fmt(avec.mean, isPct ? 1 : 0) : "—"}{avec.n > 0 && <span className="text-muted"> ± {fmt(avec.sd, 1)}</span>}</td>
+                      <td className={`py-1.5 text-right tnum ${sans.n && avec.n ? (worse ? "text-terracotta" : "text-forest") : ""}`}>{sans.n && avec.n ? `${diff > 0 ? "+" : diff < 0 ? "−" : ""}${fmt(Math.abs(diff), isPct ? 1 : 0)}` : "—"}</td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            </section>
+          );
+        })}
+      </div>
+      <p className="mt-3 text-[11.5px] leading-relaxed text-muted">
+        Écart en terre cuite : l’immigration dégrade cet indicateur ; en vert : elle l’améliore. Les deux conditions utilisent les mêmes graines ; la différence vient
+        donc de l’immigration seule, à la variabilité entre répétitions près.
+      </p>
     </Panel>
   );
 }

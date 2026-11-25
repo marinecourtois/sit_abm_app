@@ -147,6 +147,14 @@ def test_immigration_extension():
     assert imm["metrics"]["larvae_produced"] > base["metrics"]["larvae_produced"]
 
 
+def test_immigration_every_x_days():
+    """1.11.0 : une arrivée tous les X jours, à partir de J1 (jours X, 2X, …)."""
+    for every in (1, 3, 7):
+        m = _season(immigration_wild_males=10, immigration_females=5, immigration_every=every)["metrics"]
+        assert m["immigrants"] == 15 * ((SEASON["strawberry"] - 1) // every), every
+    assert _season(immigration_every=3)["metrics"] == _season()["metrics"]   # sans effectif, sans effet
+
+
 def test_carrying_capacity_extension():
     """Sans lâcher, la population grandit ; avec K_a, une émergence n'a lieu que si W + F < K_a,
     donc W + F ne dépasse jamais K_a (l'effectif initial, 600, est en dessous)."""

@@ -5,6 +5,8 @@ export type Status = "ready" | "queued" | "running" | "completed" | "cancelled" 
 
 export interface StrategySpec { key: StrategyKey; interval?: number; first_day?: number; initial_fraction?: number; maintenance_interval?: number; label?: string }
 export interface Counts { wild: number; females: number }
+/** Immigration d'une culture : mâles sauvages et femelles fécondées par arrivée, une arrivée tous les « every » jours (1.11.0). */
+export interface Arrivals extends Counts { every?: number }
 /** Inoculum de départ (« invasion » dans l'API). by_crop (1.10.0) : effectifs propres à chaque culture (inoculum fort). */
 export interface Invasion { preset?: string | null; wild: number; females: number; by_crop?: Record<string, Counts> | null }
 export interface ExperimentConfig {
@@ -16,7 +18,9 @@ export interface ExperimentConfig {
    *  Absents ou null : la valeur unique ci-dessus (budget, invasion, remating). */
   budgets?: number[] | null; invasions?: Invasion[] | null; rematings?: string[] | null;
   /** Immigration quotidienne par culture (1.10.0, extension hors notebook) ; null = désactivée. */
-  immigration?: Record<string, Counts> | null;
+  immigration?: Record<string, Arrivals> | null;
+  /** Croiser « avec » et « sans » immigration dans la même expérience (1.11.0). */
+  immigration_compare?: boolean;
 }
 export interface Experiment {
   id: string; short_id: string; name: string; project: string; description: string;
@@ -32,7 +36,7 @@ export interface ScenarioEvent { type: string; day: number; label: string }
 export interface Scenario {
   key: string; crop: CropKey; strategy: StrategySpec; strategy_key: StrategyKey; strategy_label: string;
   /** Plan (1.7.0) : identifiant de stratégie, invasion et régime propres au scénario (absents des anciens résultats : ceux de la configuration). */
-  strategy_id?: string; invasion?: Invasion; remating?: string; immigration?: Counts | null;
+  strategy_id?: string; invasion?: Invasion; remating?: string; immigration?: Arrivals | null;
   is_control: boolean; budget: number; schedule: Record<string, number>; seeds: number[];
   metrics: Record<string, Stat>; series: Record<string, Band> & { Time: number[] };
   events: ScenarioEvent[];
@@ -48,7 +52,7 @@ export interface Meta {
   biology_groups: { key: string; label: string }[];
   invasions: Record<string, { label: string; wild: number; females: number; nb_label?: string; by_crop?: Record<string, Counts>; description?: string }>;
   /** Immigration quotidienne proposée par culture (1.10.0). */
-  immigration_defaults?: Record<string, Counts>;
+  immigration_defaults?: Record<string, Arrivals>;
   budget_presets: number[]; biology: BiologyParam[]; biology_defaults: Record<string, number>;
   fixed_constants: { name: string; symbol: string; value: string; unit: string; source: string }[];
   model_constants: { eggs_poisson_mean: number; eggs_max_per_day: number; fruits_per_clutch_max: number; refractory_fertile: [number, number];
@@ -68,7 +72,7 @@ export interface LiveState {
   seq?: number;
   /** Temps écoulé et temps restant estimé à partir du débit mesuré de l'exécution en cours. */
   elapsed_s?: number | null; eta_s?: number | null;
-  log: { t: string; msg: string }[]; plan: { key: string; crop: CropKey; strategy_label: string; is_control: boolean; budget: number; invasion?: Invasion; remating?: string }[];
+  log: { t: string; msg: string }[]; plan: { key: string; crop: CropKey; strategy_label: string; is_control: boolean; budget: number; invasion?: Invasion; remating?: string; immigration?: Counts | null }[];
 }
 export interface ActiveRun { id: string; short_id: string; name: string; status: Status; progress: number; done: number; total: number; elapsed_s: number | null; eta_s: number | null }
 export type ExportFormat = "json" | "csv-metrics" | "csv-series" | "protocol" | "archive";

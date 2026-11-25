@@ -8,8 +8,8 @@ make test          # tout, directement : pytest (backend) puis Vitest (frontend)
 
 | Suite | Outil | Fichiers | Tests |
 |---|---|---|---|
-| Backend : non-régression, API, contrat | pytest (`backend/tests/`) | 3 | 66 |
-| Frontend : unitaires, composants, contrat | Vitest + Testing Library (`frontend/src/**/*.test.ts(x)`) | 14 | 106 |
+| Backend : non-régression, API, contrat | pytest (`backend/tests/`) | 3 | 68 |
+| Frontend : unitaires, composants, contrat | Vitest + Testing Library (`frontend/src/**/*.test.ts(x)`) | 14 | 108 |
 
 ## SmartTest : ne lancer que les tests affectés
 
@@ -82,6 +82,7 @@ dynamiques).
 | `test_immigration_extension` | `immigrants` = (m_W + m_F) × jours ; plus de larves qu'en parcelle fermée |
 | `test_carrying_capacity_extension` | Émergences bloquées > 0 et W + F ≤ K_a, sur un témoin dont la population dépasse K_a sans l'extension |
 | `test_turning_stage_extension` | p_y = 0 et d_t ≥ maturité max avec p_t = 0,3 est **identique au bit près** au modèle du notebook avec p_y = 0,3 ; un stade plus court change les résultats |
+| `test_immigration_every_x_days` | Arrivées tous les X jours à partir de J1 : immigrants = (m_W + m_F) × ⌊(jours − 1) / X⌋ ; sans effectif, aucun effet |
 | `test_fort_inoculum_matches_calibration` | L'inoculum fort figé (`FORT_BY_CROP`) est exactement le pic du témoin calculé par `tis_engine/calibration.py` |
 | `test_notebook_inoculum_names_unchanged` | Le plan factoriel du notebook garde ses noms et effectifs d'inoculum (dont 900 + 900 pour « Forte ») |
 | `test_turning_window_lasts_exactly_d_t_days` | Un fruit jeune aux âges 0 … M n'est « tournant » qu'aux d_t derniers (M − d_t + 1 … M) |
@@ -135,6 +136,7 @@ indicateur que le moteur ne calcule pas fait échouer le test Vitest **et** le t
 | `test_configs_before_extensions_still_validate_and_run_identically` | Une configuration d'avant la 1.9.0 (sans clés d'extension) est acceptée, garde son empreinte et donne exactement les mêmes nombres |
 | `test_strong_inoculum_per_crop_and_immigration_per_crop` | Inoculum fort et immigration par culture : chaque saison reçoit les effectifs et l'immigration de sa culture (immigrants = (m_W + m_F) × (jours − 1)), libellé « Fort (pic du témoin) », colonnes du CSV |
 | `test_immigration_cannot_be_set_twice` | Immigration par culture et réglage global ensemble : refusé |
+| `test_compare_with_and_without_immigration` | Une expérience « avec / sans immigration » : clés distinctes, condition « sans » identique au bit près au moteur sans immigration, chaque scénario apparié au témoin de sa condition |
 | `test_inoculum_and_immigration_edge_cases` | Deux inoculums aux mêmes effectifs pour une culture : refusé ; immigration d'une culture non sélectionnée ou nulle : ignorée, empreinte inchangée |
 | `test_active_extension_is_flagged` | Une extension active et un stade « tournant » couvrant toute la phase jeune produisent les avertissements attendus |
 

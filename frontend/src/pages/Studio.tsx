@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, CircleX, Download, Play, Plus, RotateCcw, Save, Trash2, Upload } from "../icons";
 import { api, type BiologyParam, type CropKey, type ExperimentConfig, type Invasion, type StrategySpec, type Validation } from "../lib/api";
-import { invasionFor, invasionKey, invasionLabel, normalizeLoadedConfig, planSize, presetInvasion } from "../lib/analysis";
+import { everyText, invasionFor, invasionKey, invasionLabel, normalizeLoadedConfig, planSize, presetInvasion } from "../lib/analysis";
 import { useMeta } from "../lib/meta";
 import { CROP_LABEL, fmt, fmtInt } from "../lib/format";
 import { CROP_COLOR, STRATEGY_COLOR } from "../lib/colors";
@@ -96,35 +96,48 @@ function PlanSection({ cfg, setCfg, all, open, setOpen }: {
 }
 
 /** Immigration quotidienne par culture (extension hors notebook, désactivée par défaut). */
-function ImmigrationField({ cfg, setImmigration }: { cfg: ExperimentConfig; setImmigration: (v: ExperimentConfig["immigration"]) => void }) {
+function ImmigrationField({ cfg, setImmigration, setCompare }: { cfg: ExperimentConfig; setImmigration: (v: ExperimentConfig["immigration"]) => void; setCompare: (v: boolean) => void }) {
   const meta = useMeta()!;
   const on = !!cfg.immigration && cfg.crops.some((c) => cfg.immigration?.[c]?.wild || cfg.immigration?.[c]?.females);
   const defaults = meta.immigration_defaults ?? {};
-  const val = (crop: string) => cfg.immigration?.[crop] ?? defaults[crop] ?? { wild: 0, females: 0 };
-  const setCrop = (crop: string, k: "wild" | "females", v: number) =>
-    setImmigration({ ...Object.fromEntries(Object.keys(defaults).map((c) => [c, val(c)])), [crop]: { ...val(crop), [k]: v } });
+  // Valeurs affichées = valeurs de la configuration (0 pour une culture absente) ; les valeurs pré-remplies ne servent qu'à l'activation
+  const val = (crop: string) => (cfg.immigration ? cfg.immigration[crop] ?? { wild: 0, females: 0, every: 1 } : defaults[crop] ?? { wild: 0, females: 0, every: 1 });
+  useEffect(() => {   // culture ajoutée pendant que l'immigration est active : valeurs pré-remplies écrites dans la configuration
+    if (on && cfg.immigration && cfg.crops.some((c) => !cfg.immigration![c] && defaults[c])) {
+      setImmigration({ ...cfg.immigration, ...Object.fromEntries(cfg.crops.filter((c) => !cfg.immigration![c] && defaults[c]).map((c) => [c, { ...defaults[c] }])) });
+    }
+  }, [cfg.crops.join(), on]);
+  useEffect(() => { if (!on && cfg.immigration_compare) setCompare(false); }, [on, cfg.immigration_compare]);   // jamais de comparaison sans immigration
+  const setCrop = (crop: string, k: "wild" | "females" | "every", v: number) =>
+    setImmigration({ ...(cfg.immigration ?? {}), [crop]: { ...val(crop), [k]: v } });
   return (
-    <div className={`rounded-md border px-3 py-2.5 ${on ? "border-terracotta/40 bg-[#FCF4EF]" : "border-line bg-white"}`}>
+    <div className={`rounded-md border px-3 py-2.5 ${on ? "border-botanic/40 bg-sage-soft" : "border-line bg-white"}`}>
       <label className="flex cursor-pointer items-start gap-2">
         <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#347A55]" checked={on}
-          onChange={(e) => setImmigration(e.target.checked ? Object.fromEntries(Object.keys(defaults).map((c) => [c, { ...defaults[c] }])) : null)} />
+          onChange={(e) => { setImmigration(e.target.checked ? Object.fromEntries(Object.keys(defaults).map((c) => [c, { ...defaults[c] }])) : null); if (!e.target.checked) setCompare(false); }} />
         <span>
-          <span className="font-medium">Immigration quotidienne</span> <Badge tone="terracotta">hors notebook</Badge>
-          <span className="block text-[11.5px] leading-snug text-muted">Chaque jour à partir de J1, des mâles sauvages et des femelles déjà fécondées entrent dans la parcelle. Désactivée : parcelle fermée, comme le notebook.</span>
+          <span className="font-medium">Immigration</span>
+          <span className="block text-[11.5px] leading-snug text-muted">À partir de J1, des mâles sauvages et des femelles déjà fécondées entrent dans la parcelle à intervalle régulier. Désactivée : parcelle fermée (valeur par défaut du modèle et du notebook).</span>
         </span>
       </label>
       {on && (
         <div className="mt-2 space-y-2 text-[12px]">
           {cfg.crops.map((c) => (
             <div key={c}>
-              <div className="font-medium">{meta.crops[c].label} <span className="font-normal text-muted">(par jour)</span></div>
-              <div className="mt-1 grid grid-cols-2 gap-2">
+              <div className="font-medium">{meta.crops[c].label} <span className="font-normal text-muted">(par arrivée)</span></div>
+              <div className="mt-1 grid grid-cols-3 gap-2">
                 <label>Mâles sauvages<NumberField label={`Immigration mâles ${meta.crops[c].label}`} value={val(c).wild} min={0} max={1000} step={1} onChange={(v) => setCrop(c, "wild", v)} /></label>
                 <label>Femelles fécondées<NumberField label={`Immigration femelles ${meta.crops[c].label}`} value={val(c).females} min={0} max={1000} step={1} onChange={(v) => setCrop(c, "females", v)} /></label>
+                <label>Tous les (jours)<NumberField label={`Immigration intervalle ${meta.crops[c].label}`} value={val(c).every ?? 1} min={1} max={Number(meta.crops[c].params.season_length) - 1} step={1} onChange={(v) => setCrop(c, "every", v)} /></label>
               </div>
+              <p className="mt-0.5 text-[11px] text-muted">Arrivées les jours {(val(c).every ?? 1) <= 1 ? "1, 2, 3…" : `${val(c).every}, ${2 * (val(c).every ?? 1)}, ${3 * (val(c).every ?? 1)}…`} · {Math.floor((Number(meta.crops[c].params.season_length) - 1) / Math.max(1, val(c).every ?? 1)) * (val(c).wild + val(c).females)} insectes sur la saison</p>
             </div>
           ))}
-          <p className="text-[11px] text-muted">Valeurs proposées par Marine : {Object.entries(defaults).map(([c, d]) => `${CROP_LABEL[c] ?? c} ${d.wild} + ${d.females}`).join(", ")} par jour.</p>
+          <label className="flex cursor-pointer items-start gap-2 border-t border-terracotta/20 pt-2">
+            <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#347A55]" checked={!!cfg.immigration_compare} onChange={(e) => setCompare(e.target.checked)} />
+            <span><span className="font-medium">Comparer avec et sans immigration</span>
+              <span className="block text-[11px] leading-snug text-muted">Chaque scénario est calculé deux fois, avec et sans immigration, avec les mêmes graines : deux fois plus de saisons. Les analyses ajoutent la section « Avec ou sans immigration ».</span></span>
+          </label>
         </div>
       )}
     </div>
@@ -297,7 +310,7 @@ export function SimulationConfigurator() {
               </div>
             )}</>}
           </div>
-          <ImmigrationField cfg={cfg} setImmigration={(v) => set("immigration", v)} />
+          <ImmigrationField cfg={cfg} setImmigration={(v) => set("immigration", v)} setCompare={(v) => set("immigration_compare", v)} />
           <div>
             <div className="flex items-center gap-1.5 font-medium">Budget <span className="font-normal text-muted">(mâles stériles lâchés par saison)</span>
               <ScientificTooltip content="Nombre total de mâles stériles lâchés sur la saison, réparti selon le calendrier de chaque stratégie. Le modèle ne contient pas de coût monétaire : aucune conversion n'est appliquée." /></div>
@@ -380,7 +393,7 @@ export function SimulationConfigurator() {
           <dl className="mt-3 grid grid-cols-[110px_1fr] gap-x-3 gap-y-1.5 text-[12.5px]">
             <dt className="text-muted">Cultures</dt><dd>{cfg.crops.map((c) => CROP_LABEL[c]).join(", ") || "—"}</dd>
             <dt className="text-muted">Inoculum</dt><dd className="tnum">{plan.invasions.map((i) => i.by_crop ? `${invasionLabel(i, meta)} — ${cfg.crops.map((c) => `${CROP_LABEL[c]} ${fmtInt(invasionFor(i, c).wild)} + ${fmtInt(invasionFor(i, c).females)}`).join(", ")}` : invasionLabel(i, meta)).join(" · ")}</dd>
-            <dt className="text-muted">Immigration</dt><dd className="tnum">{cfg.crops.some((c) => cfg.immigration?.[c]?.wild || cfg.immigration?.[c]?.females) ? cfg.crops.map((c) => `${CROP_LABEL[c]} ${cfg.immigration?.[c]?.wild ?? 0} + ${cfg.immigration?.[c]?.females ?? 0} / jour`).join(", ") : "aucune (parcelle fermée)"}</dd>
+            <dt className="text-muted">Immigration</dt><dd className="tnum">{cfg.crops.some((c) => cfg.immigration?.[c]?.wild || cfg.immigration?.[c]?.females) ? cfg.crops.map((c) => `${CROP_LABEL[c]} ${cfg.immigration?.[c]?.wild ?? 0} + ${cfg.immigration?.[c]?.females ?? 0} ${everyText(cfg.immigration?.[c]?.every)}`).join(", ") + (cfg.immigration_compare ? " · comparé à sans immigration" : "") : "aucune (parcelle fermée)"}</dd>
             <dt className="text-muted">Budget</dt><dd className="tnum">{plan.budgets.map((b) => fmtInt(b)).join(" / ")} mâles stériles / saison</dd>
             <dt className="text-muted">Stratégies</dt><dd>{cfg.strategies.length}{cfg.include_control ? " + témoin" : ""}</dd>
             <dt className="text-muted">Réaccouplement</dt><dd>{plan.rematings.map((k) => meta.remating[k]?.label ?? k).join(" · ")}</dd>

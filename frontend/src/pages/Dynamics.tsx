@@ -4,7 +4,7 @@ import { api, type Experiment, type Results, type Scenario } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { useMeta } from "../lib/meta";
 import { fmt, fmtInt } from "../lib/format";
-import { activeExtensions, scenarioLabel } from "../lib/analysis";
+import { activeExtensions, immigrationSummary, sameCell, scenarioLabel } from "../lib/analysis";
 import { StudyHeader, StudyTabs } from "../components/layout";
 import { EmptyState, Panel, PanelTitle, Select, Skeleton } from "../components/ui";
 import { ResearchAnnotation, UncertaintyLegend } from "../components/science";
@@ -42,8 +42,7 @@ function Legend({ defs, ctrl }: { defs: Line[]; ctrl: boolean }) {
 
 /** Témoin sans lâcher de la même cellule (culture, inoculum, régime), mêmes graines. */
 function controlOf(res: Results, sc: Scenario) {
-  return res.scenarios.find((c) => c.is_control && c.crop === sc.crop && c.remating === sc.remating
-    && (c.invasion?.wild ?? -1) === (sc.invasion?.wild ?? -1) && (c.invasion?.females ?? -1) === (sc.invasion?.females ?? -1));
+  return res.scenarios.find((c) => c.is_control && sameCell(c, sc));
 }
 
 /** Dernière valeur (fin de saison) de la moyenne d'une série. */
@@ -130,6 +129,7 @@ export function Dynamics() {
           {exp && <Link to={`/simulation/${exp.id}`} className="pb-2 text-[12.5px] text-forest underline">Ouvrir la simulation</Link>}
         </div>
       </Panel>
+      {exp && immigrationSummary(exp.config) && <div className="mt-3"><ResearchAnnotation><strong>Immigration :</strong> {immigrationSummary(exp.config)}. Le plan factoriel de référence est calculé sans immigration.</ResearchAnnotation></div>}
       {exp && activeExtensions(exp.config.biology, exp.config.immigration, exp.config.crops).length > 0 && <div className="mt-3"><ResearchAnnotation tone="warning"><strong>Extensions hors notebook actives :</strong> {activeExtensions(exp.config.biology, exp.config.immigration, exp.config.crops).join(" ; ")}.</ResearchAnnotation></div>}
       {pending && <div className="mt-4"><EmptyState title={pending.status === "running" || pending.status === "queued" ? "Calcul en cours" : "Pas de résultats"}>
         {pending.short_id} · {pending.name} : {pending.status === "running" || pending.status === "queued" ? "les dynamiques s’afficheront à la fin du calcul." : "cette expérience n’a pas abouti."}{" "}

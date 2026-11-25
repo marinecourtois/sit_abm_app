@@ -25,7 +25,8 @@ sont marquées « APP » et ne changent aucun nombre quand les valeurs par défa
 Extensions HORS NOTEBOOK (application 1.9.0, proposées par Marine Courtois). Désactivées par
 défaut : avec leurs valeurs par défaut (0), aucune ligne de code supplémentaire ne s'exécute et
 aucun tirage n'est ajouté, donc les résultats restent identiques au notebook au bit près.
-  EXT 1 : immigration quotidienne (à partir de J1) de mâles sauvages et de femelles déjà fécondées.
+  EXT 1 : immigration (1.11.0 : aussi dans le notebook) : tous les X jours à partir de J1, des mâles
+          sauvages et des femelles déjà fécondées entrent dans la parcelle.
   EXT 2 : capacité de charge K_a des adultes sauvages : une larve qui émerge alors que W + F ≥ K_a
           meurt au lieu de devenir adulte (régulation densité-dépendante à l'émergence).
   EXT 3 : stade « tournant » : les d_t derniers jours de la phase jeune (un fruit est jeune aux
@@ -413,7 +414,7 @@ class RematingModel(modelly.Model):
         # APP 1 / APP 2 (défauts = constantes du notebook)
         lifespan_means=None, lifespan_cv=None, eta=0.8, eta_sperm_choice=0.59,
         # Extensions hors notebook (désactivées par défaut)
-        immigration_wild_males=0, immigration_females=0, carrying_capacity=0,
+        immigration_wild_males=0, immigration_females=0, immigration_every=1, carrying_capacity=0,
         turning_days=0, turning_puncture_probability=0.30,
     ):
         super().__init__(rng=seed)
@@ -422,6 +423,7 @@ class RematingModel(modelly.Model):
         self.lifespan_cv = dict(LIFESPAN_CV if lifespan_cv is None else lifespan_cv)
         self.eta, self.eta_sperm_choice = eta, eta_sperm_choice
         self.immigration_wild_males, self.immigration_females = int(immigration_wild_males), int(immigration_females)   # EXT 1
+        self.immigration_every = max(1, int(immigration_every))   # tous les X jours
         self.total_immigrants = 0
         self.carrying_capacity = int(carrying_capacity)   # EXT 2
         self.cumulative_emergences_blocked = 0
@@ -564,7 +566,7 @@ class RematingModel(modelly.Model):
         self.total_sterile_released += n_ster
         n_fem = int(self.female_releases.get(self.time, 0))
         for _ in range(n_fem): Females_Agent(self, self.sperm_selection, initial_mating_status=self.female_release_mating_status)
-        if self.time > 0 and (self.immigration_wild_males or self.immigration_females):   # EXT 1, à partir de J1
+        if self.time > 0 and (self.immigration_wild_males or self.immigration_females) and self.time % self.immigration_every == 0:   # EXT 1, à partir de J1, tous les X jours
             for _ in range(self.immigration_wild_males): WildMales_Agent(self)
             for _ in range(self.immigration_females): Females_Agent(self, self.sperm_selection, initial_mating_status="fertile")
             self.total_immigrants += self.immigration_wild_males + self.immigration_females

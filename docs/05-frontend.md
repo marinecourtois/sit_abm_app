@@ -154,9 +154,13 @@ Les autres textes sont directement dans les pages.
   `presetInvasion(meta, clé)` donne l'inoculum d'un préréglage (l'inoculum fort porte `by_crop`),
   `invasionFor(inv, culture)` ses effectifs pour une culture. Les noms du notebook du plan
   factoriel (« Moyenne (300 W : 300 F) ») sont traduits à l'affichage (`datasetFromReference`).
-- **Immigration quotidienne** : section propre du Studio (`ImmigrationField`), visible dans les
-  deux modes, une case à cocher et deux champs par culture (`config.immigration`). Les
-  paramètres biologiques `immigration_*` ne sont plus affichés (réglage global remplacé).
+- **Immigration** : section propre du Studio (`ImmigrationField`), visible dans les deux modes :
+  une case à cocher, puis par culture mâles, femelles et « tous les X jours »
+  (`config.immigration`), et la case « Comparer avec et sans immigration »
+  (`config.immigration_compare`). Les analyses gagnent alors un sélecteur « Immigration » et la
+  section « Avec ou sans immigration » (`ImmigrationSection`) ; `sameCell` apparie chaque
+  scénario au témoin de sa condition. Les paramètres biologiques `immigration_*` ne sont pas
+  affichés (réglage global remplacé).
 - La page Paramètres garde les valeurs choisies pour la session (`sessionStorage`) ; « Ouvrir
   dans le Studio » les transmet (`navigate("/simulation", { state: { biology } })`) et passe en
   Mode Avancé si un paramètre avancé est modifié.

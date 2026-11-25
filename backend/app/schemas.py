@@ -27,6 +27,14 @@ class Counts(BaseModel):
     females: int
 
 
+class Arrivals(BaseModel):
+    """Immigration d'une culture (1.11.0) : ``wild`` mâles sauvages et ``females`` femelles
+    fécondées qui arrivent tous les ``every`` jours, à partir de J1."""
+    wild: int
+    females: int
+    every: int = 1
+
+
 class Invasion(BaseModel):
     """Inoculum de départ (« invasion » dans le notebook et l'API). ``by_crop`` (1.10.0) : effectifs
     propres à chaque culture (inoculum fort = pic du témoin) ; ``wild``/``females`` sinon."""
@@ -52,7 +60,9 @@ class ExperimentConfig(BaseModel):
     invasions: Optional[list[Invasion]] = None
     rematings: Optional[list[str]] = None
     # Immigration quotidienne par culture (1.10.0, extension hors notebook) : None = désactivée.
-    immigration: Optional[dict[str, Counts]] = None
+    immigration: Optional[dict[str, Arrivals]] = None
+    # 1.11.0 : croiser « avec » et « sans » immigration dans la même expérience (mêmes graines)
+    immigration_compare: bool = False
 
     @model_validator(mode="after")
     def _immigration_of_selected_crops(self):
@@ -125,6 +135,12 @@ def config_hash(cfg: ExperimentConfig) -> str:
             inv.pop("by_crop", None)
     if not d.get("immigration"):
         d.pop("immigration", None)
+    else:   # « tous les jours » (every = 1) : même empreinte qu'en 1.10.0
+        for v in d["immigration"].values():
+            if v.get("every") == 1:
+                v.pop("every")
+    if not d.get("immigration_compare") or "immigration" not in d:
+        d.pop("immigration_compare", None)
     defaults = biology_defaults()
     for k in EXTENSION_PARAMS:   # extensions désactivées : même empreinte qu'avant la 1.9.0
         if d["biology"].get(k) == defaults[k]:
@@ -181,7 +197,8 @@ def count_seasons(cfg: ExperimentConfig) -> int:
     treated = sum(1 for s in cfg.strategies if s.key != "no_tis")
     control = 1 if cfg.include_control or any(s.key == "no_tis" for s in cfg.strategies) else 0
     per_cell = control + treated * len(plan_budgets(cfg))   # le témoin (budget 0) est commun à tous les budgets
-    return len(cfg.crops) * len(plan_invasions(cfg)) * len(plan_rematings(cfg)) * per_cell * cfg.replicates
+    modes = 2 if cfg.immigration_compare and immigration_on(cfg) else 1
+    return len(cfg.crops) * len(plan_invasions(cfg)) * len(plan_rematings(cfg)) * modes * per_cell * cfg.replicates
 
 
 def validate_config(cfg: ExperimentConfig, history: list[dict] | None = None) -> dict:
@@ -220,9 +237,17 @@ def validate_config(cfg: ExperimentConfig, history: list[dict] | None = None) ->
             if crop not in CROPS:
                 errors.append(f"Immigration : culture inconnue « {crop} ».")
             elif not (0 <= c.wild <= 1000 and 0 <= c.females <= 1000):
-                errors.append(f"Immigration ({crop_label(crop)}) : entre 0 et 1 000 individus par jour.")
+                errors.append(f"Immigration ({crop_label(crop)}) : entre 0 et 1 000 individus par arrivée.")
+            elif not 1 <= c.every <= CROPS[crop].season_length - 1:   # jours simulés 0 … L−1, arrivées aux jours X, 2X…
+                errors.append(f"Immigration ({crop_label(crop)}) : une arrivée tous les 1 à {CROPS[crop].season_length - 1} jours.")
         if cfg.biology.get("immigration_wild_males", 0) or cfg.biology.get("immigration_females", 0):
             errors.append("Immigration définie deux fois (par culture et dans les paramètres biologiques) : n'en garder qu'une.")
+    if cfg.immigration_compare:
+        missing = [crop_label(c) for c in cfg.crops if not (cfg.immigration or {}).get(c)]
+        if not immigration_on(cfg):
+            errors.append("Comparaison avec / sans immigration : activez l'immigration et donnez au moins un apport non nul.")
+        elif missing:
+            errors.append("Comparaison avec / sans immigration : donnez un apport non nul pour " + ", ".join(missing) + ".")
     for name, values in (("budgets", plan_budgets(cfg)), ("régimes", plan_rematings(cfg)),
                          ("inoculums", [(i.wild, i.females, json.dumps(i.model_dump()["by_crop"], sort_keys=True)) for i in plan_invasions(cfg)])):
         if len(set(values)) != len(values):
@@ -254,11 +279,12 @@ def validate_config(cfg: ExperimentConfig, history: list[dict] | None = None) ->
                 errors.append(f"{k} = {v} hors de la plage admise [{meta[3]} ; {meta[4]}] ({meta[1]}).")
             elif v != meta[2] and k not in EXTENSION_PARAMS:
                 warnings.append(f"{k} = {v} {meta[1]} (valeur du notebook : {meta[2]}).")
-    ext = active_extensions(cfg.biology)
-    if immigration_on(cfg) and "immigration" not in ext:
-        ext = ["immigration", *ext]
+    ext = [e for e in active_extensions(cfg.biology) if e != "immigration"]
+    if immigration_on(cfg) or "immigration" in active_extensions(cfg.biology):
+        warnings.append("Immigration active : les résultats ne sont pas comparables au plan factoriel de référence, "
+                        "calculé sans immigration.")
     if ext:
-        names = {"immigration": "immigration quotidienne", "carrying_capacity": "capacité de charge", "turning": "stade « tournant »"}
+        names = {"carrying_capacity": "capacité de charge", "turning": "stade « tournant »"}
         warnings.append("Extension hors notebook active : " + ", ".join(names[e] for e in ext)
                         + ". Les résultats ne sont plus comparables au notebook ni au plan factoriel de référence.")
     td = cfg.biology.get("turning_days", 0)

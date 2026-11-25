@@ -14,7 +14,7 @@ import { ChartExportMenu } from "../components/charts/ChartExportMenu";
 import { ReleaseCalendar, SimulationTimeline } from "../components/SimulationTimeline";
 import { downloadText, toCsv } from "../components/charts/exportChart";
 import { AnalysisSuite, PlanHint, type AnalysisSelection } from "../components/analysis/AnalysisSuite";
-import { activeExtensions, datasetFromResults, invasionLabel, planSize, scenarioLabel } from "../lib/analysis";
+import { activeExtensions, immigrationSummary, datasetFromResults, invasionLabel, planSize, sameCell, scenarioLabel } from "../lib/analysis";
 
 const DEFAULT_VARS = ["Wild_males", "Females", "Sterile_males", "Larvae"];
 const GROUPS = [{ key: "insectes", label: "Insectes" }, { key: "fruits", label: "Fruits" }, { key: "dérivées", label: "Dérivées" }] as const;
@@ -111,8 +111,7 @@ export function LiveSimulation() {
     return { id: v, label: m.label, color: m.color, dash: m.dash, x: rows.map((_, i) => i), y: rows.map(val) };
   }), [vars, sc, liveRows.length, exp, crop, meta]);
   // Témoin sans TIS de la même cellule (culture, invasion, régime), mêmes graines
-  const ctrlSc = sc && !sc.is_control ? res?.scenarios.find((c) => c.is_control && c.crop === sc.crop && c.remating === sc.remating
-    && (c.invasion?.wild ?? -1) === (sc.invasion?.wild ?? -1) && (c.invasion?.females ?? -1) === (sc.invasion?.females ?? -1)) : undefined;
+  const ctrlSc = sc && !sc.is_control ? res?.scenarios.find((c) => c.is_control && sameCell(c, sc)) : undefined;
   const ctrlSeries: ChartSeries[] = showCtrl && ctrlSc ? vars.filter((v) => ctrlSc.series[v] && v !== "Wild_adults_vs_control").map((v) => ({
     id: `ctrl:${v}`, label: `Témoin · ${VAR[v].label}`, color: VAR[v].color, dash: "2 4", width: 1.4, opacity: 0.6,
     x: ctrlSc.series.Time, y: ctrlSc.series[v].mean })) : [];
@@ -161,6 +160,7 @@ export function LiveSimulation() {
       )}
       {status === "error" && <div className="mt-4"><ResearchAnnotation tone="warning"><strong>Simulation en erreur.</strong> {exp.error}</ResearchAnnotation></div>}
       {status === "cancelled" && <div className="mt-4"><ResearchAnnotation tone="warning"><strong>Simulation interrompue.</strong> {exp.error} — aucun résultat partiel n’est enregistré. Une relance crée une nouvelle exécution identifiable.</ResearchAnnotation></div>}
+      {immigrationSummary(exp.config) && <div className="mt-4"><ResearchAnnotation><strong>Immigration :</strong> {immigrationSummary(exp.config)}. Le plan factoriel de référence est calculé sans immigration.</ResearchAnnotation></div>}
       {activeExtensions(exp.config.biology, exp.config.immigration, exp.config.crops).length > 0 && <div className="mt-4"><ResearchAnnotation tone="warning"><strong>Extensions hors notebook actives :</strong> {activeExtensions(exp.config.biology, exp.config.immigration, exp.config.crops).join(" ; ")}. Ces mécanismes n’existent pas dans le modèle du notebook : les résultats ne sont pas comparables au plan factoriel de référence.</ResearchAnnotation></div>}
       {status === "ready" && <div className="mt-4"><ResearchAnnotation>Simulation prête : la configuration est enregistrée ({exp.short_id}) et peut être lancée.</ResearchAnnotation></div>}
 
@@ -328,7 +328,8 @@ function ExperimentAnalyses({ exp, res }: { exp: Experiment; res: Results }) {
 function PairedEffects({ res, exp, sel }: { res: Results; exp: Experiment; sel: AnalysisSelection }) {
   const meta = useMeta();
   const rows = res.scenarios.filter((s) => !s.is_control && s.vs_control && s.crop === sel.crop && s.budget === sel.budget
-    && (s.remating ?? exp.config.remating) === sel.remating && invasionLabel(s.invasion ?? exp.config.invasion, meta) === sel.invasion);
+    && (s.remating ?? exp.config.remating) === sel.remating && invasionLabel(s.invasion ?? exp.config.invasion, meta) === sel.invasion
+    && (sel.immigration == null || (s.immigration ? "avec" : "sans") === sel.immigration));
   const K = [["larval_damage_pct", "Fruits infestés"], ["larvae_produced", "Larves produites"], ["harvested_clean_pct", "Récolte saine"]] as const;
   return (
     <Panel className="px-5 py-4">
