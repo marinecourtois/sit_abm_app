@@ -20,7 +20,7 @@ export function Analytics() {
 
   return (
     <>
-      <StudyHeader crumb="Recherche agronomique / Étude 01" title="Research Analytics" subtitle="Plan factoriel : cultures × invasions × budgets × stratégies" />
+      <StudyHeader crumb="Recherche agronomique / Étude 01" title="Research Analytics" subtitle="Plan factoriel : cultures × inoculums de départ × budgets × stratégies" />
       <StudyTabs />
       <div className="mt-4"><ResearchAnnotation>
         <strong>Source :</strong> {ref.data?.description ?? "…"} <Badge tone="green">vérifié</Badge> {ref.data?.verified}
@@ -35,7 +35,7 @@ export function Analytics() {
             <Panel className="px-5 py-4">
               <PanelTitle sub="Paramètres biologiques (η, durées de vie, taux de pourrissement…)">Sensibilité paramétrique</PanelTitle>
               <div className="mt-3 rounded-md border border-dashed border-line bg-white/60 px-4 py-3 text-[12.5px] leading-relaxed text-muted">
-                Le plan factoriel du notebook ne fait varier que la culture, l’invasion, le budget, la stratégie et le régime de réaccouplement : aucune
+                Le plan factoriel du notebook ne fait varier que la culture, l’inoculum de départ, le budget, la stratégie et le régime de réaccouplement : aucune
                 sensibilité aux paramètres biologiques ne peut en être tirée, donc aucune n’est affichée. Pour l’étudier, créez des variantes d’un même
                 scénario dans le <Link className="text-forest underline" to="/simulation">Studio</Link> (Mode Avancé, un paramètre à la fois) puis comparez-les
                 dans le <Link className="text-forest underline" to="/comparaison">Comparison Lab</Link>.

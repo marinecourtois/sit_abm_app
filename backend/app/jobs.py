@@ -13,7 +13,7 @@ from tis_engine.parameters import SCHEMA_VERSION
 from tis_engine.runner import SERIES_VARS, Cancelled, aggregate, build_schedule
 
 from . import store, worker
-from .schemas import (ExperimentConfig, StrategySpec, plan_budgets, plan_invasions, plan_rematings, strategy_id,
+from .schemas import (ExperimentConfig, StrategySpec, invasion_for, plan_budgets, plan_invasions, plan_rematings, strategy_id,
                       strategy_label)
 from .worker import run_task
 
@@ -80,14 +80,18 @@ def scenario_plan(cfg: ExperimentConfig):
     out = []
     for crop in cfg.crops:
         L = CROPS[crop].season_length
+        imm = (cfg.immigration or {}).get(crop)
+        if imm is not None and not (imm.wild or imm.females):
+            imm = None
         for inv in invasions:
             for rem in rematings:
                 for s in strategies:
                     for budget in ([0] if s.key == "no_tis" else budgets):
                         sched = build_schedule(s.model_dump(exclude_none=True), budget, L)
+                        w, f = invasion_for(inv, crop)   # inoculum fort : effectifs propres à la culture
                         parts = [crop]
                         if len(invasions) > 1:
-                            parts.append(f"inv={inv.wild}:{inv.females}")
+                            parts.append(f"inv={w}:{f}")
                         if len(rematings) > 1:
                             parts.append(f"rem={rem}")
                         if len(budgets) > 1 and s.key != "no_tis":
@@ -96,7 +100,8 @@ def scenario_plan(cfg: ExperimentConfig):
                         out.append({"key": "::".join([*parts, sid]), "crop": crop, "strategy": s.model_dump(exclude_none=True),
                                     "strategy_key": s.key, "strategy_id": sid, "strategy_label": strategy_label(s),
                                     "is_control": s.key == "no_tis", "budget": budget,
-                                    "invasion": inv.model_dump(), "remating": rem, "schedule": sched})
+                                    "invasion": {"preset": inv.preset, "wild": w, "females": f}, "remating": rem,
+                                    "immigration": imm.model_dump() if imm else None, "schedule": sched})
     return out
 
 
@@ -162,9 +167,12 @@ def _run(eid, cfg: ExperimentConfig, plan):
         order = sorted(((p, rep) for p in plan for rep in range(cfg.replicates)),
                        key=lambda pr: (pr[1] != 0, -season_cost(pr[0]["crop"])))
         for p, rep in order:
+            bio = cfg.biology
+            if p["immigration"]:   # immigration propre à la culture (extension hors notebook)
+                bio = {**bio, "immigration_wild_males": p["immigration"]["wild"], "immigration_females": p["immigration"]["females"]}
             task = {"crop": p["crop"], "wild": p["invasion"]["wild"], "females": p["invasion"]["females"],
                     "remating": p["remating"], "seed": replicate_seed(cfg.seed, rep),
-                    "schedule": p["schedule"], "biology": cfg.biology}
+                    "schedule": p["schedule"], "biology": bio}
             f = _pool.submit(run_task, eid, p["key"], rep, task, rep == 0)
             futures[f] = (p["key"], rep)
         results: dict[str, dict[int, dict]] = {}

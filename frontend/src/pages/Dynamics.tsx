@@ -40,11 +40,23 @@ function Legend({ defs, ctrl }: { defs: Line[]; ctrl: boolean }) {
   );
 }
 
-/** Témoin sans lâcher de la même cellule (culture, invasion, régime), mêmes graines. */
+/** Témoin sans lâcher de la même cellule (culture, inoculum, régime), mêmes graines. */
 function controlOf(res: Results, sc: Scenario) {
   return res.scenarios.find((c) => c.is_control && c.crop === sc.crop && c.remating === sc.remating
     && (c.invasion?.wild ?? -1) === (sc.invasion?.wild ?? -1) && (c.invasion?.females ?? -1) === (sc.invasion?.females ?? -1));
 }
+
+/** Dernière valeur (fin de saison) de la moyenne d'une série. */
+function last(s: Scenario | undefined, v: string) {
+  const y = s?.series[v]?.mean;
+  return y?.length ? y[y.length - 1] : null;
+}
+
+/** Variation relative en %, signée (« −45 % »). */
+const pct = (v: number) => `${v >= 0 ? "+" : "−"}${fmt(Math.abs(v), 0)} %`;
+/** Variation relative ; « paired » = moyenne des variations par répétition (même graine), comme ailleurs dans l'application. */
+const change = (x: number | null, ref: number | null, paired?: number | null) =>
+  paired != null ? ` (${pct(paired)})` : x == null || !ref ? "" : ` (${pct((100 * (x - ref)) / ref)})`;
 
 function peak(s: Scenario | undefined, v: string) {
   const y = s?.series[v]?.mean;
@@ -62,17 +74,24 @@ export function Dynamics() {
   const done = useMemo(() => (list.data ?? []).filter((e) => e.status === "completed"), [list.data]);
   const eid = sp.get("exp") || (done.find((e) => e.tags.includes("référence")) ?? done[0])?.id || "";
   const exp = done.find((e) => e.id === eid);
+  const pending = (list.data ?? []).find((e) => e.id === eid && e.status !== "completed");   // expérience pas (encore) terminée
+  const running = pending && (pending.status === "running" || pending.status === "queued");
+  useEffect(() => {   // calcul en cours : relire la liste toutes les 3 s jusqu'à la fin
+    if (!running) return;
+    const t = setInterval(() => { list.reload(); }, 3000);
+    return () => clearInterval(t);
+  }, [running]);
   const [res, setRes] = useState<Results | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [scen, setScen] = useState("");
   const [ctrlOn, setCtrlOn] = useState(true);
   useEffect(() => {
-    if (!eid) return;
+    if (!eid || pending) return;
     let alive = true;   // une réponse arrivée après un changement d'expérience est ignorée
     setRes(null); setErr(null);
     api.results(eid).then((r) => { if (alive) setRes(r); }).catch((e) => { if (alive) setErr((e as Error).message); });
     return () => { alive = false; };
-  }, [eid]);
+  }, [eid, !!pending]);
   useEffect(() => { if (res && !res.scenarios.some((s) => s.key === scen)) setScen((res.scenarios.find((s) => !s.is_control) ?? res.scenarios[0])?.key ?? ""); }, [res]);
 
   const sc = res?.scenarios.find((s) => s.key === scen);
@@ -90,7 +109,10 @@ export function Dynamics() {
 
   if (list.error) return <EmptyState title="Expériences indisponibles">{list.error}</EmptyState>;
   const n = exp?.config.replicates ?? 0;
-  const pkW = peak(sc, "Wild_adults"), pkWc = peak(ctrl, "Wild_adults"), pkS = peak(sc, "Sterile_males"), pkL = peak(sc, "Larvae"), pkLc = peak(ctrl, "Larvae");
+  const W = last(sc, "Wild_adults"), Wc = last(ctrl, "Wild_adults"), W0 = sc?.series.Wild_adults?.mean[0] ?? null;
+  const Lp = sc?.metrics.larvae_produced?.mean ?? null, Lpc = ctrl?.metrics.larvae_produced?.mean ?? null;
+  const FF = last(sc, "Fertile_females"), FFc = last(ctrl, "Fertile_females");
+  const pkS = peak(sc, "Sterile_males");
   const pS = sc?.series.Sterile_mating_prob?.mean;
   const pSmean = pS?.length ? pS.slice(1).reduce((a, b) => a + b, 0) / Math.max(1, pS.length - 1) : null;
 
@@ -108,21 +130,37 @@ export function Dynamics() {
           {exp && <Link to={`/simulation/${exp.id}`} className="pb-2 text-[12.5px] text-forest underline">Ouvrir la simulation</Link>}
         </div>
       </Panel>
-      {exp && activeExtensions(exp.config.biology).length > 0 && <div className="mt-3"><ResearchAnnotation tone="warning"><strong>Extensions hors notebook actives :</strong> {activeExtensions(exp.config.biology).join(" ; ")}.</ResearchAnnotation></div>}
-      {err && <div className="mt-4"><EmptyState title="Résultats indisponibles">{err}</EmptyState></div>}
+      {exp && activeExtensions(exp.config.biology, exp.config.immigration, exp.config.crops).length > 0 && <div className="mt-3"><ResearchAnnotation tone="warning"><strong>Extensions hors notebook actives :</strong> {activeExtensions(exp.config.biology, exp.config.immigration, exp.config.crops).join(" ; ")}.</ResearchAnnotation></div>}
+      {pending && <div className="mt-4"><EmptyState title={pending.status === "running" || pending.status === "queued" ? "Calcul en cours" : "Pas de résultats"}>
+        {pending.short_id} · {pending.name} : {pending.status === "running" || pending.status === "queued" ? "les dynamiques s’afficheront à la fin du calcul." : "cette expérience n’a pas abouti."}{" "}
+        <Link className="text-forest underline" to={`/simulation/${pending.id}`}>Suivre la simulation</Link></EmptyState></div>}
+      {err && !pending && <div className="mt-4"><EmptyState title="Résultats indisponibles">{err}</EmptyState></div>}
       {!list.loading && !done.length && <div className="mt-4"><EmptyState title="Aucune expérience terminée">Lancez une simulation dans le <Link className="text-forest underline" to="/simulation">Studio</Link>.</EmptyState></div>}
-      {(list.loading || (eid && !res && !err)) && <Skeleton className="mt-4 h-96" />}
+      {(list.loading || (eid && !res && !err && !pending)) && <Skeleton className="mt-4 h-96" />}
       {sc && meta && (<>
         {!hasNew && <div className="mt-3"><ResearchAnnotation>Expérience calculée avant la version 1.9.0 : les femelles fécondées, la probabilité d’accouplement stérile et les fruits pourris par jour n’ont pas été enregistrés. Dupliquez-la pour les obtenir (mêmes graines, mêmes autres résultats).</ResearchAnnotation></div>}
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            ["Pic d’adultes sauvages (W + F)", pkW ? `${fmtInt(Math.round(pkW.value))} à J${pkW.day}` : "—", pkWc ? `témoin : ${fmtInt(Math.round(pkWc.value))} à J${pkWc.day}` : ""],
-            ["Pic de mâles stériles", pkS && pkS.value > 0 ? `${fmtInt(Math.round(pkS.value))} à J${pkS.day}` : "aucun lâcher", ""],
-            ["Pic de larves", pkL ? `${fmtInt(Math.round(pkL.value))} à J${pkL.day}` : "—", pkLc ? `témoin : ${fmtInt(Math.round(pkLc.value))} à J${pkLc.day}` : ""],
-            ["Accouplements stériles (probabilité moyenne)", pSmean != null ? `${fmt(100 * pSmean, 1)} %` : "—", pSmean != null ? `η·S / (W + η·S), moyenne sur la saison` : "non enregistrée"],
-          ].map(([t, v, s]) => (
-            <Panel key={t} className="px-4 py-3"><div className="text-[11.5px] text-muted">{t}</div><div className="mt-0.5 font-serif text-[22px] font-semibold tnum">{v}</div>{s && <div className="text-[11.5px] text-muted tnum">{s}</div>}</Panel>
+          {([
+            ["Adultes sauvages en fin de saison", W != null ? fmtInt(Math.round(W)) : "—",
+              Wc != null ? `témoin sans lâcher : ${fmtInt(Math.round(Wc))}${change(W, Wc, sc.vs_control?.wild_adults_final?.mean)}` : sc.is_control ? "ce scénario est le témoin" : "",
+              W0 != null ? `Mâles W + femelles F au dernier jour. À J0 : ${fmtInt(Math.round(W0))}, c’est l’inoculum de départ.` : ""],
+            ["Larves produites sur la saison", Lp != null ? fmtInt(Math.round(Lp)) : "—",
+              Lpc != null ? `témoin sans lâcher : ${fmtInt(Math.round(Lpc))}${change(Lp, Lpc, sc.vs_control?.larvae_produced?.mean)}` : "",
+              "Toutes les larves nées pendant la saison (cumul)."],
+            ["Femelles fécondées en fin de saison", FF != null ? fmtInt(Math.round(FF)) : "—",
+              FFc != null ? `témoin sans lâcher : ${fmtInt(Math.round(FFc))}${change(FF, FFc)}` : FF == null ? "non enregistré pour cette expérience" : "",
+              "Femelles capables de pondre des œufs viables au dernier jour."],
+            ["Accouplements stériles", pSmean != null ? `${fmt(100 * pSmean, 0)} %` : "—",
+              pkS && pkS.value > 0 ? `jusqu’à ${fmtInt(Math.round(pkS.value))} mâles stériles présents (J${pkS.day})` : "aucun mâle stérile lâché",
+              "Part moyenne des accouplements faits avec un mâle stérile sur la saison."],
+          ] as [string, string, string, string][]).map(([t, v, s, help]) => (
+            <Panel key={t} className="px-4 py-3">
+              <div className="text-[11.5px] font-medium text-ink">{t}</div>
+              <div className="mt-0.5 font-serif text-[22px] font-semibold tnum">{v}</div>
+              {s && <div className="text-[11.5px] text-muted tnum">{s}</div>}
+              {help && <div className="mt-1 text-[11px] leading-snug text-muted">{help}</div>}
+            </Panel>
           ))}
         </div>
 

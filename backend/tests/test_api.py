@@ -96,7 +96,7 @@ def test_exports_and_protocol_roundtrip(client):
     rows = list(csv.DictReader(io.StringIO(client.get(f"/api/experiments/{e['id']}/export?format=csv-metrics").text)))
     assert rows and "larval_damage_pct" in rows[0]
     series = client.get(f"/api/experiments/{e['id']}/export?format=csv-series").text.splitlines()
-    assert series[0].startswith("experiment,crop,invasion,wild,females,remating,strategy,budget,day")
+    assert series[0].startswith("experiment,crop,invasion,wild,females,remating,strategy,budget,immigration_wild,immigration_females,day")
     proto = client.get(f"/api/experiments/{e['id']}/export?format=protocol").json()
     imp = client.post("/api/protocol/import", json=proto).json()
     assert imp["config"] == e["config"] and imp["status"] == "ready"
@@ -213,7 +213,7 @@ def test_plan_crosses_budgets_invasions_and_regimes(client):
             assert s["vs_control"]["larvae_produced"]["values"] == pytest.approx(expect)
     rows = list(csv.DictReader(io.StringIO(client.get(f"/api/experiments/{e['id']}/export?format=csv-metrics").text)))
     assert len(rows) == 120 and {r["remating"] for r in rows} == {"preference", "first"}
-    assert {r["invasion"] for r in rows} == {"Faible (90 W : 90 F)", "Personnalisée (120 W : 150 F)"}
+    assert {r["invasion"] for r in rows} == {"Faible (90 W : 90 F)", "Personnalisé (120 W : 150 F)"}
 
 
 def test_plan_limits_and_legacy_hash(client):
@@ -228,7 +228,8 @@ def test_plan_limits_and_legacy_hash(client):
     legacy = cfg(client)
     import hashlib, json
     from tis_engine.parameters import EXTENSION_PARAMS
-    dump = ExperimentConfig(**legacy).model_dump(exclude={"budgets", "invasions", "rematings"})
+    dump = ExperimentConfig(**legacy).model_dump(exclude={"budgets", "invasions", "rematings", "immigration"})
+    dump["invasion"].pop("by_crop")   # champ 1.10.0
     for k in EXTENSION_PARAMS:   # forme d'une configuration d'avant la 1.9.0 (sans extensions)
         dump["biology"].pop(k)
     assert config_hash(ExperimentConfig(**legacy)) == hashlib.sha256(json.dumps(dump, sort_keys=True).encode()).hexdigest()[:16]
@@ -261,3 +262,54 @@ def test_active_extension_is_flagged(client):
     assert not frac["ok"] and any("entière" in e for e in frac["errors"])
     bad = client.post("/api/validate", json=cfg(client, biology={**cfg(client)["biology"], "turning_days": "trois"}))
     assert bad.status_code == 200 and not bad.json()["ok"]   # erreur explicite, pas de 500
+
+
+def test_strong_inoculum_per_crop_and_immigration_per_crop(client):
+    """1.10.0 : l'inoculum fort a des effectifs propres à chaque culture (pic du témoin) et
+    l'immigration quotidienne se règle par culture ; chaque saison reçoit les valeurs de sa culture."""
+    from tis_engine.parameters import FORT_BY_CROP, IMMIGRATION_DEFAULTS
+    meta = client.get("/api/meta").json()
+    fort = meta["invasions"]["forte"]
+    assert fort["by_crop"] == FORT_BY_CROP and fort["label"].startswith("Fort")
+    assert meta["immigration_defaults"] == IMMIGRATION_DEFAULTS
+    config = cfg(client, crops=["strawberry", "cherry"], strategies=[{"key": "every_7"}], replicates=10,
+                 invasion={"preset": "forte", "wild": fort["wild"], "females": fort["females"], "by_crop": fort["by_crop"]},
+                 immigration=IMMIGRATION_DEFAULTS)
+    v = client.post("/api/validate", json=config).json()
+    assert v["ok"], v["errors"]
+    assert any("immigration quotidienne" in w for w in v["warnings"])
+    assert not any("diffèrent du préréglage" in w for w in v["warnings"])
+    e = wait(client, client.post("/api/experiments", json={"name": "fort + immigration", "config": config}).json()["id"], timeout=300)
+    assert e["status"] == "completed"
+    res = client.get(f"/api/experiments/{e['id']}/results").json()
+    for sc in res["scenarios"]:
+        assert (sc["invasion"]["wild"], sc["invasion"]["females"]) == (FORT_BY_CROP[sc["crop"]]["wild"], FORT_BY_CROP[sc["crop"]]["females"])
+        imm = IMMIGRATION_DEFAULTS[sc["crop"]]
+        assert sc["immigration"] == imm
+        days = len(sc["series"]["Time"]) - 1
+        assert sc["metrics"]["immigrants"]["values"] == [(imm["wild"] + imm["females"]) * (days - 1)] * 10
+    rows = list(csv.DictReader(io.StringIO(client.get(f"/api/experiments/{e['id']}/export?format=csv-metrics").text)))
+    assert {r["invasion"] for r in rows} == {"Fort (pic du témoin)"}
+    assert {(r["crop"], r["immigration_wild"]) for r in rows} == {("strawberry", "15"), ("cherry", "8")}
+
+
+def test_immigration_cannot_be_set_twice(client):
+    b = {**cfg(client)["biology"], "immigration_females": 5}
+    v = client.post("/api/validate", json=cfg(client, biology=b, immigration={"cherry": {"wild": 8, "females": 8}})).json()
+    assert not v["ok"] and any("deux fois" in e for e in v["errors"])
+
+
+def test_inoculum_and_immigration_edge_cases(client):
+    """Deux inoculums qui donnent les mêmes effectifs pour une culture sont refusés (clés de
+    scénario identiques) ; l'immigration d'une culture non sélectionnée ou nulle est ignorée et
+    ne change pas l'empreinte."""
+    from app.schemas import ExperimentConfig, config_hash
+    from tis_engine.parameters import FORT_BY_CROP
+    fort = {"preset": "forte", "wild": 900, "females": 900, "by_crop": FORT_BY_CROP}
+    dup = client.post("/api/validate", json=cfg(client, crops=["strawberry"], invasions=[fort, {"preset": None, **FORT_BY_CROP["strawberry"]}])).json()
+    assert not dup["ok"] and any("mêmes effectifs" in e for e in dup["errors"])
+    base = cfg(client, crops=["strawberry"])
+    other = cfg(client, crops=["strawberry"], immigration={"strawberry": {"wild": 0, "females": 0}, "cherry": {"wild": 8, "females": 8}})
+    assert ExperimentConfig(**other).immigration is None
+    assert config_hash(ExperimentConfig(**other)) == config_hash(ExperimentConfig(**base))
+    assert not any("immigration" in w for w in client.post("/api/validate", json=other).json()["warnings"])

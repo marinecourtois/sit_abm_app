@@ -5,6 +5,7 @@ import { api, type Results, type Scenario } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { useMeta } from "../lib/meta";
 import { fmt, fmtInt, fmtPct } from "../lib/format";
+import { presetInvasion } from "../lib/analysis";
 import { CROP_COLOR } from "../lib/colors";
 import { StudyHeader, StudyTabs } from "../components/layout";
 import { BotanicalSpeciesCard, ResearchMetric, ScientificProcessDiagram } from "../components/science";
@@ -91,7 +92,7 @@ export function Overview() {
       const inv = meta.invasions[invasion];
       const e = await api.create({
         name: `${crop === "strawberry" ? "Fraise" : "Cerise"} · ${meta.strategies[strategy].label} · ${fmtInt(budget)} stériles`,
-        config: { crops: [crop], strategies: [{ key: strategy }], invasion: { preset: invasion, wild: inv.wild, females: inv.females },
+        config: { crops: [crop], strategies: [{ key: strategy }], invasion: presetInvasion(meta, invasion),
           budget, remating: "preference", replicates: meta.default_replicates ?? meta.limits.replicates[0], seed: 42, include_control: true, biology: meta.biology_defaults },
       });
       toast(`Simulation ${e.short_id} lancée.`, "success");
@@ -122,7 +123,7 @@ export function Overview() {
       <div className="mt-4 grid gap-4 lg:flex-1 xl:grid-cols-[minmax(0,1fr)_352px]">
         <Panel className="group flex flex-col px-5 pb-2.5 pt-3">
           <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-            <ScientificTooltip side="bottom" content={<>Adultes sauvages (mâles W + femelles F) du scénario rapportés à ceux du témoin sans TIS, même jour et même graine. Moyenne ± écart-type sur {nRep} répétitions · invasion {meta?.invasions[cfg?.invasion.preset ?? ""]?.label ?? "—"} · {fmtInt(cfg?.budget)} mâles stériles par saison · régime « {cfg?.remating} » · expérience {exp?.short_id}.</>}>
+            <ScientificTooltip side="bottom" content={<>Adultes sauvages (mâles W + femelles F) du scénario rapportés à ceux du témoin sans TIS, même jour et même graine. Moyenne ± écart-type sur {nRep} répétitions · inoculum {meta?.invasions[cfg?.invasion.preset ?? ""]?.label ?? "—"} · {fmtInt(cfg?.budget)} mâles stériles par saison · régime « {cfg?.remating} » · expérience {exp?.short_id}.</>}>
               <h2 tabIndex={0} className="cursor-help font-serif text-[21px] font-semibold outline-none">Dynamique des populations au cours du temps</h2>
             </ScientificTooltip>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
@@ -131,7 +132,7 @@ export function Overview() {
               </ul>
               <ChartExportMenu iconOnly getSvg={() => chartRef.current}
                 meta={{ title: "Dynamique des populations sauvages (adultes W + F, relatif au témoin sans TIS)", filename: `dynamique-${exp?.short_id ?? "ref"}`,
-                  caption: `Moyenne ± écart-type sur ${nRep} répétitions. Invasion ${meta?.invasions[cfg?.invasion.preset ?? ""]?.label ?? ""}, budget ${fmtInt(cfg?.budget)} mâles stériles, régime « ${cfg?.remating} ». Expérience ${exp?.short_id}, moteur ${exp?.engine_version}, paramètres ${exp?.params_version}.` }} />
+                  caption: `Moyenne ± écart-type sur ${nRep} répétitions. Inoculum de départ ${meta?.invasions[cfg?.invasion.preset ?? ""]?.label ?? ""}, budget ${fmtInt(cfg?.budget)} mâles stériles, régime « ${cfg?.remating} ». Expérience ${exp?.short_id}, moteur ${exp?.engine_version}, paramètres ${exp?.params_version}.` }} />
             </div>
           </div>
           <div ref={chartBox} className="relative min-h-[236px] flex-1">
@@ -151,8 +152,8 @@ export function Overview() {
             <label htmlFor="ov-crop" className="font-medium">Culture</label>
             <Select id="ov-crop" label="Culture" value={crop} onChange={(v) => setCrop(v as "strawberry")}
               options={[{ value: "strawberry", label: "Fraise", icon: <StrawberryDot /> }, { value: "cherry", label: "Cerise", icon: <CherryDot /> }]} />
-            <label htmlFor="ov-inv" className="font-medium">Pression d’invasion</label>
-            <Select id="ov-inv" label="Pression d'invasion" value={invasion} onChange={setInvasion} icon={<SignalMedium size={16} />}
+            <label htmlFor="ov-inv" className="font-medium">Inoculum de départ</label>
+            <Select id="ov-inv" label="Inoculum de départ" value={invasion} onChange={setInvasion} icon={<SignalMedium size={16} />}
               options={Object.entries(meta?.invasions ?? {}).map(([k, v]) => ({ value: k, label: v.label.split(" (")[0], icon: <SignalMedium size={16} /> }))} />
             <span className="font-medium">Stratégie de lâcher</span>
             <Segmented label="Stratégie de lâcher" value={strategy} onChange={setStrategy}

@@ -197,7 +197,7 @@ export const Leaf = icon("Leaf", () => (<>
   <path d="M9 14.8l-.4-3.6M11.6 12.4 11.4 9M9.4 15.2l3.4.3M12.3 12.6l3.3.1" strokeWidth={1} />
 </>));
 
-/** Pression d'invasion : effectifs croissants (barres + insecte stylisé). */
+/** Inoculum de départ : effectifs croissants (barres + insecte stylisé). */
 export const SignalMedium = icon("SignalMedium", () => (<>
   <path d="M5 19.5v-3.5M9.5 19.5V13M14 19.5v-9M18.5 19.5V7.5" strokeWidth={2} />
   <path d="M3.5 19.5h17" strokeWidth={1.1} />

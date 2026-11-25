@@ -41,7 +41,7 @@ le moteur reproduit le notebook au bit près (`test_factorial_bit_exact`, `test_
 
 | Marque | Paramètres | Règle |
 |---|---|---|
-| EXT 1 | `immigration_wild_males` (m_W), `immigration_females` (m_F) | Chaque jour à partir de J1, après les lâchers, m_W mâles sauvages et m_F femelles **déjà fécondées** entrent dans la parcelle, à l'âge 0 (J0 est l'invasion initiale). Métrique `immigrants` = (m_W + m_F) × (jours − 1). |
+| EXT 1 | `immigration_wild_males` (m_W), `immigration_females` (m_F) ; depuis la 1.10.0, réglés **par culture** via `config.immigration` (le Studio n'expose plus le réglage global) | Chaque jour à partir de J1, après les lâchers, m_W mâles sauvages et m_F femelles **déjà fécondées** entrent dans la parcelle, à l'âge 0 (J0 est l'invasion initiale). Métrique `immigrants` = (m_W + m_F) × (jours − 1). |
 | EXT 2 | `carrying_capacity` (K_a) | Une larve qui émerge alors que W + F ≥ K_a meurt au lieu de devenir adulte (sans tirage du sexe). W + F ne dépasse donc K_a que par l'effectif initial ou l'immigration. Métrique `emergences_blocked`. |
 | EXT 3 | `turning_days` (d_t), `turning_puncture_probability` (p_t) | Un fruit est jeune aux âges 0 … M (M = âge de maturité tiré). Aux d_t derniers de ces âges (M − d_t + 1 … M), une ponte tentée réussit avec p_t au lieu de p_y. Même nombre de tirages. La maturité est tirée en 2–4 j (fraise) et 10–15 j (cerise) ; avec d_t > maturité max, toute la phase jeune est « tournante » (la validation l'indique). |
 
@@ -138,6 +138,26 @@ Tous les pourcentages sont rapportés à `crop.total_fruits` (90 000 fruits prod
 
 ---
 
+### Inoculum de départ fort (1.10.0)
+
+« Inoculum de départ » est le nom retenu pour ce que le notebook appelle « invasion » (effectifs
+d'adultes sauvages à J0). L'inoculum **fort** de l'application est calé sur le pic de population
+du témoin sans lâcher (`tis_engine/calibration.py`) : partie de l'inoculum modéré (300 W + 300 F),
+moyenne de 20 répétitions (graines 42 + 1000·r, régime « preference », paramètres du notebook).
+Sans lâcher, la population croît jusqu'au dernier jour ; le pic est donc la population en fin de
+saison :
+
+| Culture | Pic du témoin | Inoculum fort |
+|---|---|---|
+| Fraise | 1 242,4 adultes à J100 | 621 W + 621 F |
+| Cerise | 13 276,9 adultes à J25 | 6 638 W + 6 639 F |
+
+Les valeurs sont figées dans `parameters.FORT_BY_CROP` ;
+`test_fort_inoculum_matches_calibration` vérifie qu'elles sont exactement celles que calcule le
+moteur. Après un changement du moteur ou des paramètres par défaut, relancer
+`python -m tis_engine.calibration` et mettre à jour `FORT_BY_CROP`. Le plan factoriel du notebook
+garde son inoculum « Forte » à 900 W + 900 F (`nb_label`).
+
 ## 4. Versions
 
 Trois numéros de version accompagnent chaque expérience :
@@ -154,7 +174,8 @@ Historique de `ENGINE_VERSION` : **1.1.0** (extraction du notebook, APP 1 à 5) 
 (application 1.6.0, APP 6, performance seule : mêmes nombres au bit près) → **1.3.0**
 (application 1.9.0, APP 7 et extensions EXT 1 à 3 désactivées par défaut : mêmes nombres au bit
 près). `PARAMS_VERSION` : `nb-2025.10-echelle30` → `nb-2025.10-echelle30-ext1` (cinq paramètres
-d'extension ajoutés, valeurs du notebook inchangées). `SCHEMA_VERSION` : 1 → **2** (plans,
+d'extension ajoutés, valeurs du notebook inchangées) → `nb-2025.10-echelle30-ext2` (1.10.0 :
+inoculum fort par culture, immigration par culture ; `SCHEMA_VERSION` 3). `SCHEMA_VERSION` : 1 → **2** (plans,
 paramètres d'extension, `invasion`/`remating`/`strategy_id` par scénario, séries
 `Fertile_females`, `Sterile_mating_prob`, `Rotten_daily`, métriques `immigrants`,
 `emergences_blocked`). Les configurations d'avant la 1.9.0, sans clés d'extension, restent

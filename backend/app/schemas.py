@@ -5,7 +5,7 @@ import hashlib
 import json
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from tis_engine.model import CROPS
 from tis_engine.parameters import (MAX_REPLICATES, MIN_REPLICATES, BIOLOGY_PARAMS, EXTENSION_PARAMS, INVASION_PRESETS, STRATEGY_META,
@@ -22,10 +22,18 @@ class StrategySpec(BaseModel):
     label: Optional[str] = None
 
 
+class Counts(BaseModel):
+    wild: int
+    females: int
+
+
 class Invasion(BaseModel):
+    """Inoculum de départ (« invasion » dans le notebook et l'API). ``by_crop`` (1.10.0) : effectifs
+    propres à chaque culture (inoculum fort = pic du témoin) ; ``wild``/``females`` sinon."""
     preset: Optional[str] = None
     wild: int
     females: int
+    by_crop: Optional[dict[str, Counts]] = None
 
 
 class ExperimentConfig(BaseModel):
@@ -43,6 +51,16 @@ class ExperimentConfig(BaseModel):
     budgets: Optional[list[int]] = None
     invasions: Optional[list[Invasion]] = None
     rematings: Optional[list[str]] = None
+    # Immigration quotidienne par culture (1.10.0, extension hors notebook) : None = désactivée.
+    immigration: Optional[dict[str, Counts]] = None
+
+    @model_validator(mode="after")
+    def _immigration_of_selected_crops(self):
+        # Immigration : seules les cultures sélectionnées avec un apport non nul comptent ; vide = None
+        if self.immigration is not None:
+            kept = {c: v for c, v in self.immigration.items() if (c in self.crops or c not in CROPS) and (v.wild or v.females)}
+            self.immigration = kept or None
+        return self
 
     @field_validator("biology")
     @classmethod
@@ -102,6 +120,11 @@ def config_hash(cfg: ExperimentConfig) -> str:
             del d[lst]
         else:
             del d[one]
+    for inv in [d.get("invasion"), *(d.get("invasions") or [])]:   # champs 1.10.0 absents : même empreinte
+        if inv is not None and inv.get("by_crop") is None:
+            inv.pop("by_crop", None)
+    if not d.get("immigration"):
+        d.pop("immigration", None)
     defaults = biology_defaults()
     for k in EXTENSION_PARAMS:   # extensions désactivées : même empreinte qu'avant la 1.9.0
         if d["biology"].get(k) == defaults[k]:
@@ -119,6 +142,10 @@ def plan_invasions(cfg: ExperimentConfig) -> list[Invasion]:
     return list(cfg.invasions) if cfg.invasions else [cfg.invasion]
 
 
+def immigration_on(cfg: ExperimentConfig) -> bool:
+    return bool(cfg.immigration) and any(c.wild or c.females for c in cfg.immigration.values())
+
+
 def plan_rematings(cfg: ExperimentConfig) -> list[str]:
     return list(cfg.rematings) if cfg.rematings else [cfg.remating]
 
@@ -127,11 +154,22 @@ def is_plan(cfg: ExperimentConfig) -> bool:
     return any(len(f(cfg)) > 1 for f in (plan_budgets, plan_invasions, plan_rematings))
 
 
+def invasion_for(inv: Invasion, crop: str) -> tuple[int, int]:
+    """Effectifs de l'inoculum de départ pour une culture."""
+    if inv.by_crop and crop in inv.by_crop:
+        c = inv.by_crop[crop]
+        return c.wild, c.females
+    return inv.wild, inv.females
+
+
 def invasion_name(inv: Invasion) -> str:
     p = INVASION_PRESETS.get(inv.preset or "")
-    if p and (p["wild"], p["females"]) == (inv.wild, inv.females):
-        return p["label"]
-    return f"Personnalisée ({inv.wild} W : {inv.females} F)"
+    if p:
+        if (p["wild"], p["females"]) == (inv.wild, inv.females) and not inv.by_crop:
+            return p["label"] if "by_crop" not in p else p["nb_label"].replace("Forte", "Fort")
+        if "by_crop" in p and (inv.by_crop or any((v["wild"], v["females"]) == (inv.wild, inv.females) for v in p["by_crop"].values())):
+            return p["label"]
+    return f"Personnalisé ({inv.wild} W : {inv.females} F)"
 
 
 def crop_label(crop: str) -> str:
@@ -162,21 +200,40 @@ def validate_config(cfg: ExperimentConfig, history: list[dict] | None = None) ->
         if b < 0 or b > 1_000_000:
             errors.append(f"Budget {b} : le budget (nombre total de mâles stériles lâchés) doit être compris entre 0 et 1 000 000.")
     for inv in plan_invasions(cfg):
-        if inv.wild < 0 or inv.females < 0:
-            errors.append("Les effectifs initiaux d'insectes doivent être positifs.")
-        if inv.wild + inv.females > 200_000:
-            errors.append("Population initiale supérieure à 200 000 individus : non prise en charge.")
+        for crop in cfg.crops:
+            w, f = invasion_for(inv, crop)
+            if w < 0 or f < 0:
+                errors.append("Les effectifs de l'inoculum de départ doivent être positifs.")
+            if w + f > 200_000:
+                errors.append("Inoculum de départ supérieur à 200 000 individus : non pris en charge.")
+        if inv.by_crop and any(c not in CROPS for c in inv.by_crop):
+            errors.append("Inoculum par culture : culture inconnue.")
         if inv.preset and inv.preset in INVASION_PRESETS:
             p = INVASION_PRESETS[inv.preset]
-            if (p["wild"], p["females"]) != (inv.wild, inv.females):
-                warnings.append(f"Invasion « {p['label']} » : les effectifs diffèrent du préréglage, ils seront utilisés tels quels.")
+            expected = {c: (v["wild"], v["females"]) for c, v in p["by_crop"].items()} if "by_crop" in p and inv.by_crop else None
+            same = (all(invasion_for(inv, c) == expected[c] for c in cfg.crops if c in expected) if expected
+                    else (p["wild"], p["females"]) == (inv.wild, inv.females))
+            if not same:
+                warnings.append(f"Inoculum « {p['label']} » : les effectifs diffèrent du préréglage, ils seront utilisés tels quels.")
+    if cfg.immigration is not None:
+        for crop, c in cfg.immigration.items():
+            if crop not in CROPS:
+                errors.append(f"Immigration : culture inconnue « {crop} ».")
+            elif not (0 <= c.wild <= 1000 and 0 <= c.females <= 1000):
+                errors.append(f"Immigration ({crop_label(crop)}) : entre 0 et 1 000 individus par jour.")
+        if cfg.biology.get("immigration_wild_males", 0) or cfg.biology.get("immigration_females", 0):
+            errors.append("Immigration définie deux fois (par culture et dans les paramètres biologiques) : n'en garder qu'une.")
     for name, values in (("budgets", plan_budgets(cfg)), ("régimes", plan_rematings(cfg)),
-                         ("invasions", [(i.wild, i.females) for i in plan_invasions(cfg)])):
+                         ("inoculums", [(i.wild, i.females, json.dumps(i.model_dump()["by_crop"], sort_keys=True)) for i in plan_invasions(cfg)])):
         if len(set(values)) != len(values):
             errors.append(f"Plan : {name} en double.")
+    for crop in cfg.crops:   # inoculums distincts mais mêmes effectifs pour une culture (ex. Fort et un personnalisé identique)
+        resolved = [invasion_for(i, crop) for i in plan_invasions(cfg)]
+        if len(set(resolved)) != len(resolved) and len(set(json.dumps(i.model_dump(), sort_keys=True) for i in plan_invasions(cfg))) == len(resolved):
+            errors.append(f"Plan : deux inoculums donnent les mêmes effectifs pour {crop_label(crop)} ; n'en garder qu'un.")
     if count_seasons(cfg) > MAX_SEASONS:
         errors.append(f"Plan de {count_seasons(cfg):,} saisons : au-delà de {MAX_SEASONS:,} saisons par expérience. ".replace(",", " ")
-                      + "Réduisez le nombre de budgets, d'invasions, de régimes, de stratégies ou de répétitions.")
+                      + "Réduisez le nombre de budgets, d'inoculums de départ, de régimes, de stratégies ou de répétitions.")
     if not 0 <= cfg.seed < 2**31:
         errors.append("La graine aléatoire doit être un entier entre 0 et 2³¹−1.")
 
@@ -198,6 +255,8 @@ def validate_config(cfg: ExperimentConfig, history: list[dict] | None = None) ->
             elif v != meta[2] and k not in EXTENSION_PARAMS:
                 warnings.append(f"{k} = {v} {meta[1]} (valeur du notebook : {meta[2]}).")
     ext = active_extensions(cfg.biology)
+    if immigration_on(cfg) and "immigration" not in ext:
+        ext = ["immigration", *ext]
     if ext:
         names = {"immigration": "immigration quotidienne", "carrying_capacity": "capacité de charge", "turning": "stade « tournant »"}
         warnings.append("Extension hors notebook active : " + ", ".join(names[e] for e in ext)

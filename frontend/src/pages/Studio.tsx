@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, CircleX, Download, Play, Plus, RotateCcw, Save, Trash2, Upload } from "../icons";
 import { api, type BiologyParam, type CropKey, type ExperimentConfig, type Invasion, type StrategySpec, type Validation } from "../lib/api";
-import { invasionLabel, planSize } from "../lib/analysis";
+import { invasionFor, invasionKey, invasionLabel, normalizeLoadedConfig, planSize, presetInvasion } from "../lib/analysis";
 import { useMeta } from "../lib/meta";
 import { CROP_LABEL, fmt, fmtInt } from "../lib/format";
 import { CROP_COLOR, STRATEGY_COLOR } from "../lib/colors";
@@ -51,44 +51,80 @@ function PlanSection({ cfg, setCfg, all, open, setOpen }: {
 }) {
   const meta = useMeta()!;
   const d = planSize(cfg);
-  const invKey = (i: Invasion) => `${i.wild}:${i.females}`;
+  const invKey = invasionKey;
   const setBudgets = (l: number[]) => setCfg((c) => { const v = [...new Set(l)].sort((a, b) => a - b); return v.length > 1 ? { ...c, budgets: v, budget: v[0] } : { ...c, budgets: null, budget: v[0] ?? c.budget }; });
-  const setInvasions = (l: Invasion[]) => setCfg((c) => { const v = [...l].sort((a, b) => a.wild + a.females - b.wild - b.females); return v.length > 1 ? { ...c, invasions: v, invasion: v[0] } : { ...c, invasions: null, invasion: v[0] ?? c.invasion }; });
+  const setInvasions = (l: Invasion[]) => setCfg((c) => { const v = [...l].sort((a, b) => (a.by_crop ? 1 : 0) - (b.by_crop ? 1 : 0) || a.wild + a.females - b.wild - b.females); return v.length > 1 ? { ...c, invasions: v, invasion: v[0] } : { ...c, invasions: null, invasion: v[0] ?? c.invasion }; });
   const setRematings = (l: string[]) => setCfg((c) => { const order = Object.keys(meta.remating); const v = order.filter((k) => l.includes(k)); return v.length > 1 ? { ...c, rematings: v, remating: v[0] } : { ...c, rematings: null, remating: v[0] ?? c.remating }; });
   const budgetOpts = [...new Set([...meta.budget_presets.filter((b) => b > 0), ...d.budgets])].sort((a, b) => a - b);
-  const invOpts: Invasion[] = [...Object.entries(meta.invasions).map(([k, v]) => ({ preset: k, wild: v.wild, females: v.females })),
-    ...d.invasions.filter((i) => !Object.values(meta.invasions).some((p) => p.wild === i.wild && p.females === i.females))];
+  const presets = Object.keys(meta.invasions).map((k) => presetInvasion(meta, k));
+  const invOpts: Invasion[] = [...presets, ...d.invasions.filter((i) => !presets.some((p) => invKey(p) === invKey(i)))];
   const regOpts = Object.keys(meta.remating).filter((k) => all || k === "preference" || k === "first" || d.rematings.includes(k));
   const active = d.budgets.length > 1 || d.invasions.length > 1 || d.rematings.length > 1;
   const chip = (on: boolean) => `rounded border px-2 py-0.5 text-[11.5px] tnum ${on ? "border-botanic bg-sage text-forest" : "border-line bg-white hover:border-botanic/50"}`;
   const notebook = () => setCfg((c) => ({ ...c,
     budgets: meta.budget_presets.filter((b) => b > 0), budget: meta.budget_presets.filter((b) => b > 0)[0],
-    invasions: Object.entries(meta.invasions).map(([k, v]) => ({ preset: k, wild: v.wild, females: v.females })), invasion: { preset: "faible", wild: meta.invasions.faible.wild, females: meta.invasions.faible.females },
+    invasions: Object.keys(meta.invasions).map((k) => presetInvasion(meta, k)), invasion: presetInvasion(meta, "faible"),
     rematings: ["preference", "first"], remating: "preference" }));
   return (
     <div className="mt-5 border-t border-line pt-4" id="plan">
       <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex w-full items-center justify-between gap-2 text-left">
         <h3 className="flex items-center gap-1.5 text-[13.5px] font-semibold">Plan d’expérience <span className="font-normal text-muted">(optionnel)</span>
-          <ScientificTooltip content="Croise plusieurs budgets, invasions et régimes de réaccouplement dans la même expérience, avec les mêmes graines. Toutes les courbes de la section Analyses (heatmap, dose-réponse, polyandrie vs monandrie) deviennent alors complètes." /></h3>
+          <ScientificTooltip content="Croise plusieurs budgets, inoculums de départ et régimes de réaccouplement dans la même expérience, avec les mêmes graines. Toutes les courbes de la section Analyses (heatmap, dose-réponse, polyandrie vs monandrie) deviennent alors complètes." /></h3>
         {active ? <Badge tone="green">{d.invasions.length} × {d.budgets.length} × {d.rematings.length}</Badge> : <span className="text-[11.5px] text-muted">{open ? "Masquer" : "Afficher"}</span>}
       </button>
       {open && (
         <div className="mt-2 space-y-2.5 text-[12px]">
-          <p className="text-[11.5px] leading-snug text-muted">Cochez plusieurs valeurs pour les croiser. Le témoin (sans lâcher) est calculé une fois par culture, invasion et régime.</p>
+          <p className="text-[11.5px] leading-snug text-muted">Cochez plusieurs valeurs pour les croiser. Le témoin (sans lâcher) est calculé une fois par culture, inoculum de départ et régime.</p>
           <div><div className="text-muted">Budgets (stériles / saison)</div>
             <div className="mt-1 flex flex-wrap gap-1.5">{budgetOpts.map((b) => { const on = d.budgets.includes(b); return (
               <button key={b} type="button" aria-pressed={on} className={chip(on)} onClick={() => setBudgets(on ? d.budgets.filter((x) => x !== b) : [...d.budgets, b])}>{fmtInt(b)}</button>); })}</div></div>
-          <div><div className="text-muted">Invasions</div>
+          <div><div className="text-muted">Inoculums de départ</div>
             <div className="mt-1 flex flex-wrap gap-1.5">{invOpts.map((i) => { const on = d.invasions.some((x) => invKey(x) === invKey(i)); return (
               <button key={invKey(i)} type="button" aria-pressed={on} className={chip(on)} onClick={() => setInvasions(on ? d.invasions.filter((x) => invKey(x) !== invKey(i)) : [...d.invasions, i])}>
-                {i.preset && meta.invasions[i.preset] ? meta.invasions[i.preset].label : `${i.wild} W : ${i.females} F`}</button>); })}</div></div>
+                {invasionLabel(i, meta)}</button>); })}</div></div>
           <div><div className="text-muted">Régimes de réaccouplement</div>
             <div className="mt-1 flex flex-wrap gap-1.5">{regOpts.map((k) => { const on = d.rematings.includes(k); return (
               <button key={k} type="button" aria-pressed={on} className={chip(on)} onClick={() => setRematings(on ? d.rematings.filter((x) => x !== k) : [...d.rematings, k])}>{meta.remating[k].short}</button>); })}</div></div>
           <div className="flex flex-wrap gap-2 pt-1">
-            <Button size="sm" onClick={notebook}>Plan du notebook (3 × 3 × 2)</Button>
+            <Button size="sm" onClick={notebook}>Plan complet (3 inoculums × 3 budgets × 2 régimes)</Button>
             {active && <Button size="sm" variant="ghost" onClick={() => setCfg((c) => ({ ...c, budgets: null, invasions: null, rematings: null }))}>Revenir à un seul scénario</Button>}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Immigration quotidienne par culture (extension hors notebook, désactivée par défaut). */
+function ImmigrationField({ cfg, setImmigration }: { cfg: ExperimentConfig; setImmigration: (v: ExperimentConfig["immigration"]) => void }) {
+  const meta = useMeta()!;
+  const on = !!cfg.immigration && cfg.crops.some((c) => cfg.immigration?.[c]?.wild || cfg.immigration?.[c]?.females);
+  const defaults = meta.immigration_defaults ?? {};
+  const val = (crop: string) => cfg.immigration?.[crop] ?? defaults[crop] ?? { wild: 0, females: 0 };
+  const setCrop = (crop: string, k: "wild" | "females", v: number) =>
+    setImmigration({ ...Object.fromEntries(Object.keys(defaults).map((c) => [c, val(c)])), [crop]: { ...val(crop), [k]: v } });
+  return (
+    <div className={`rounded-md border px-3 py-2.5 ${on ? "border-terracotta/40 bg-[#FCF4EF]" : "border-line bg-white"}`}>
+      <label className="flex cursor-pointer items-start gap-2">
+        <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#347A55]" checked={on}
+          onChange={(e) => setImmigration(e.target.checked ? Object.fromEntries(Object.keys(defaults).map((c) => [c, { ...defaults[c] }])) : null)} />
+        <span>
+          <span className="font-medium">Immigration quotidienne</span> <Badge tone="terracotta">hors notebook</Badge>
+          <span className="block text-[11.5px] leading-snug text-muted">Chaque jour à partir de J1, des mâles sauvages et des femelles déjà fécondées entrent dans la parcelle. Désactivée : parcelle fermée, comme le notebook.</span>
+        </span>
+      </label>
+      {on && (
+        <div className="mt-2 space-y-2 text-[12px]">
+          {cfg.crops.map((c) => (
+            <div key={c}>
+              <div className="font-medium">{meta.crops[c].label} <span className="font-normal text-muted">(par jour)</span></div>
+              <div className="mt-1 grid grid-cols-2 gap-2">
+                <label>Mâles sauvages<NumberField label={`Immigration mâles ${meta.crops[c].label}`} value={val(c).wild} min={0} max={1000} step={1} onChange={(v) => setCrop(c, "wild", v)} /></label>
+                <label>Femelles fécondées<NumberField label={`Immigration femelles ${meta.crops[c].label}`} value={val(c).females} min={0} max={1000} step={1} onChange={(v) => setCrop(c, "females", v)} /></label>
+              </div>
+            </div>
+          ))}
+          <p className="text-[11px] text-muted">Valeurs proposées par Marine : {Object.entries(defaults).map(([c, d]) => `${CROP_LABEL[c] ?? c} ${d.wild} + ${d.females}`).join(", ")} par jour.</p>
         </div>
       )}
     </div>
@@ -179,7 +215,7 @@ export function SimulationConfigurator() {
       toast("Paramètres repris de la page Paramètres.", "info");
       return;
     }
-    if (from) api.experiment(from).then((e) => { setCfg({ ...e.config, biology: { ...meta.biology_defaults, ...e.config.biology } }); setName(`${e.name} (variante)`); setProject(e.project); setParent(e.id); if (planSize(e.config).budgets.length > 1 || e.config.invasions?.length || e.config.rematings?.length) setPlanOpen(true); }).catch(() => setCfg(base));
+    if (from) api.experiment(from).then((e) => { setCfg(normalizeLoadedConfig(e.config, meta.biology_defaults)); setName(`${e.name} (variante)`); setProject(e.project); setParent(e.id); if (planSize(e.config).budgets.length > 1 || e.config.invasions?.length || e.config.rematings?.length) setPlanOpen(true); }).catch(() => setCfg(base));
     else setCfg(base);
   }, [meta]);
 
@@ -207,11 +243,12 @@ export function SimulationConfigurator() {
   };
   const exportProtocol = () => downloadText(JSON.stringify({ format: "modelly-tis-protocol", schema_version: meta.schema_version, name, config: cfg, versions: meta.versions }, null, 2), `${name.replace(/\W+/g, "-")}-protocole.json`, "application/json");
   const importProtocol = async (f: File) => {
-    try { const doc = JSON.parse(await f.text()); if (doc.format !== "modelly-tis-protocol") throw new Error("Format « modelly-tis-protocol » attendu."); setCfg({ ...doc.config, biology: { ...meta.biology_defaults, ...(doc.config?.biology ?? {}) } }); setName(doc.name ?? name); toast("Protocole importé : vérifiez la validation avant de lancer.", "info"); }
+    try { const doc = JSON.parse(await f.text()); if (doc.format !== "modelly-tis-protocol") throw new Error("Format « modelly-tis-protocol » attendu."); setCfg(normalizeLoadedConfig(doc.config, meta.biology_defaults)); setName(doc.name ?? name); toast("Protocole importé : vérifiez la validation avant de lancer.", "info"); }
     catch (e) { toast(`Import impossible : ${(e as Error).message}`, "error"); }
   };
 
-  const invPreset = cfg.invasion.preset && meta.invasions[cfg.invasion.preset] ? cfg.invasion.preset : "custom";
+  // Un ancien « forte » (900 : 900, sans effectifs par culture) n'est pas l'inoculum fort actuel : il s'affiche en personnalisé
+  const invPreset = cfg.invasion.preset && meta.invasions[cfg.invasion.preset] && (!meta.invasions[cfg.invasion.preset].by_crop || cfg.invasion.by_crop) ? cfg.invasion.preset : "custom";
   const plan = planSize(cfg);
   const inPlan = (n: number, what: string) => n > 1 && <p className="mt-1 rounded bg-sage-soft px-2 py-1 text-[11.5px] text-forest">{what} : défini par le plan d’expérience ci-dessous.</p>;
   return (
@@ -242,18 +279,25 @@ export function SimulationConfigurator() {
             </div>
           </fieldset>
           <div>
-            <div className="flex items-center gap-1.5 font-medium">Pression d’invasion <ScientificTooltip content="Effectifs initiaux d'adultes sauvages à J0 : mâles (W) et femelles (F). Préréglages du notebook (cellule 6), échelle 30." /></div>
-            {inPlan(plan.invasions.length, `${plan.invasions.length} invasions`)}
-            {plan.invasions.length < 2 && <><div className="mt-1"><Select label="Pression d'invasion" value={invPreset}
-              onChange={(v) => v === "custom" ? set("invasion", { ...cfg.invasion, preset: null }) : set("invasion", { preset: v, wild: meta.invasions[v].wild, females: meta.invasions[v].females })}
-              options={[...Object.entries(meta.invasions).map(([k, v]) => ({ value: k, label: v.label })), ...(mode === "avance" ? [{ value: "custom", label: "Personnalisée…" }] : [])]} /></div>
-            {(mode === "avance" || invPreset === "custom") && (
+            <div className="flex items-center gap-1.5 font-medium">Inoculum de départ <ScientificTooltip content="Adultes sauvages présents à J0 : mâles (W) et femelles (F). Faible et modéré : préréglages du notebook (cellule 6, échelle 30). Fort : population qu'atteint le témoin sans lâcher en fin de saison depuis l'inoculum modéré, propre à chaque culture." /></div>
+            {inPlan(plan.invasions.length, `${plan.invasions.length} inoculums`)}
+            {plan.invasions.length < 2 && <><div className="mt-1"><Select label="Inoculum de départ" value={invPreset}
+              onChange={(v) => v === "custom" ? set("invasion", { ...cfg.invasion, ...invasionFor(cfg.invasion, cfg.crops[0] ?? "strawberry"), preset: null, by_crop: null }) : set("invasion", presetInvasion(meta, v))}
+              options={[...Object.entries(meta.invasions).map(([k, v]) => ({ value: k, label: v.label })), ...(mode === "avance" ? [{ value: "custom", label: "Personnalisé…" }] : [])]} /></div>
+            {cfg.invasion.by_crop && (
+              <p className="mt-1 text-[11.5px] leading-snug text-muted">
+                {cfg.crops.map((c) => { const n = invasionFor(cfg.invasion, c); return `${CROP_LABEL[c]} : ${fmtInt(n.wild)} mâles + ${fmtInt(n.females)} femelles`; }).join(" · ")}
+                <span className="block">{meta.invasions[cfg.invasion.preset ?? ""]?.description}</span>
+              </p>
+            )}
+            {!cfg.invasion.by_crop && (mode === "avance" || invPreset === "custom") && (
               <div className="mt-2 grid grid-cols-2 gap-2 text-[12px]">
                 <label>Mâles sauvages W<NumberField label="Mâles sauvages" value={cfg.invasion.wild} min={0} max={100000} step={10} unit="ind." onChange={(v) => set("invasion", { ...cfg.invasion, preset: null, wild: v })} /></label>
                 <label>Femelles F<NumberField label="Femelles" value={cfg.invasion.females} min={0} max={100000} step={10} unit="ind." onChange={(v) => set("invasion", { ...cfg.invasion, preset: null, females: v })} /></label>
               </div>
             )}</>}
           </div>
+          <ImmigrationField cfg={cfg} setImmigration={(v) => set("immigration", v)} />
           <div>
             <div className="flex items-center gap-1.5 font-medium">Budget <span className="font-normal text-muted">(mâles stériles lâchés par saison)</span>
               <ScientificTooltip content="Nombre total de mâles stériles lâchés sur la saison, réparti selon le calendrier de chaque stratégie. Le modèle ne contient pas de coût monétaire : aucune conversion n'est appliquée." /></div>
@@ -287,7 +331,7 @@ export function SimulationConfigurator() {
             {modifiedBio > 0 && <Badge tone="terracotta">{modifiedBio} modifié{modifiedBio > 1 ? "s" : ""}</Badge>}
           </div>
           <p className="mt-0.5 text-[11.5px] text-muted">Repère vertical sur le curseur : valeur du notebook.</p>
-          <div className="mt-3"><ParameterGroups params={mode === "avance" ? bio : bio.filter((p) => !p.advanced)} values={cfg.biology} onChange={(v) => set("biology", v)} /></div>
+          <div className="mt-3"><ParameterGroups params={(mode === "avance" ? bio : bio.filter((p) => !p.advanced)).filter((p) => !p.name.startsWith("immigration_"))} values={cfg.biology} onChange={(v) => set("biology", v)} /></div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
             {mode !== "avance" && <p className="text-[11.5px] text-muted">Mode Avancé : {bio.length} paramètres et 4 régimes de réaccouplement.</p>}
             {modifiedBio > 0 && <Button size="sm" variant="ghost" icon={<RotateCcw size={13} />} onClick={() => set("biology", { ...meta.biology_defaults })}>Tout rétablir (notebook)</Button>}
@@ -335,7 +379,8 @@ export function SimulationConfigurator() {
           <PanelTitle>Récapitulatif</PanelTitle>
           <dl className="mt-3 grid grid-cols-[110px_1fr] gap-x-3 gap-y-1.5 text-[12.5px]">
             <dt className="text-muted">Cultures</dt><dd>{cfg.crops.map((c) => CROP_LABEL[c]).join(", ") || "—"}</dd>
-            <dt className="text-muted">Invasion</dt><dd className="tnum">{plan.invasions.map((i) => invasionLabel(i, meta)).join(" · ")}</dd>
+            <dt className="text-muted">Inoculum</dt><dd className="tnum">{plan.invasions.map((i) => i.by_crop ? `${invasionLabel(i, meta)} — ${cfg.crops.map((c) => `${CROP_LABEL[c]} ${fmtInt(invasionFor(i, c).wild)} + ${fmtInt(invasionFor(i, c).females)}`).join(", ")}` : invasionLabel(i, meta)).join(" · ")}</dd>
+            <dt className="text-muted">Immigration</dt><dd className="tnum">{cfg.crops.some((c) => cfg.immigration?.[c]?.wild || cfg.immigration?.[c]?.females) ? cfg.crops.map((c) => `${CROP_LABEL[c]} ${cfg.immigration?.[c]?.wild ?? 0} + ${cfg.immigration?.[c]?.females ?? 0} / jour`).join(", ") : "aucune (parcelle fermée)"}</dd>
             <dt className="text-muted">Budget</dt><dd className="tnum">{plan.budgets.map((b) => fmtInt(b)).join(" / ")} mâles stériles / saison</dd>
             <dt className="text-muted">Stratégies</dt><dd>{cfg.strategies.length}{cfg.include_control ? " + témoin" : ""}</dd>
             <dt className="text-muted">Réaccouplement</dt><dd>{plan.rematings.map((k) => meta.remating[k]?.label ?? k).join(" · ")}</dd>

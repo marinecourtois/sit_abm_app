@@ -4,6 +4,56 @@ Format : une section par version de l'application (`APP_VERSION`, `backend/app/_
 Les versions du moteur (`ENGINE_VERSION`), des paramètres et du schéma sont indépendantes et
 enregistrées avec chaque expérience (voir docs/03 § 4).
 
+## 1.10.0 — 25 novembre 2026
+
+Retours de Marine (et de son encadrante) après essai de la 1.9.
+
+### Changements
+
+- **« Inoculum de départ »** remplace « pression d'invasion » partout dans l'interface, les
+  exports et le rapport. Les niveaux deviennent **faible / modéré / fort** (« moyenne » dans le
+  notebook). L'API garde ses clés (`invasion`, `faible`, `moyenne`, `forte`).
+- **Inoculum fort = pic du témoin, propre à chaque culture.** Dans ce modèle, la population sans
+  lâcher croît jusqu'au dernier jour : le pic est la population d'adultes sauvages en fin de
+  saison. Partie de l'inoculum modéré (300 + 300), moyenne de 20 répétitions :
+  **fraise 621 + 621** (pic 1 242 à J100), **cerise 6 638 + 6 639** (pic 13 277 à J25). Calcul :
+  `tis_engine/calibration.py` ; un test vérifie que les valeurs figées sont exactement celles
+  que calcule le moteur. Le plan factoriel du notebook (page Analyses) garde ses 900 + 900
+  (« Fort (900 W : 900 F) »).
+- **Immigration quotidienne visible et réglable par culture** dans le Studio (Mode Essentiel et
+  Avancé), avec les valeurs proposées par Marine pré-remplies (fraise 15 + 15, cerise 8 + 8 par
+  jour). Désactivée par défaut : une case à cocher l'active. Elle était auparavant cachée en Mode
+  Avancé, d'où des résultats inchangés.
+- **Page Dynamiques** : les cartes « pic d'adultes / pic de stériles / pic de larves » (le
+  « pic d'adultes 600 à J0 » n'était que l'inoculum de départ) sont remplacées par des valeurs
+  de fin de saison comparées au témoin : adultes sauvages, larves produites, femelles
+  fécondées, part des accouplements stériles, chacune avec une phrase d'explication. Une
+  expérience encore en calcul affiche « Calcul en cours » au lieu d'une erreur.
+- Exports CSV : colonnes `immigration_wild` et `immigration_females` (repli sur l'immigration
+  globale des expériences 1.9.0).
+
+### Corrections (revue indépendante avant publication)
+
+- Liste des expériences et rapport : l'inoculum fort affichait 900 W : 900 F au lieu des
+  effectifs réellement simulés par culture.
+- Plan avec l'inoculum fort et un inoculum personnalisé aux mêmes effectifs : scénarios en
+  double (même clé) ; c'est maintenant refusé à la validation.
+- Rapport : l'immigration et les autres extensions actives sont indiquées dans le protocole.
+- Duplication ou import d'une configuration 1.9.0 avec immigration globale : convertie en
+  immigration par culture équivalente (elle était appliquée sans être visible).
+- Immigration d'une culture non sélectionnée ou nulle : ignorée (plus d'avertissement ni
+  d'empreinte différente).
+- Ancien « Fort » 900 + 900 dupliqué : affiché comme inoculum personnalisé, avec un nom court
+  distinct de l'inoculum fort actuel.
+- Page Dynamiques : se met à jour seule à la fin d'un calcul ; les variations par rapport au
+  témoin sont les variations appariées (même graine), comme sur les autres pages.
+
+### Versions
+
+`PARAMS_VERSION` `nb-2025.10-echelle30-ext2`, `SCHEMA_VERSION` 3 (`invasion.by_crop`,
+`immigration` par culture, `immigration` par scénario). Moteur inchangé (1.3.0). Les
+configurations antérieures gardent leur empreinte.
+
 ## 1.9.1 — 25 novembre 2026
 
 ### Nouveautés

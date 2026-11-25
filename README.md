@@ -1,6 +1,6 @@
 # Modelly TIS Research
 
-**Version 1.9.1** · [journal des versions](CHANGELOG.md)
+**Version 1.10.0** · [journal des versions](CHANGELOG.md)
 
 Application web scientifique pour **simuler, comparer et documenter des stratégies de
 Technique de l'Insecte Stérile (TIS)** sur deux systèmes agricoles : la fraise
@@ -27,7 +27,7 @@ make serve     # construit le frontend puis lance l'application sur http://local
 ```
 
 Au premier démarrage, l'API lance automatiquement l'**étude de référence** affichée sur la
-vue d'ensemble (2 cultures × 5 stratégies + témoin, invasion Moyenne, 9 000 stériles,
+vue d'ensemble (2 cultures × 5 stratégies + témoin, inoculum de départ modéré, 9 000 stériles,
 10 répétitions, graine 42). Le calcul dure quelques secondes ; la page se met à jour seule.
 
 **Minimum de l'étude : 10 répétitions par scénario** (`MIN_REPLICATES`, `backend/tis_engine/parameters.py`) ;
@@ -60,7 +60,7 @@ Arrêter le serveur : `Ctrl+C`, ou `pkill -f "uvicorn app.main:app"` s'il tourne
 | **Modèle** | Les cinq agents (mâle stérile, mâle sauvage, femelle, larve, fruit) : rôle, état, comportement quotidien et valeurs lues dans le moteur ; une journée simulée ; hypothèses H1–H8, en distinguant le notebook des options. |
 | **Dynamiques** | Pour un scénario : insectes (dont **femelles fécondées**), état des fruits, fruits pourris par jour, probabilité d'accouplement stérile, pics, **témoin superposé**. |
 | **Expériences** | Liste, recherche, filtres, regroupement par projet, métadonnées de reproductibilité, duplication, exports, **archive de reproductibilité (.zip)**, import de protocole, suppression. |
-| **Simulation** | *Studio* : configuration en Mode Essentiel ou Avancé, **plan d'expérience** (plusieurs budgets, invasions et régimes croisés dans une même expérience) (paramètres groupés par thème, curseurs avec repère de la valeur du notebook, régime de réaccouplement avec sa formule, **extensions hors notebook** optionnelles : immigration, capacité de charge, stade « tournant »), validation scientifique, durée estimée à partir des exécutions mesurées, aperçu des calendriers de lâchers. *Live* : suivi en direct, temps écoulé et restant (débit mesuré), progression dans le titre de l'onglet, notification de fin, frise chronologique, calendrier, événements, annulation. **Analyses de l'expérience** : les graphiques de la page Analyses (heatmap, dose-réponse, Pareto, incertitude, polyandrie vs monandrie) calculés sur ses propres répétitions, et l'effet apparié vs témoin. |
+| **Simulation** | *Studio* : configuration en Mode Essentiel ou Avancé, **inoculum de départ** faible / modéré / fort (fort = pic du témoin, propre à chaque culture), **immigration quotidienne** par culture (case à cocher, hors notebook), **plan d'expérience** (plusieurs budgets, inoculums et régimes croisés dans une même expérience) (paramètres groupés par thème, curseurs avec repère de la valeur du notebook, régime de réaccouplement avec sa formule, **extensions hors notebook** optionnelles : immigration, capacité de charge, stade « tournant »), validation scientifique, durée estimée à partir des exécutions mesurées, aperçu des calendriers de lâchers. *Live* : suivi en direct, temps écoulé et restant (débit mesuré), progression dans le titre de l'onglet, notification de fin, frise chronologique, calendrier, événements, annulation. **Analyses de l'expérience** : les graphiques de la page Analyses (heatmap, dose-réponse, Pareto, incertitude, polyandrie vs monandrie) calculés sur ses propres répétitions, et l'effet apparié vs témoin. |
 | **Comparaison** | 2 à 4 scénarios : courbes superposées ou séparées, normalisation explicite, axes synchronisés, incertitude, tableau ordonné selon un critère choisi. |
 | **Résultats** | Plan factoriel du notebook recalculé à 20 répétitions : **synthèse décisionnelle** (stratégie en tête par culture et régime, écart au témoin), **fraise vs cerise**, heatmaps, dose-réponse, front de Pareto, distribution des répétitions, **polyandrie vs monandrie** ; chaque indicateur affiche sa définition exacte. |
 | **Publications** | Rapport scientifique structuré (12 sections) imprimable en PDF, exports CSV/JSON. |

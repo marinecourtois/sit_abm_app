@@ -150,6 +150,13 @@ Les autres textes sont directement dans les pages.
 - Les paramètres `extension: true` (groupe « Extensions hors notebook ») portent un badge
   « hors notebook », affichent « désactivé à 0 » au lieu de la valeur du notebook, et leur groupe
   rappelle qu'activés ils changent le modèle.
+- **Inoculum de départ** : nom affiché partout à la place de « invasion » (clés d'API inchangées).
+  `presetInvasion(meta, clé)` donne l'inoculum d'un préréglage (l'inoculum fort porte `by_crop`),
+  `invasionFor(inv, culture)` ses effectifs pour une culture. Les noms du notebook du plan
+  factoriel (« Moyenne (300 W : 300 F) ») sont traduits à l'affichage (`datasetFromReference`).
+- **Immigration quotidienne** : section propre du Studio (`ImmigrationField`), visible dans les
+  deux modes, une case à cocher et deux champs par culture (`config.immigration`). Les
+  paramètres biologiques `immigration_*` ne sont plus affichés (réglage global remplacé).
 - La page Paramètres garde les valeurs choisies pour la session (`sessionStorage`) ; « Ouvrir
   dans le Studio » les transmet (`navigate("/simulation", { state: { biology } })`) et passe en
   Mode Avancé si un paramètre avancé est modifié.
@@ -174,7 +181,7 @@ métriques).
   recalcul). À côté de l'incertitude : l'effet apparié vs témoin de chaque stratégie.
 
 En tête de la suite, la **synthèse décisionnelle** (`synthesize`, `lib/analysis.ts`) classe les
-stratégies au budget et à l'invasion choisis, par culture et par régime, et répond aux deux
+stratégies au budget et à l'inoculum de départ choisis, par culture et par régime, et répond aux deux
 questions de l'étude (même optimum pour fraise et cerise ? l'optimum change-t-il avec le régime ?).
 Un écart est « net » s'il dépasse la somme des écarts-types des deux premières, sinon il est
 signalé comme inférieur à la variabilité. Avec deux cultures, la figure **Fraise vs cerise** met
@@ -184,8 +191,8 @@ témoin** trace la trajectoire moyenne du témoin de la même cellule (tirets).
 Chaque graphique n'utilise que les dimensions présentes. Une dimension à une seule valeur est
 indiquée (« Fixés dans ce plan ») et le graphique qui en a besoin dit ce qui manque, avec un lien
 « Dupliquer en plan » (`/simulation?from=<id>&plan=1`). Pour tout voir dans une expérience, le
-Studio propose la section **Plan d'expérience** (plusieurs budgets, invasions, régimes ; bouton
-« Plan du notebook (3 × 3 × 2) »).
+Studio propose la section **Plan d'expérience** (plusieurs budgets, inoculums, régimes ; bouton
+« Plan complet (3 inoculums × 3 budgets × 2 régimes) »).
 
 ## Indicateurs de la page Analyses
 

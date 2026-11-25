@@ -4,7 +4,9 @@ export type StrategyKey = "no_tis" | "daily" | "every_3" | "every_7" | "front_70
 export type Status = "ready" | "queued" | "running" | "completed" | "cancelled" | "error";
 
 export interface StrategySpec { key: StrategyKey; interval?: number; first_day?: number; initial_fraction?: number; maintenance_interval?: number; label?: string }
-export interface Invasion { preset?: string | null; wild: number; females: number }
+export interface Counts { wild: number; females: number }
+/** Inoculum de départ (« invasion » dans l'API). by_crop (1.10.0) : effectifs propres à chaque culture (inoculum fort). */
+export interface Invasion { preset?: string | null; wild: number; females: number; by_crop?: Record<string, Counts> | null }
 export interface ExperimentConfig {
   crops: CropKey[]; strategies: StrategySpec[];
   invasion: Invasion;
@@ -13,6 +15,8 @@ export interface ExperimentConfig {
   /** Plan (1.7.0) : plusieurs budgets, invasions ou régimes croisés dans une même expérience.
    *  Absents ou null : la valeur unique ci-dessus (budget, invasion, remating). */
   budgets?: number[] | null; invasions?: Invasion[] | null; rematings?: string[] | null;
+  /** Immigration quotidienne par culture (1.10.0, extension hors notebook) ; null = désactivée. */
+  immigration?: Record<string, Counts> | null;
 }
 export interface Experiment {
   id: string; short_id: string; name: string; project: string; description: string;
@@ -28,7 +32,7 @@ export interface ScenarioEvent { type: string; day: number; label: string }
 export interface Scenario {
   key: string; crop: CropKey; strategy: StrategySpec; strategy_key: StrategyKey; strategy_label: string;
   /** Plan (1.7.0) : identifiant de stratégie, invasion et régime propres au scénario (absents des anciens résultats : ceux de la configuration). */
-  strategy_id?: string; invasion?: Invasion; remating?: string;
+  strategy_id?: string; invasion?: Invasion; remating?: string; immigration?: Counts | null;
   is_control: boolean; budget: number; schedule: Record<string, number>; seeds: number[];
   metrics: Record<string, Stat>; series: Record<string, Band> & { Time: number[] };
   events: ScenarioEvent[];
@@ -42,7 +46,9 @@ export interface Meta {
   strategies: Record<string, { label: string; short: string; nb: string; description: string; params: Record<string, number> }>;
   remating: Record<string, { label: string; short: string; notebook: string; formula: string; description: string }>;
   biology_groups: { key: string; label: string }[];
-  invasions: Record<string, { label: string; wild: number; females: number }>;
+  invasions: Record<string, { label: string; wild: number; females: number; nb_label?: string; by_crop?: Record<string, Counts>; description?: string }>;
+  /** Immigration quotidienne proposée par culture (1.10.0). */
+  immigration_defaults?: Record<string, Counts>;
   budget_presets: number[]; biology: BiologyParam[]; biology_defaults: Record<string, number>;
   fixed_constants: { name: string; symbol: string; value: string; unit: string; source: string }[];
   model_constants: { eggs_poisson_mean: number; eggs_max_per_day: number; fruits_per_clutch_max: number; refractory_fertile: [number, number];

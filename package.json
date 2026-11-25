@@ -1,7 +1,7 @@
 {
   "name": "modelly-tis-research",
   "private": true,
-  "version": "1.9.1",
+  "version": "1.10.0",
   "description": "Racine du dépôt : outillage de tests (SmartTest) pour le frontend (Vitest) et le backend (pytest).",
   "scripts": {
     "test": "smarttest run",

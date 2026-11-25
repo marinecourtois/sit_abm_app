@@ -2,7 +2,7 @@
 // polyandrie vs monandrie) : une ligne par saison simulée, aux colonnes du CSV du plan factoriel
 // du notebook. Deux sources : le plan factoriel de référence (page Analyses) et les répétitions
 // d'une expérience de l'application (page Simulation).
-import type { Experiment, ExperimentConfig, Invasion, Meta, Results, Scenario } from "./api";
+import type { Counts, Experiment, ExperimentConfig, Invasion, Meta, Results, Scenario } from "./api";
 import { CROP_LABEL, fmtInt } from "./format";
 import type { Row } from "./indicators";
 import { SERIES_PALETTE, STRATEGY_COLOR, STRATEGY_ORDER } from "./colors";
@@ -26,17 +26,25 @@ export interface AnalysisDataset {
   nRep: number;
 }
 
-const invasionCount = (label: string) => parseInt(label.split("(")[1] ?? "0", 10) || 0;
+/** Ordre d'affichage des inoculums : par effectif, l'inoculum fort calé sur le pic du témoin en dernier. */
+const invasionCount = (label: string) => (label.includes("pic du témoin") ? Number.MAX_SAFE_INTEGER : parseInt(label.split("(")[1] ?? "0", 10) || 0);
 
-/** Nom court d'une invasion : « Moyenne », ou les effectifs pour une invasion personnalisée. */
-export const invasionShort = (label: string) => (label.startsWith("Personnalisée") ? label.replace("Personnalisée (", "").replace(")", "") : label.split(" (")[0]);
+/** Nom court d'un inoculum : « Modéré », ou les effectifs pour un inoculum personnalisé. */
+export const invasionShort = (label: string) => (/^Personnalisée? \(/.test(label) ? label.replace(/^Personnalisée? \(/, "").replace(")", "")
+  : /^Fort \(\d/.test(label) ? `Fort ${label.split(" (")[1].replace(")", "")}` : label.split(" (")[0]);
 
-/** « Moyenne (300 W : 300 F) » : même libellé que le CSV du notebook, trié par effectif. */
-export function invasionLabel(inv: { preset?: string | null; wild: number; females: number }, meta: Meta | null): string {
+/** Libellé de l'inoculum de départ : « Modéré (300 W : 300 F) », « Fort (pic du témoin) »… */
+export function invasionLabel(inv: { preset?: string | null; wild: number; females: number; by_crop?: Record<string, Counts> | null }, meta: Meta | null): string {
   const p = inv.preset ? meta?.invasions[inv.preset] : undefined;
-  if (p && p.wild === inv.wild && p.females === inv.females) return p.label;
-  return `Personnalisée (${inv.wild} W : ${inv.females} F)`;
+  if (p) {
+    if (p.by_crop && (inv.by_crop || Object.values(p.by_crop).some((c) => c.wild === inv.wild && c.females === inv.females))) return p.label;
+    if (p.wild === inv.wild && p.females === inv.females && !inv.by_crop) return p.by_crop ? `${p.label.split(" (")[0]} (${inv.wild} W : ${inv.females} F)` : p.label;
+  }
+  return `Personnalisé (${inv.wild} W : ${inv.females} F)`;
 }
+
+/** Effectifs de l'inoculum pour une culture (inoculum fort : propres à la culture). */
+export const invasionFor = (inv: Invasion, crop: string): Counts => inv.by_crop?.[crop] ?? { wild: inv.wild, females: inv.females };
 
 function dimensions(rows: Row[]) {
   const uniq = <T,>(f: (r: Row) => T) => Array.from(new Set(rows.map(f)));
@@ -53,7 +61,10 @@ function dimensions(rows: Row[]) {
 export function datasetFromReference(raw: Row[], meta: Meta | null): AnalysisDataset {
   const nb = (meta as unknown as { strategy_nb_names?: Record<string, string> } | null)?.strategy_nb_names ?? {};
   const nb2key = Object.fromEntries(Object.entries(nb).map(([k, v]) => [v, k]));
-  const rows = raw.map((r) => ({ ...r, Strategy: nb2key[String(r.Strategy)] ?? String(r.Strategy) }));
+  // Noms du notebook (« Moyenne (300 W : 300 F) ») → noms de l'application (« Modéré (300 W : 300 F) »), mêmes effectifs
+  const invName = Object.fromEntries(Object.values(meta?.invasions ?? {}).filter((p) => p.nb_label)
+    .map((p) => [p.nb_label!, `${p.label.split(" (")[0]} (${p.nb_label!.split(" (")[1]}`]));
+  const rows = raw.map((r) => ({ ...r, Strategy: nb2key[String(r.Strategy)] ?? String(r.Strategy), Invasion: invName[String(r.Invasion)] ?? String(r.Invasion) }));
   const present = new Set(rows.map((r) => String(r.Strategy)));
   const strategies = STRATEGY_ORDER.filter((k) => present.has(k)).map((k) => ({
     id: k, label: meta?.strategies[k]?.label ?? k, short: meta?.strategies[k]?.short ?? k, color: STRATEGY_COLOR[k], control: k === "no_tis",
@@ -113,7 +124,7 @@ export function scenarioLabel(
 ): string {
   const d = planSize(cfg);
   const parts = [CROP_LABEL[p.crop] ?? p.crop, p.strategy_label];
-  if (d.invasions.length > 1 && p.invasion) parts.push(`invasion ${invasionShort(invasionLabel(p.invasion, meta)).toLowerCase()}`);
+  if (d.invasions.length > 1 && p.invasion) parts.push(`inoculum ${invasionShort(invasionLabel(p.invasion, meta)).toLowerCase()}`);
   if (d.budgets.length > 1 && !p.is_control) parts.push(`${fmtInt(p.budget)} stériles`);
   if (d.rematings.length > 1 && p.remating) parts.push(meta?.remating[p.remating]?.short ?? p.remating);
   return parts.join(" · ");
@@ -190,11 +201,40 @@ export function synthesize(data: AnalysisDataset, value: (r: Row) => number, hig
 }
 
 /** Extensions hors notebook actives dans des paramètres biologiques (miroir de parameters.active_extensions). */
-export function activeExtensions(bio: Record<string, number> | undefined): string[] {
+export function activeExtensions(bio: Record<string, number> | undefined, immigration?: Record<string, Counts> | null, crops?: string[]): string[] {
   if (!bio) return [];
   const on: string[] = [];
-  if ((bio.immigration_wild_males ?? 0) || (bio.immigration_females ?? 0)) on.push(`immigration (${bio.immigration_wild_males ?? 0} mâles et ${bio.immigration_females ?? 0} femelles / jour)`);
+  const imm = Object.entries(immigration ?? {}).filter(([crop, c]) => (c.wild || c.females) && (!crops || crops.includes(crop)));
+  if (imm.length) on.push(`immigration quotidienne (${imm.map(([crop, c]) => `${CROP_LABEL[crop] ?? crop} : ${c.wild} mâles et ${c.females} femelles / jour`).join(" ; ")})`);
+  else if ((bio.immigration_wild_males ?? 0) || (bio.immigration_females ?? 0)) on.push(`immigration (${bio.immigration_wild_males ?? 0} mâles et ${bio.immigration_females ?? 0} femelles / jour)`);
   if (bio.carrying_capacity ?? 0) on.push(`capacité de charge K_a = ${bio.carrying_capacity}`);
   if (bio.turning_days ?? 0) on.push(`stade « tournant » (${bio.turning_days} j, p_t = ${bio.turning_puncture_probability})`);
   return on;
+}
+
+/** Inoculum d'un préréglage : l'inoculum fort porte les effectifs propres à chaque culture. */
+export function presetInvasion(meta: Meta, key: string): Invasion {
+  const p = meta.invasions[key];
+  return { preset: key, wild: p.wild, females: p.females, ...(p.by_crop ? { by_crop: p.by_crop } : {}) };
+}
+
+/** Clé d'identité d'un inoculum (préréglage par culture ou effectifs). */
+export const invasionKey = (i: Invasion) => (i.by_crop ? `${i.preset ?? ""}:par-culture` : `${i.wild}:${i.females}`);
+
+/** Effectifs d'un inoculum, en clair : par culture pour l'inoculum fort. */
+export function invasionCounts(inv: Invasion, crops: string[], fmt: (n: number) => string = String): string {
+  if (!inv.by_crop) return `${fmt(inv.wild)} W : ${fmt(inv.females)} F`;
+  return crops.map((c) => { const n = invasionFor(inv, c); return `${CROP_LABEL[c] ?? c} ${fmt(n.wild)} W : ${fmt(n.females)} F`; }).join(", ");
+}
+
+/** Configuration chargée (duplication, import) : l'immigration globale d'avant la 1.10.0 devient
+ *  l'immigration par culture équivalente, et l'inoculum garde ses effectifs réels. */
+export function normalizeLoadedConfig(cfg: ExperimentConfig, defaults: Record<string, number>): ExperimentConfig {
+  const biology = { ...defaults, ...cfg.biology };
+  const w = biology.immigration_wild_males ?? 0, f = biology.immigration_females ?? 0;
+  if ((w || f) && !cfg.immigration) {
+    return { ...cfg, biology: { ...biology, immigration_wild_males: 0, immigration_females: 0 },
+      immigration: Object.fromEntries(cfg.crops.map((c) => [c, { wild: w, females: f }])) };
+  }
+  return { ...cfg, biology };
 }

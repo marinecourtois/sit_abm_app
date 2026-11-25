@@ -44,8 +44,8 @@ notebook (voir `tests/test_regression.py`).
 
 | Format | Où | Contenu |
 |---|---|---|
-| CSV métriques | Expériences, Publications | `experiment, crop, invasion, wild, females, remating, strategy, budget, replicate, seed, <métriques…>` |
-| CSV séries | Expériences, Publications | `experiment, crop, invasion, wild, females, remating, strategy, budget, day, <série>_mean, <série>_sd…` |
+| CSV métriques | Expériences, Publications | `experiment, crop, invasion, wild, females, remating, strategy, budget, immigration_wild, immigration_females, replicate, seed, <métriques…>` |
+| CSV séries | Expériences, Publications | `experiment, crop, invasion, wild, females, remating, strategy, budget, immigration_wild, immigration_females, day, <série>_mean, <série>_sd…` |
 | CSV figure | Menu « Exporter » d'un graphique | Les données exactement tracées (après normalisation éventuelle) |
 | JSON expérience | Expériences, Publications | Métadonnées, configuration, versions, résultats complets |
 | JSON protocole | Studio, Expériences | `{format: "modelly-tis-protocol", schema_version, name, config, versions}` — réimportable |

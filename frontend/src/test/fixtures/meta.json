@@ -1,7 +1,7 @@
 {
   "engine_version": "1.3.0",
-  "params_version": "nb-2025.10-echelle30-ext1",
-  "schema_version": 2,
+  "params_version": "nb-2025.10-echelle30-ext2",
+  "schema_version": 3,
   "crops": {
     "strawberry": {
       "label": "Fraise",
@@ -131,18 +131,42 @@
   "invasions": {
     "faible": {
       "label": "Faible (90 W : 90 F)",
+      "nb_label": "Faible (90 W : 90 F)",
       "wild": 90,
       "females": 90
     },
     "moyenne": {
-      "label": "Moyenne (300 W : 300 F)",
+      "label": "Modéré (300 W : 300 F)",
+      "nb_label": "Moyenne (300 W : 300 F)",
       "wild": 300,
       "females": 300
     },
     "forte": {
-      "label": "Forte (900 W : 900 F)",
+      "label": "Fort (pic du témoin)",
+      "nb_label": "Forte (900 W : 900 F)",
       "wild": 900,
-      "females": 900
+      "females": 900,
+      "by_crop": {
+        "strawberry": {
+          "wild": 621,
+          "females": 621
+        },
+        "cherry": {
+          "wild": 6638,
+          "females": 6639
+        }
+      },
+      "description": "Population d'adultes sauvages qu'atteint le témoin sans lâcher en fin de saison, partie de l'inoculum modéré (moyenne de 20 répétitions), propre à chaque culture."
+    }
+  },
+  "immigration_defaults": {
+    "strawberry": {
+      "wild": 15,
+      "females": 15
+    },
+    "cherry": {
+      "wild": 8,
+      "females": 8
     }
   },
   "budget_presets": [
@@ -613,10 +637,10 @@
     ]
   },
   "versions": {
-    "app_version": "1.9.1",
+    "app_version": "1.10.0",
     "engine_version": "1.3.0",
-    "params_version": "nb-2025.10-echelle30-ext1",
-    "schema_version": 2,
+    "params_version": "nb-2025.10-echelle30-ext2",
+    "schema_version": 3,
     "modelly_version": "1.5.1",
     "modelly_source": "source locale /home/tkmremi/Desktop/work/Modelly",
     "python": "3.15.0"

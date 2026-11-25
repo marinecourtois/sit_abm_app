@@ -8,8 +8,8 @@ make test          # tout, directement : pytest (backend) puis Vitest (frontend)
 
 | Suite | Outil | Fichiers | Tests |
 |---|---|---|---|
-| Backend : non-régression, API, contrat | pytest (`backend/tests/`) | 3 | 61 |
-| Frontend : unitaires, composants, contrat | Vitest + Testing Library (`frontend/src/**/*.test.ts(x)`) | 14 | 100 |
+| Backend : non-régression, API, contrat | pytest (`backend/tests/`) | 3 | 66 |
+| Frontend : unitaires, composants, contrat | Vitest + Testing Library (`frontend/src/**/*.test.ts(x)`) | 14 | 106 |
 
 ## SmartTest : ne lancer que les tests affectés
 
@@ -82,6 +82,8 @@ dynamiques).
 | `test_immigration_extension` | `immigrants` = (m_W + m_F) × jours ; plus de larves qu'en parcelle fermée |
 | `test_carrying_capacity_extension` | Émergences bloquées > 0 et W + F ≤ K_a, sur un témoin dont la population dépasse K_a sans l'extension |
 | `test_turning_stage_extension` | p_y = 0 et d_t ≥ maturité max avec p_t = 0,3 est **identique au bit près** au modèle du notebook avec p_y = 0,3 ; un stade plus court change les résultats |
+| `test_fort_inoculum_matches_calibration` | L'inoculum fort figé (`FORT_BY_CROP`) est exactement le pic du témoin calculé par `tis_engine/calibration.py` |
+| `test_notebook_inoculum_names_unchanged` | Le plan factoriel du notebook garde ses noms et effectifs d'inoculum (dont 900 + 900 pour « Forte ») |
 | `test_turning_window_lasts_exactly_d_t_days` | Un fruit jeune aux âges 0 … M n'est « tournant » qu'aux d_t derniers (M − d_t + 1 … M) |
 
 ### `tests/test_frontend_contract.py` — contrat backend → frontend
@@ -131,6 +133,9 @@ indicateur que le moteur ne calcule pas fait échouer le test Vitest **et** le t
 | `test_plan_crosses_budgets_invasions_and_regimes` | Plan 2 invasions × 2 régimes × 2 budgets : chaque scénario est **identique au bit près** à un appel direct du moteur (répétitions 0 et 9), graines communes, effet apparié calculé contre le témoin de sa cellule, colonnes du CSV |
 | `test_plan_limits_and_legacy_hash` | Plan trop grand ou valeurs en double refusés ; une configuration sans plan garde l'empreinte d'avant la 1.7.0 ; liste à une valeur = valeur unique |
 | `test_configs_before_extensions_still_validate_and_run_identically` | Une configuration d'avant la 1.9.0 (sans clés d'extension) est acceptée, garde son empreinte et donne exactement les mêmes nombres |
+| `test_strong_inoculum_per_crop_and_immigration_per_crop` | Inoculum fort et immigration par culture : chaque saison reçoit les effectifs et l'immigration de sa culture (immigrants = (m_W + m_F) × (jours − 1)), libellé « Fort (pic du témoin) », colonnes du CSV |
+| `test_immigration_cannot_be_set_twice` | Immigration par culture et réglage global ensemble : refusé |
+| `test_inoculum_and_immigration_edge_cases` | Deux inoculums aux mêmes effectifs pour une culture : refusé ; immigration d'une culture non sélectionnée ou nulle : ignorée, empreinte inchangée |
 | `test_active_extension_is_flagged` | Une extension active et un stade « tournant » couvrant toute la phase jeune produisent les avertissements attendus |
 
 Les tests de l'API utilisent une base et un dossier de résultats temporaires : ils ne

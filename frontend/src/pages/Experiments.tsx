@@ -6,7 +6,7 @@ import { api, type Experiment } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { useMeta } from "../lib/meta";
 import { CROP_LABEL, STATUS_LABEL, fmtDate, fmtInt } from "../lib/format";
-import { planSize } from "../lib/analysis";
+import { invasionCounts, planSize } from "../lib/analysis";
 import { StudyHeader } from "../components/layout";
 import { Badge, Button, EmptyState, ExperimentStatus, Panel, Select, Skeleton, useToast } from "../components/ui";
 
@@ -20,7 +20,7 @@ export function ExperimentTable({ rows, selected, onSelect, onOpen }: { rows: Ex
           {onSelect && <th className="w-8 px-3 py-2"><span className="sr-only">Sélection</span></th>}
           <th className="px-3 py-2 font-medium">Identifiant</th><th className="px-3 py-2 font-medium">Nom</th>
           <th className="px-3 py-2 font-medium">Cultures</th><th className="px-3 py-2 font-medium">Stratégies</th>
-          <th className="px-3 py-2 text-right font-medium">Budget</th><th className="px-3 py-2 font-medium">Invasion</th>
+          <th className="px-3 py-2 text-right font-medium">Budget</th><th className="px-3 py-2 font-medium">Inoculum</th>
           <th className="px-3 py-2 text-right font-medium">Rép.</th><th className="px-3 py-2 font-medium">Statut</th><th className="px-3 py-2 font-medium">Créée</th>
         </tr></thead>
         <tbody>
@@ -35,7 +35,7 @@ export function ExperimentTable({ rows, selected, onSelect, onOpen }: { rows: Ex
               <td className="px-3 py-2">{e.config.crops.map((c) => CROP_LABEL[c]).join(", ")}</td>
               <td className="px-3 py-2 text-muted">{e.config.strategies.map((s) => meta?.strategies[s.key]?.short ?? s.key).join(", ")}{e.config.include_control ? " + témoin" : ""}</td>
               <td className="px-3 py-2 text-right tnum">{planSize(e.config).budgets.map((b) => fmtInt(b)).join(" / ")}</td>
-              <td className="px-3 py-2 tnum text-muted">{planSize(e.config).invasions.map((i) => `${i.wild} W : ${i.females} F`).join(" · ")}{(e.config.rematings?.length ?? 0) > 1 && <span className="block text-[11px]">{e.config.rematings!.length} régimes</span>}</td>
+              <td className="px-3 py-2 tnum text-muted">{planSize(e.config).invasions.map((i) => invasionCounts(i, e.config.crops)).join(" · ")}{(e.config.rematings?.length ?? 0) > 1 && <span className="block text-[11px]">{e.config.rematings!.length} régimes</span>}</td>
               <td className="px-3 py-2 text-right tnum">{e.config.replicates}</td>
               <td className="px-3 py-2"><ExperimentStatus status={e.status} progress={e.progress} /></td>
               <td className="px-3 py-2 whitespace-nowrap text-muted">{fmtDate(e.created_at)}</td>

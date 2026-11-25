@@ -24,7 +24,9 @@ En production (`make serve`), elle est désactivée : aucune documentation n'est
     { "key": "periodic", "interval": 5, "first_day": 2 },
     { "key": "front_loaded", "initial_fraction": 0.5, "maintenance_interval": 5 }
   ],
-  "invasion": { "preset": "moyenne", "wild": 300, "females": 300 },
+  "invasion": { "preset": "moyenne", "wild": 300, "females": 300 },   // inoculum de départ (« invasion » dans l'API)
+  // inoculum fort (1.10.0) : effectifs propres à chaque culture
+  //   { "preset": "forte", "wild": 900, "females": 900, "by_crop": { "strawberry": {"wild": 621, "females": 621}, "cherry": {"wild": 6638, "females": 6639} } }
   "budget": 9000,                             // mâles stériles lâchés par saison (aucune unité monétaire)
   "remating": "preference",                   // preference | first | last | mixed
   "replicates": 20,                           // 10 (minimum de l'étude) à 50 ; le Studio propose 20
@@ -39,12 +41,22 @@ En production (`make serve`), elle est désactivée : aucune documentation n'est
   // la valeur unique ci-dessus. Une liste remplace la valeur unique correspondante.
   "budgets": [4500, 9000, 18000],
   "invasions": [{ "preset": "faible", "wild": 90, "females": 90 }, { "preset": "forte", "wild": 900, "females": 900 }],
-  "rematings": ["preference", "first"]
+  "rematings": ["preference", "first"],
+
+  // Immigration quotidienne par culture (1.10.0, extension hors notebook). Absente ou null : aucune.
+  "immigration": { "strawberry": {"wild": 15, "females": 15}, "cherry": {"wild": 8, "females": 8} }
 }
 ```
 
-**Plan d'expérience.** Les scénarios sont culture × invasion × régime × (témoin + stratégie ×
-budget) : le témoin (budget 0) est calculé une fois par culture, invasion et régime, et sert de
+**Inoculum de départ.** `by_crop` donne les effectifs de chaque culture (préréglage « forte » :
+pic du témoin, voir `tis_engine/calibration.py`) ; sans `by_crop`, `wild`/`females` valent pour
+toutes les cultures. Chaque scénario des résultats porte les effectifs de sa culture.
+**Immigration.** `immigration[culture]` fixe les mâles sauvages et femelles fécondées qui entrent
+chaque jour à partir de J1 dans les saisons de cette culture ; ne pas la combiner avec
+`biology.immigration_*` (refusé).
+
+**Plan d'expérience.** Les scénarios sont culture × inoculum × régime × (témoin + stratégie ×
+budget) : le témoin (budget 0) est calculé une fois par culture, inoculum et régime, et sert de
 référence appariée à tous les budgets de sa cellule. Toutes les cellules utilisent les mêmes
 graines (`seed + 1000·r`). Validation : valeurs en double refusées, au plus `MAX_SEASONS`
 (10 000) saisons par expérience (`backend/app/schemas.py`). Une configuration sans champ de plan
@@ -61,7 +73,7 @@ Clés de stratégie : `no_tis`, `daily`, `every_3`, `every_7`, `front_70`, `fron
 |---|---|---|
 | GET | `/health` | État du serveur et versions : `app_version` (application), moteur, paramètres, schéma, modelly, Python |
 | GET | `/queue` | Exécutions en file ou en cours : `{workers, active: [{id, short_id, name, status, progress, done, total, elapsed_s, eta_s}]}` |
-| GET | `/meta` | Registre complet : cultures, stratégies (avec leurs paramètres), régimes de réaccouplement (libellé, formule LaTeX, description), préréglages d'invasion et de budget, paramètres biologiques (libellé, groupe, symbole, unité, défaut, plage, source), groupes, constantes fixes du modèle, limites (répétitions 10 – 50), répétitions proposées par défaut (`default_replicates`, 20), résumé du plan factoriel servi, versions. Chaque paramètre biologique porte `extension: true` s'il s'agit d'une extension hors notebook (groupe `extensions`) |
+| GET | `/meta` | Registre complet : cultures, stratégies (avec leurs paramètres), régimes de réaccouplement (libellé, formule LaTeX, description), préréglages d'invasion et de budget, paramètres biologiques (libellé, groupe, symbole, unité, défaut, plage, source), groupes, constantes fixes du modèle, limites (répétitions 10 – 50), répétitions proposées par défaut (`default_replicates`, 20), inoculums de départ (`invasions` : `label`, `nb_label` du notebook, `by_crop` pour l'inoculum fort), immigration proposée par culture (`immigration_defaults`), résumé du plan factoriel servi, versions. Chaque paramètre biologique porte `extension: true` s'il s'agit d'une extension hors notebook (groupe `extensions`) |
 | POST | `/validate` | Corps : `ExperimentConfig`. Renvoie `{ok, errors, warnings, scenarios[], estimate}` ; `scenarios` contient le calendrier calculé de chaque culture × stratégie |
 
 ## Expériences
@@ -89,7 +101,7 @@ Statuts : `ready`, `queued`, `running`, `completed`, `cancelled`, `error`.
   "seq": 1834,                       // curseur : à renvoyer dans ?since= au prochain appel
   "elapsed_s": 5.2, "eta_s": 7.1,    // eta = écoulé / done × (total − done) ; null avant la 1re saison et après la fin
   "live": { "strawberry::daily": { "day": 63, "from": 58, "rows": [ {"Wild_males": …, …}, … ] } },
-  "log": [{"t": "…", "msg": "…"}], "plan": [{"key", "crop", "strategy_label", "is_control", "budget", "invasion", "remating"}]
+  "log": [{"t": "…", "msg": "…"}], "plan": [{"key", "crop", "strategy_label", "is_control", "budget", "invasion", "remating", "immigration"}]
 }
 ```
 
@@ -111,7 +123,8 @@ Statuts : `ready`, `queued`, `running`, `completed`, `cancelled`, `error`.
     "key": "strawberry::every_3", "crop": "strawberry",   // plan : "strawberry::inv=90:90::rem=first::b=4500::every_3"
     "strategy": {"key": "every_3"}, "strategy_key": "every_3", "strategy_id": "every_3", "strategy_label": "J+3",
     "is_control": false, "budget": 9000,
-    "invasion": {"preset": "moyenne", "wild": 300, "females": 300}, "remating": "preference",   // depuis 1.7.0
+    "invasion": {"preset": "moyenne", "wild": 300, "females": 300}, "remating": "preference",   // depuis 1.7.0 ; effectifs de la culture
+    "immigration": {"wild": 15, "females": 15} | null,   // depuis 1.10.0
     "schedule": {"0": 265, "3": 265, …},
     "seeds": [42, 1042, 2042],
     "metrics": { "larval_damage_pct": {"mean", "sd", "min", "max", "n", "values": [...]}, …,

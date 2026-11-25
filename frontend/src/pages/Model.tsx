@@ -30,7 +30,7 @@ function agents(meta: Meta): AgentCard[] {
     },
     {
       key: "W", name: "Mâle sauvage (W)", engine: "WildMales_Agent", icon: <Bug size={20} />, tone: "#145A3D",
-      role: "Présent dès J0 (invasion) puis issu des larves qui émergent (une sur deux en moyenne). Compté dans W.",
+      role: "Présent dès J0 (inoculum de départ) puis issu des larves qui émergent (une sur deux en moyenne). Compté dans W.",
       state: ["date de naissance", "date de mort"],
       daily: ["Meurt à sa date de mort, sinon reste disponible pour les accouplements."],
       params: [["Durée de vie moyenne", <><Tex>{"\\bar{T}_W"}</Tex> = {dec(bio(meta, "lifespan_wild"))} j</>], ["Sex-ratio à l’émergence", <>{dec(c.sex_ratio)} mâle</>]],
@@ -92,7 +92,7 @@ function hypotheses(meta: Meta): Hyp[] {
     { id: "H5", status: "notebook", title: "Budget exprimé en insectes",
       text: "Le budget est un nombre de mâles stériles lâchés par saison ; le modèle ne contient aucun coût monétaire." },
     { id: "H6", status: "extension", title: "Population fermée — ou immigration (option)",
-      text: <>Dans le notebook, aucun insecte n’entre ni ne sort de la parcelle. Option hors notebook : immigration quotidienne (à partir de J1) de <Tex>{"m_W"}</Tex> mâles et <Tex>{"m_F"}</Tex> femelles fécondées (proposition de Marine : 15 / jour en fraise, 8 en cerise).</> },
+      text: <>Dans le notebook, aucun insecte n’entre ni ne sort de la parcelle. Option hors notebook : immigration quotidienne (à partir de J1) de mâles sauvages et de femelles fécondées, réglée par culture dans le Studio (proposition de Marine : 15 + 15 par jour en fraise, 8 + 8 en cerise).</> },
     { id: "H7", status: "extension", title: "Pas de capacité de charge — ou plafond K_a (option)",
       text: <>Dans le notebook, rien ne limite la population d’adultes. Option hors notebook : une larve qui émerge alors que W + F ≥ <Tex>{"K_a"}</Tex> meurt (proposition : 3 000).</> },
     { id: "H8", status: "extension", title: "Deux stades de fruit — ou stade « tournant » (option)",

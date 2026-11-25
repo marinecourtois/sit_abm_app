@@ -161,7 +161,7 @@ export function LiveSimulation() {
       )}
       {status === "error" && <div className="mt-4"><ResearchAnnotation tone="warning"><strong>Simulation en erreur.</strong> {exp.error}</ResearchAnnotation></div>}
       {status === "cancelled" && <div className="mt-4"><ResearchAnnotation tone="warning"><strong>Simulation interrompue.</strong> {exp.error} — aucun résultat partiel n’est enregistré. Une relance crée une nouvelle exécution identifiable.</ResearchAnnotation></div>}
-      {activeExtensions(exp.config.biology).length > 0 && <div className="mt-4"><ResearchAnnotation tone="warning"><strong>Extensions hors notebook actives :</strong> {activeExtensions(exp.config.biology).join(" ; ")}. Ces mécanismes n’existent pas dans le modèle du notebook : les résultats ne sont pas comparables au plan factoriel de référence.</ResearchAnnotation></div>}
+      {activeExtensions(exp.config.biology, exp.config.immigration, exp.config.crops).length > 0 && <div className="mt-4"><ResearchAnnotation tone="warning"><strong>Extensions hors notebook actives :</strong> {activeExtensions(exp.config.biology, exp.config.immigration, exp.config.crops).join(" ; ")}. Ces mécanismes n’existent pas dans le modèle du notebook : les résultats ne sont pas comparables au plan factoriel de référence.</ResearchAnnotation></div>}
       {status === "ready" && <div className="mt-4"><ResearchAnnotation>Simulation prête : la configuration est enregistrée ({exp.short_id}) et peut être lancée.</ResearchAnnotation></div>}
 
       <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -230,7 +230,7 @@ export function LiveSimulation() {
             <div className="flex items-center gap-2">
               <ChartExportMenu getSvg={() => chartRef.current}
                 meta={{ title: planItem ? scenarioLabel(planItem, exp.config, meta) : "", filename: `${exp.short_id}-dynamique`,
-                  caption: `${sc ? `Moyenne ± écart-type, ${exp.config.replicates} répétitions` : "Répétition 1 (calcul en cours)"}. Invasion ${(planItem?.invasion ?? exp.config.invasion).wild} W : ${(planItem?.invasion ?? exp.config.invasion).females} F, budget ${planItem?.budget ?? exp.config.budget} stériles, régime ${planItem?.remating ?? exp.config.remating}, graine ${exp.config.seed}. ${exp.short_id}, moteur ${exp.engine_version}.` }}
+                  caption: `${sc ? `Moyenne ± écart-type, ${exp.config.replicates} répétitions` : "Répétition 1 (calcul en cours)"}. Inoculum ${(planItem?.invasion ?? exp.config.invasion).wild} W : ${(planItem?.invasion ?? exp.config.invasion).females} F, budget ${planItem?.budget ?? exp.config.budget} stériles, régime ${planItem?.remating ?? exp.config.remating}, graine ${exp.config.seed}. ${exp.short_id}, moteur ${exp.engine_version}.` }}
                 onCsv={() => downloadText(toCsv([["jour", ...[...chartSeries, ...ctrlSeries].flatMap((s) => [s.id + "_moyenne", s.id + "_ecart_type"])], ...chartSeries[0]?.x.map((t, i) => [t, ...[...chartSeries, ...ctrlSeries].flatMap((s) => [s.y[i], s.sd?.[i] ?? ""])]) ?? []]), `${exp.short_id}-series.csv`)} />
             </div>
           </div>
@@ -260,7 +260,7 @@ export function LiveSimulation() {
                 })}
               </div>
               {vars.join() !== DEFAULT_VARS.join() && <button type="button" onClick={() => { setVars(DEFAULT_VARS); setGroup("insectes"); }} className="text-[12px] text-muted underline underline-offset-2 hover:text-ink">Réinitialiser</button>}
-              {ctrlSc && <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-[12px] text-ink" title="Trajectoire moyenne du témoin sans lâcher, même culture, invasion, régime et mêmes graines">
+              {ctrlSc && <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-[12px] text-ink" title="Trajectoire moyenne du témoin sans lâcher, même culture, inoculum, régime et mêmes graines">
                 <input type="checkbox" className="h-3.5 w-3.5 accent-[#347A55]" checked={showCtrl} onChange={(e) => setShowCtrl(e.target.checked)} />
                 Superposer le témoin <svg width="18" height="6" aria-hidden><line x1="0" x2="18" y1="3" y2="3" stroke="#657068" strokeWidth="1.6" strokeDasharray="2 4" /></svg></label>}
             </div>
@@ -313,7 +313,7 @@ function ExperimentAnalyses({ exp, res }: { exp: Experiment; res: Results }) {
           <h2 id="analyses-h" className="font-serif text-[26px] font-semibold">Analyses de l’expérience</h2>
           <p className="font-serif text-[14px] text-muted">
             Mêmes graphiques que la page Analyses, calculés sur les {data.nRep} répétitions de chaque scénario de {exp.short_id}
-            {" "}({data.rows.length} saisons : {data.crops.length} culture{data.crops.length > 1 ? "s" : ""} × {data.invasions.length} invasion{data.invasions.length > 1 ? "s" : ""} × {data.budgets.filter((b) => b > 0).length} budget{data.budgets.filter((b) => b > 0).length > 1 ? "s" : ""} × {data.strategies.length} stratégie{data.strategies.length > 1 ? "s" : ""} × {data.regimes.length} régime{data.regimes.length > 1 ? "s" : ""}).
+            {" "}({data.rows.length} saisons : {data.crops.length} culture{data.crops.length > 1 ? "s" : ""} × {data.invasions.length} inoculum{data.invasions.length > 1 ? "s" : ""} × {data.budgets.filter((b) => b > 0).length} budget{data.budgets.filter((b) => b > 0).length > 1 ? "s" : ""} × {data.strategies.length} stratégie{data.strategies.length > 1 ? "s" : ""} × {data.regimes.length} régime{data.regimes.length > 1 ? "s" : ""}).
           </p>
         </div>
       </div>
@@ -332,7 +332,7 @@ function PairedEffects({ res, exp, sel }: { res: Results; exp: Experiment; sel: 
   const K = [["larval_damage_pct", "Fruits infestés"], ["larvae_produced", "Larves produites"], ["harvested_clean_pct", "Récolte saine"]] as const;
   return (
     <Panel className="px-5 py-4">
-      <PanelTitle sub={`${CROP_LABEL[sel.crop]} · invasion ${sel.invasion.split(" (")[0]} · budget ${fmtInt(sel.budget)} · variation relative au témoin, même graine, moyenne ± écart-type`}>Effet vs témoin, apparié</PanelTitle>
+      <PanelTitle sub={`${CROP_LABEL[sel.crop]} · inoculum ${sel.invasion.split(" (")[0].toLowerCase()} · budget ${fmtInt(sel.budget)} · variation relative au témoin, même graine, moyenne ± écart-type`}>Effet vs témoin, apparié</PanelTitle>
       {rows.length ? (
         <table className="mt-3 w-full text-[12.5px]">
           <thead><tr className="border-b border-line text-left text-[11.5px] text-muted"><th className="py-1.5 font-medium">Stratégie</th>{K.map(([k, l]) => <th key={k} className="py-1.5 text-right font-medium">{l}</th>)}</tr></thead>

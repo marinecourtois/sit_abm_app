@@ -184,3 +184,21 @@ def test_turning_window_lasts_exactly_d_t_days():
         m.time = t
         hits.append(f.can_receive_oviposition())
     assert hits == [False] * (f.maturation_age + 1 - 3) + [True] * 3
+
+
+def test_fort_inoculum_matches_calibration():
+    """L'inoculum fort figé dans parameters.FORT_BY_CROP est exactement celui que calcule
+    tis_engine.calibration (pic du témoin sans lâcher depuis l'inoculum modéré, 20 répétitions)."""
+    from tis_engine.calibration import fort_inoculum
+    from tis_engine.parameters import FORT_BY_CROP
+    for crop in ("strawberry", "cherry"):
+        assert fort_inoculum(crop) == FORT_BY_CROP[crop], crop
+
+
+def test_notebook_inoculum_names_unchanged():
+    """Le plan factoriel du notebook garde ses noms et ses effectifs (900 W : 900 F pour « Forte »)."""
+    from tis_engine.parameters import INVASION_PRESETS
+    names = [p["nb_label"] for p in INVASION_PRESETS.values()]
+    assert names == ["Faible (90 W : 90 F)", "Moyenne (300 W : 300 F)", "Forte (900 W : 900 F)"]
+    with open(REF / "resultats_experience_factorielle.csv") as f:
+        assert {r["Invasion"] for r in csv.DictReader(f)} == set(names)

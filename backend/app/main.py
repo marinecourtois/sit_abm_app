@@ -66,7 +66,7 @@ def reference_config() -> dict:
 
 def reference_description(cfg: dict, inv: str) -> str:
     budget = f"{cfg['budget']:,}".replace(",", "\u202f")
-    return (f"{len(cfg['strategies'])} stratégies TIS et témoin, invasion {inv}, budget {budget} stériles, "
+    return (f"{len(cfg['strategies'])} stratégies TIS et témoin, inoculum de départ {inv}, budget {budget} stériles, "
             f"régime « {cfg['remating']} », {cfg['replicates']} répétitions, graine {cfg['seed']}.")
 
 
@@ -319,14 +319,17 @@ def _results_json(e, r) -> str:
     return json.dumps({"metadata": _metadata(e), "config": e["config"], "versions": versions(), "results": r}, ensure_ascii=False)
 
 
-_CELL_COLS = ["crop", "invasion", "wild", "females", "remating", "strategy", "budget"]
+_CELL_COLS = ["crop", "invasion", "wild", "females", "remating", "strategy", "budget", "immigration_wild", "immigration_females"]
 
 
 def _cell(sc, cfg) -> list:
     """Identification d'un scénario : culture, invasion, régime, stratégie, budget (plan ou valeurs uniques)."""
     inv = sc.get("invasion") or cfg["invasion"]
+    imm = sc.get("immigration") or {}
+    bio = cfg.get("biology") or {}   # immigration globale (1.9.0) si le scénario n'a pas la sienne
     return [sc["crop"], invasion_name(Invasion(**inv)), inv["wild"], inv["females"], sc.get("remating") or cfg["remating"],
-            sc["strategy_label"], sc["budget"]]
+            sc["strategy_label"], sc["budget"], imm.get("wild", bio.get("immigration_wild_males", 0)),
+            imm.get("females", bio.get("immigration_females", 0))]
 
 
 def _metrics_csv(name, r, cfg) -> str:
@@ -475,7 +478,7 @@ def _reference_doc(which: str) -> dict:
     rows, sha = _read_csv(src["path"])
     uniq = lambda k: sorted({r[k] for r in rows}, key=str)
     if which == "factorial":
-        desc = (f"Plan factoriel du notebook : {len(uniq('Crop'))} cultures × {len(uniq('Invasion'))} invasions × "
+        desc = (f"Plan factoriel du notebook : {len(uniq('Crop'))} cultures × {len(uniq('Invasion'))} inoculums de départ × "
                 f"{len(uniq('Budget'))} budgets ({', '.join(str(b) for b in sorted(uniq('Budget')))}) × {len(uniq('Remating'))} régimes × "
                 f"{len(uniq('Strategy'))} stratégies (dont le témoin au budget 0) × {len(uniq('Replicate'))} répétitions — {len(rows)} saisons.")
     else:

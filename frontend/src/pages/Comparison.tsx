@@ -161,7 +161,7 @@ export function Comparison() {
                     <dt className="text-muted">Culture</dt><dd><em className="font-serif">{meta?.crops[s.sc.crop].latin}</em></dd>
                     <dt className="text-muted">Budget</dt><dd className="tnum">{fmtInt(s.sc.budget)} stériles</dd>
                     <dt className="text-muted">Période</dt><dd className="tnum">J0 – J{s.sc.series.Time[s.sc.series.Time.length - 1]}</dd>
-                    <dt className="text-muted">Invasion</dt><dd className="tnum">{invasionLabel(s.sc.invasion ?? s.exp.config.invasion, meta)}</dd>
+                    <dt className="text-muted">Inoculum</dt><dd className="tnum">{invasionLabel(s.sc.invasion ?? s.exp.config.invasion, meta)}</dd>
                     <dt className="text-muted">Régime</dt><dd>{s.sc.remating ?? s.exp.config.remating}</dd>
                     <dt className="text-muted">Identifiant</dt><dd className="font-mono text-[10.5px]">{s.exp.short_id} · graines {s.sc.seeds.join(", ")}</dd>
                   </dl>
@@ -171,7 +171,7 @@ export function Comparison() {
             {(crops.size > 1 || budgets.size > 1 || invasions.size > 1 || regimes.size > 1) && <ResearchAnnotation>
               {crops.size > 1 && <>Cultures différentes : durées de saison distinctes ({[...crops].map((c) => `${CROP_LABEL[c]} ${meta?.crops[c].params.season_length} j`).join(", ")}) et dynamiques de fruits différentes{VAR[variable]?.unit === "individus" && norm === "none" ? <> ; les populations sont comparées en effectifs absolus (individus), sur des parcelles de {[...crops].map((c) => fmtInt(Number(meta?.crops[c].params.total_fruits))).join(" / ")} fruits</> : null}. </>}
               {budgets.size > 1 && <>Budgets différents entre scénarios. </>}
-              {invasions.size > 1 && <>Invasions initiales différentes entre scénarios. </>}
+              {invasions.size > 1 && <>Inoculums de départ différents entre scénarios. </>}
               {regimes.size > 1 && <>Régimes de réaccouplement différents entre scénarios. </>}
               Utilisez la normalisation pour une comparaison relative explicite.
             </ResearchAnnotation>}

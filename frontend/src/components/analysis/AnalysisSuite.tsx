@@ -76,7 +76,7 @@ export function AnalysisSuite({ data, meta, source, exportPrefix, planHint, asid
     if (!g.length) continue;
     pts.push({ id: `${crop}|${i}|${b}|${s.id}`, x: stats(g.map((r) => val(r, "rotten_larvae_pct"))).mean, y: stats(g.map((r) => val(r, "rotten_sterile_only_pct"))).mean,
       size: b, color: s.color, shape: crop === "strawberry" ? "circle" : "triangle", group: crop,
-      label: `${CROP_LABEL[crop]} · ${s.label}`, detail: [`Invasion ${short(i)}`, `Budget ${fmtInt(b)} stériles`, `n = ${g.length} répétitions`] });
+      label: `${CROP_LABEL[crop]} · ${s.label}`, detail: [`Inoculum ${short(i).toLowerCase()}`, `Budget ${fmtInt(b)} stériles`, `n = ${g.length} répétitions`] });
   }
   const frontier = paretoFront(pts);
 
@@ -84,7 +84,7 @@ export function AnalysisSuite({ data, meta, source, exportPrefix, planHint, asid
   const strip = cols.map((s) => ({ s, vals: sub.filter((r) => r.Invasion === inv && is(r, s) && (s.control || Number(r.Budget) === budget)).map((r) => val(r)) }));
 
   const fixed = [
-    invasions.length === 1 && `invasion ${short(invasions[0])}`,
+    invasions.length === 1 && `inoculum ${short(invasions[0]).toLowerCase()}`,
     tis.length === 1 && `budget ${fmtInt(tis[0])}`,
     regimes.length === 1 && `régime ${meta.remating[regimes[0]]?.short ?? regimes[0]}`,
   ].filter(Boolean) as string[];
@@ -115,14 +115,14 @@ export function AnalysisSuite({ data, meta, source, exportPrefix, planHint, asid
       <Panel className="mt-4 px-5 py-4">
         <PanelTitle sub={`${CROP_LABEL[crop]} · régime ${remating} · moyenne ± écart-type (n = ${nRep} répétitions par case)${control ? " · témoin : budget 0" : ""}`}
           right={<ChartExportMenu getSvg={() => hmRef.current} meta={{ title: `Matrice décisionnelle — ${m.label} (${CROP_LABEL[crop]})`, filename: `${exportPrefix}heatmap-${crop}-${metric}`, caption: `${source}, régime ${remating}, moyenne de ${nRep} répétitions. ${m.unit}.` }} />}>
-          Heatmap : invasion × budget × stratégie</PanelTitle>
+          Heatmap : inoculum de départ × budget × stratégie</PanelTitle>
         {hmRows.length ? (
           <div className="mt-3"><Heatmap ref={hmRef} rows={hmRows.map(({ i, b }) => `${short(i)} · ${fmtInt(b)}`)} cols={cols.map((s) => (s.control ? "Témoin" : s.short))}
             values={hm.map((r) => r.map((c) => (c.n ? c.mean : null)))} sd={hm.map((r) => r.map((c) => (c.n ? c.sd : null)))}
             domain={[0, m.unit.startsWith("%") ? Math.min(100, Math.ceil(hmMax / 5) * 5) : hmMax]} palette={m.palette} unit={m.unit.startsWith("%") ? "%" : "larves"}
             ariaLabel={`Heatmap ${m.label}`} colGroupLabel="Stratégie de distribution (budget identique par ligne)" /></div>
         ) : <Missing>Aucun scénario avec lâchers dans ces données.</Missing>}
-        {hmRows.length === 1 && <Missing>Une seule ligne : ce plan n’a qu’une invasion et qu’un budget. {planHint}</Missing>}
+        {hmRows.length === 1 && <Missing>Une seule ligne : ce plan n’a qu’un inoculum de départ et qu’un budget. {planHint}</Missing>}
       </Panel>
 
       {crops.length > 1 && <CropComparison data={data} meta={meta} metric={metric} remating={remating} invasion={inv} budget={budget} exportPrefix={exportPrefix} source={source} />}
@@ -130,8 +130,8 @@ export function AnalysisSuite({ data, meta, source, exportPrefix, planHint, asid
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
         <Panel className="px-5 py-4">
           <PanelTitle sub="Intensité de l'intervention (mâles stériles / saison) → réponse modélisée · barres : ± écart-type"
-            right={<div className="flex items-center gap-2">{invasions.length > 1 && <div className="w-40"><Select label="Invasion" value={inv} onChange={setInvasion} options={invasions.map((i) => ({ value: i, label: short(i) }))} /></div>}
-              <ChartExportMenu getSvg={() => drRef.current} meta={{ title: `Dose-réponse — ${m.label} (${CROP_LABEL[crop]}, invasion ${short(inv)})`, filename: `${exportPrefix}dose-reponse-${crop}`, caption: `${source}. ${control ? "Budget 0 = témoin sans TIS, commun à toutes les stratégies. " : ""}Moyenne ± écart-type, ${nRep} répétitions, régime ${remating}.` }} /></div>}>
+            right={<div className="flex items-center gap-2">{invasions.length > 1 && <div className="w-40"><Select label="Inoculum de départ" value={inv} onChange={setInvasion} options={invasions.map((i) => ({ value: i, label: short(i) }))} /></div>}
+              <ChartExportMenu getSvg={() => drRef.current} meta={{ title: `Dose-réponse — ${m.label} (${CROP_LABEL[crop]}, inoculum ${short(inv).toLowerCase()})`, filename: `${exportPrefix}dose-reponse-${crop}`, caption: `${source}. ${control ? "Budget 0 = témoin sans TIS, commun à toutes les stratégies. " : ""}Moyenne ± écart-type, ${nRep} répétitions, régime ${remating}.` }} /></div>}>
             Courbes dose-réponse</PanelTitle>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px]">{dose.map((d) => <span key={d.id} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: d.color }} />{d.label}</span>)}</div>
           {dose.some((d) => d.x.length) ? (
@@ -155,9 +155,9 @@ export function AnalysisSuite({ data, meta, source, exportPrefix, planHint, asid
 
       <div className={`mt-4 grid gap-4 ${aside ? "xl:grid-cols-2" : ""}`} style={aside ? undefined : { maxWidth: 880 }}>
         <Panel className="px-5 py-4">
-          <PanelTitle sub={`Valeurs de chaque répétition (points) et moyenne (trait) · invasion ${short(inv)}`}
+          <PanelTitle sub={`Valeurs de chaque répétition (points) et moyenne (trait) · inoculum ${short(inv).toLowerCase()}`}
             right={<div className="flex items-center gap-2">{tis.length > 1 && <div className="w-64"><Segmented size="sm" label="Budget" value={String(budget)} onChange={(v) => setBudget(Number(v))} options={tis.map((b) => ({ value: String(b), label: fmtInt(b) }))} /></div>}
-              <ChartExportMenu getSvg={() => stRef.current} meta={{ title: `Distribution des répétitions — ${m.label}`, filename: `${exportPrefix}repetitions-${crop}`, caption: `${source}. Invasion ${short(inv)}, budget ${fmtInt(budget)}, régime ${remating}.` }} /></div>}>
+              <ChartExportMenu getSvg={() => stRef.current} meta={{ title: `Distribution des répétitions — ${m.label}`, filename: `${exportPrefix}repetitions-${crop}`, caption: `${source}. Inoculum ${short(inv).toLowerCase()}, budget ${fmtInt(budget)}, régime ${remating}.` }} /></div>}>
             Incertitude entre répétitions</PanelTitle>
           <StripPlot ref={stRef} data={strip.map(({ s, vals }) => ({ label: s.control ? "Témoin" : s.short, color: s.color, values: vals }))} unit={m.unit} />
           <p className="text-[11.5px] text-muted">Avec {nRep} répétitions, ni quartiles ni intervalles de confiance ne sont calculés : les valeurs individuelles sont affichées.</p>
@@ -193,7 +193,7 @@ function Missing({ children }: { children: ReactNode }) {
 
 /** Lien « dupliquer en plan » pour compléter les dimensions manquantes d'une expérience. */
 export function PlanHint({ id }: { id: string }) {
-  return <Link className="text-forest underline" to={`/simulation?from=${id}&plan=1`}>Dupliquer en plan (plusieurs budgets, invasions, régimes)</Link>;
+  return <Link className="text-forest underline" to={`/simulation?from=${id}&plan=1`}>Dupliquer en plan (plusieurs budgets, inoculums, régimes)</Link>;
 }
 
 export const StripPlot = forwardRef<SVGSVGElement, { data: { label: string; color: string; values: number[] }[]; unit: string }>(function StripPlot({ data, unit }, ref) {
@@ -254,8 +254,8 @@ function PolyMonoSection({ rows, meta, metric, crops, invasions, budgets, strate
           <p className="font-serif text-[13.5px] text-muted">Effet du régime de réaccouplement des femelles sur « {ind.label} » · {nRep} répétitions par point · figure 1 du notebook</p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
-          {invasions.length > 1 && <div className="w-64 text-[12px]"><span className="text-muted">Invasion</span>
-            <Segmented size="sm" label="Invasion" value={invasion} onChange={setInv} options={invasions.map((i) => ({ value: i, label: short(i) }))} /></div>}
+          {invasions.length > 1 && <div className="w-64 text-[12px]"><span className="text-muted">Inoculum de départ</span>
+            <Segmented size="sm" label="Inoculum de départ" value={invasion} onChange={setInv} options={invasions.map((i) => ({ value: i, label: short(i) }))} /></div>}
           {budgets.length > 1 && <div className="w-64 text-[12px]"><span className="text-muted">Budget (mâles stériles / saison)</span>
             <Segmented size="sm" label="Budget" value={String(b)} onChange={(v) => setBudget(Number(v))} options={budgets.map((x) => ({ value: String(x), label: fmtInt(x) }))} /></div>}
         </div>
@@ -277,7 +277,7 @@ function PolyMonoSection({ rows, meta, metric, crops, invasions, budgets, strate
           return (
             <section key={crop} aria-label={c.label}>
               <h3 className="font-serif text-[17px] font-semibold">{c.label} <span className="text-[13px] font-normal italic text-muted">{c.latin}</span></h3>
-              <DodgedStrip crop={crop} data={d} ind={ind} exportPrefix={exportPrefix} title={`${ind.label} — ${c.label}, invasion ${short(invasion)}, budget ${fmtInt(b)}`} />
+              <DodgedStrip crop={crop} data={d} ind={ind} exportPrefix={exportPrefix} title={`${ind.label} — ${c.label}, inoculum ${short(invasion).toLowerCase()}, budget ${fmtInt(b)}`} />
               <table className="mt-2 w-full text-[12.5px]">
                 <caption className="sr-only">Moyennes par régime et écart</caption>
                 <thead><tr className="border-b border-line text-left text-[11.5px] text-muted">
@@ -380,8 +380,8 @@ function DecisionSynthesis({ data, meta, metric, invasion, setInvasion, budget, 
           <p className="font-serif text-[13.5px] text-muted">Stratégie en tête pour « {ind.label} » {ind.higherIsBetter ? "(plus haut = meilleur)" : "(plus bas = meilleur)"}, calculée sur ces données · {data.nRep} répétitions par scénario</p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
-          {data.invasions.length > 1 && <div className="w-64 text-[12px]"><span className="text-muted">Invasion</span>
-            <Segmented size="sm" label="Invasion (synthèse)" value={invasion} onChange={setInvasion} options={data.invasions.map((i) => ({ value: i, label: short(i) }))} /></div>}
+          {data.invasions.length > 1 && <div className="w-64 text-[12px]"><span className="text-muted">Inoculum de départ</span>
+            <Segmented size="sm" label="Inoculum de départ (synthèse)" value={invasion} onChange={setInvasion} options={data.invasions.map((i) => ({ value: i, label: short(i) }))} /></div>}
           {budgets.length > 1 && <div className="w-64 text-[12px]"><span className="text-muted">Budget (stériles / saison)</span>
             <Segmented size="sm" label="Budget (synthèse)" value={String(budget)} onChange={(x) => setBudget(Number(x))} options={budgets.map((b) => ({ value: String(b), label: fmtInt(b) }))} /></div>}
         </div>
@@ -428,7 +428,7 @@ function DecisionSynthesis({ data, meta, metric, invasion, setInvasion, budget, 
         </table>
       </div>
       <p className="mt-2 text-[11.5px] leading-relaxed text-muted">
-        Invasion {short(invasion)}. Lecture descriptive, sans test statistique : un écart est « net » quand il dépasse la somme des écarts-types des deux
+        Inoculum de départ : {short(invasion).toLowerCase()}. Lecture descriptive, sans test statistique : un écart est « net » quand il dépasse la somme des écarts-types des deux
         premières stratégies ; sinon, leur classement peut s’inverser d’un jeu de répétitions à l’autre. Ces résultats portent sur le modèle simulé, pas
         sur des parcelles réelles.
       </p>
@@ -456,8 +456,8 @@ function CropComparison({ data, meta, metric, remating, invasion, budget, export
   const pct = ind.unit.startsWith("%");
   return (
     <Panel className="mt-4 px-5 py-4">
-      <PanelTitle sub={`Même stratégie, même invasion (${short(invasion)}), même budget (${fmtInt(budget)}), régime ${meta.remating[remating]?.short ?? remating} · moyenne ± écart-type, ${data.nRep} répétitions`}
-        right={<ChartExportMenu getSvg={() => ref.current} meta={{ title: `Fraise vs cerise — ${ind.label}`, filename: `${exportPrefix}fraise-vs-cerise-${metric}`, caption: `${source}. ${ind.label} (${ind.unit}), invasion ${short(invasion)}, budget ${fmtInt(budget)}, régime ${remating}. Barres : moyenne ; traits : ± écart-type.` }} />}>
+      <PanelTitle sub={`Même stratégie, même inoculum de départ (${short(invasion).toLowerCase()}), même budget (${fmtInt(budget)}), régime ${meta.remating[remating]?.short ?? remating} · moyenne ± écart-type, ${data.nRep} répétitions`}
+        right={<ChartExportMenu getSvg={() => ref.current} meta={{ title: `Fraise vs cerise — ${ind.label}`, filename: `${exportPrefix}fraise-vs-cerise-${metric}`, caption: `${source}. ${ind.label} (${ind.unit}), inoculum ${short(invasion).toLowerCase()}, budget ${fmtInt(budget)}, régime ${remating}. Barres : moyenne ; traits : ± écart-type.` }} />}>
         Fraise vs cerise, par stratégie</PanelTitle>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px]">{data.crops.map((c) => <span key={c} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: CROP_COLOR[c] }} />{meta.crops[c as "strawberry"]?.label ?? c}</span>)}</div>
       <svg ref={ref} viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`Comparaison fraise et cerise, ${ind.label}`}>

@@ -41,7 +41,7 @@ COLS = {  # colonnes du CSV du notebook -> métriques du moteur
 
 
 def tasks(n_reps: int):
-    invasions = {p["label"]: p for p in INVASION_PRESETS.values()}           # Faible, Moyenne, Forte (ordre du notebook)
+    invasions = {p["nb_label"]: p for p in INVASION_PRESETS.values()}        # Faible, Moyenne, Forte (noms et effectifs du notebook)
     budgets = [b * ECHELLE for b in (0, 150, 300, 600)]
     for crop in (STRAWBERRY, CHERRY):
         for inv_name, pop in invasions.items():

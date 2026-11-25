@@ -50,7 +50,8 @@ export function Parameters() {
   const groups = meta.biology_groups;
   const cats = [{ value: "all", label: "Tous" }, ...groups.map((g) => ({ value: g.key, label: g.label.replace(" (désactivées par défaut)", "") })),
     { value: "cultures", label: "Cultures" }, { value: "constantes", label: "Constantes fixes" }];
-  const shown = meta.biology.filter((p) => cat === "all" || p.group === cat);
+  // L'immigration se règle par culture (Studio, section « Immigration quotidienne ») : pas dans les réglages globaux
+  const shown = meta.biology.filter((p) => (cat === "all" || p.group === cat) && !p.name.startsWith("immigration_"));
   const exportJson = () => {
     const doc = JSON.parse(parametersJson(meta));
     doc.current = values;   // valeurs choisies sur cette page
@@ -133,10 +134,19 @@ export function Parameters() {
               ))}</tbody>
             </table>
           </div>
-          <h3 className="mt-4 text-[13.5px] font-semibold">Invasions initiales (préréglages)</h3>
+          <h3 className="mt-4 text-[13.5px] font-semibold">Inoculum de départ (préréglages)</h3>
           <div className="mt-2 grid gap-2 sm:grid-cols-3">{Object.entries(meta.invasions).map(([k, v]) => (
             <div key={k} className="rounded-md border border-line bg-white px-3 py-2 text-[12.5px]"><strong>{v.label.split(" (")[0]}</strong>
-              <div className="tnum text-muted">{fmtInt(v.wild)} mâles sauvages, {fmtInt(v.females)} femelles à J0</div></div>
+              {v.by_crop
+                ? <>{Object.entries(v.by_crop).map(([c, n]) => <div key={c} className="tnum text-muted">{CROP_LABEL[c]} : {fmtInt(n.wild)} mâles, {fmtInt(n.females)} femelles à J0</div>)}
+                    <div className="mt-1 text-[11px] leading-snug text-muted">{v.description} Plan factoriel du notebook : {fmtInt(v.wild)} + {fmtInt(v.females)}.</div></>
+                : <div className="tnum text-muted">{fmtInt(v.wild)} mâles sauvages, {fmtInt(v.females)} femelles à J0</div>}
+            </div>
+          ))}</div>
+          <h3 className="mt-4 text-[13.5px] font-semibold">Immigration quotidienne proposée <span className="font-normal text-muted">(hors notebook, désactivée par défaut ; à activer dans le Studio)</span></h3>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">{Object.entries(meta.immigration_defaults ?? {}).map(([c, n]) => (
+            <div key={c} className="rounded-md border border-line bg-white px-3 py-2 text-[12.5px]"><strong>{CROP_LABEL[c]}</strong>
+              <div className="tnum text-muted">{n.wild} mâles sauvages et {n.females} femelles fécondées par jour, à partir de J1</div></div>
           ))}</div>
         </Panel>
       )}

@@ -7,7 +7,7 @@ import { useMeta } from "../lib/meta";
 import { CROP_LABEL, fmt, fmtDate, fmtInt } from "../lib/format";
 import { CROP_COLOR, STRATEGY_COLOR } from "../lib/colors";
 import { METRIC } from "../lib/variables";
-import { invasionLabel, invasionShort, planSize, scenarioLabel } from "../lib/analysis";
+import { activeExtensions, invasionFor, invasionLabel, invasionShort, planSize, scenarioLabel } from "../lib/analysis";
 import { StudyHeader } from "../components/layout";
 import { Button, EmptyState, Panel, PanelTitle, Select, Skeleton } from "../components/ui";
 import { TimeSeriesChart } from "../components/charts/TimeSeriesChart";
@@ -98,7 +98,11 @@ export function Publications() {
           {has("Protocole expérimental") && <>{H("Protocole expérimental")}
             <ul className="list-disc pl-6"><li>Cultures : {crops.map((c) => meta.crops[c].label).join(", ")}.</li>
               <li>Stratégies : {Array.from(new Set(res.scenarios.filter((s) => s.crop === crops[0]).map((s) => s.strategy_label))).join(", ")}.</li>
-              <li>Invasion initiale : {planSize(exp.config).invasions.map((i) => `${invasionLabel(i, meta).split(" (")[0]} (${fmtInt(i.wild)} mâles sauvages et ${fmtInt(i.females)} femelles)`).join(" ; ")}.</li>
+              <li>Inoculum de départ : {planSize(exp.config).invasions.map((i) => `${invasionLabel(i, meta).split(" (")[0]} (${i.by_crop
+                ? crops.map((c) => { const n = invasionFor(i, c); return `${meta.crops[c].label.toLowerCase()} : ${fmtInt(n.wild)} mâles sauvages et ${fmtInt(n.females)} femelles`; }).join(" ; ")
+                : `${fmtInt(i.wild)} mâles sauvages et ${fmtInt(i.females)} femelles`})`).join(" ; ")}.</li>
+              <li>Immigration quotidienne : {activeExtensions(exp.config.biology, exp.config.immigration, exp.config.crops).filter((x) => x.startsWith("immigration")).join(" ; ") || "aucune (parcelle fermée, comme le notebook)"}.</li>
+              {activeExtensions(exp.config.biology, exp.config.immigration, exp.config.crops).filter((x) => !x.startsWith("immigration")).length > 0 && <li>Extensions hors notebook actives : {activeExtensions(exp.config.biology, exp.config.immigration, exp.config.crops).filter((x) => !x.startsWith("immigration")).join(" ; ")}.</li>}
               <li>Réaccouplement : {planSize(exp.config).rematings.map((k) => meta.remating[k]?.label ?? k).join(", ")}. Répétitions : {exp.config.replicates} (graines {exp.config.seed} + 1000·r, communes à tous les scénarios).</li></ul></>}
           {has("Paramètres") && <>{H("Paramètres")}
             <table className="w-full font-sans text-[12px]"><tbody>{meta.biology.map((p) => (
@@ -127,7 +131,7 @@ export function Publications() {
           {has("Conclusion descriptive") && <>{H("Conclusion descriptive")}{crops.flatMap((c) => cellsOf(res, c).map((cell, ci) => { const d = describe(cell); if (!d) return null;
             const L = (x: Scenario) => scenarioLabel(x, exp.config, meta).split(" · ").slice(1).join(" · ");
             const c0 = cell[0];
-            const where = cellsOf(res, c).length > 1 ? ` (${[c0.invasion && planSize(exp.config).invasions.length > 1 ? `invasion ${invasionShort(invasionLabel(c0.invasion, meta)).toLowerCase()}` : "", c0.remating && planSize(exp.config).rematings.length > 1 ? meta.remating[c0.remating]?.short.toLowerCase() : ""].filter(Boolean).join(", ")})` : "";
+            const where = cellsOf(res, c).length > 1 ? ` (${[c0.invasion && planSize(exp.config).invasions.length > 1 ? `inoculum ${invasionShort(invasionLabel(c0.invasion, meta)).toLowerCase()}` : "", c0.remating && planSize(exp.config).rematings.length > 1 ? meta.remating[c0.remating]?.short.toLowerCase() : ""].filter(Boolean).join(", ")})` : "";
             return (
             <p key={c + ci}><strong>{meta.crops[c].label}{where}.</strong> Sur ces {d.n} répétitions, les dommages larvaires moyens les plus faibles sont observés avec « {L(d.lo)} » ({fmt(d.lo.metrics.larval_damage_pct.mean, 2)} % des fruits) et les plus élevés parmi les stratégies TIS avec « {L(d.hi)} » ({fmt(d.hi.metrics.larval_damage_pct.mean, 2)} %){d.ctrl ? `, contre ${fmt(d.ctrl.metrics.larval_damage_pct.mean, 2)} % pour le témoin de la même ${planSize(exp.config).invasions.length > 1 || planSize(exp.config).rematings.length > 1 ? "cellule" : "expérience"}` : ""}. Les pourris par piqûres stériles seules vont de {fmt(d.stLo.metrics.rotten_sterile_only_pct.mean, 2)} % (« {L(d.stLo)} ») à {fmt(d.stHi.metrics.rotten_sterile_only_pct.mean, 2)} % (« {L(d.stHi)} »). Ces constats sont descriptifs et propres aux hypothèses du modèle.</p>); }))}</>}
           {has("Métadonnées de reproductibilité") && <>{H("Métadonnées de reproductibilité")}

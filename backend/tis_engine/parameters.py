@@ -16,14 +16,31 @@ MAX_REPLICATES = 50
 # Valeur proposée par défaut dans le Studio (1.8.0) ; le minimum accepté reste MIN_REPLICATES
 DEFAULT_REPLICATES = 20
 
-PARAMS_VERSION = "nb-2025.10-echelle30-ext1"   # ext1 (1.9.0) : + 5 paramètres d'extension, désactivés ; valeurs du notebook inchangées
-SCHEMA_VERSION = 2   # 2 (1.9.0) : plans, extensions, champs par scénario, nouvelles séries et métriques
+PARAMS_VERSION = "nb-2025.10-echelle30-ext2"   # ext1 (1.9.0) : + 5 paramètres d'extension ; ext2 (1.10.0) : inoculum fort par culture, immigration par culture
+SCHEMA_VERSION = 3   # 2 (1.9.0) : plans, extensions… ; 3 (1.10.0) : invasion.by_crop, immigration par culture
 
+# Inoculum fort par culture (1.10.0) : population d'adultes sauvages du témoin sans lâcher en fin de
+# saison, partie de l'inoculum modéré (moyenne de 20 répétitions) — voir tis_engine/calibration.py.
+# Vérifié par tests/test_regression.py::test_fort_inoculum_matches_calibration.
+FORT_BY_CROP = {"strawberry": {"wild": 621, "females": 621}, "cherry": {"wild": 6638, "females": 6639}}
+
+# Inoculum de départ (nom demandé par Marine Courtois et son encadrante ; « invasion » dans le
+# notebook). Clés et effectifs « wild »/« females » inchangés : le plan factoriel du notebook
+# (« nb_label ») garde ses 900 W : 900 F pour l'inoculum fort ; les expériences de l'application
+# utilisent « by_crop » quand il existe.
 INVASION_PRESETS = {
-    "faible": {"label": f"Faible ({3 * ECHELLE} W : {3 * ECHELLE} F)", "wild": 3 * ECHELLE, "females": 3 * ECHELLE},
-    "moyenne": {"label": f"Moyenne ({10 * ECHELLE} W : {10 * ECHELLE} F)", "wild": 10 * ECHELLE, "females": 10 * ECHELLE},
-    "forte": {"label": f"Forte ({30 * ECHELLE} W : {30 * ECHELLE} F)", "wild": 30 * ECHELLE, "females": 30 * ECHELLE},
+    "faible": {"label": f"Faible ({3 * ECHELLE} W : {3 * ECHELLE} F)", "nb_label": f"Faible ({3 * ECHELLE} W : {3 * ECHELLE} F)",
+               "wild": 3 * ECHELLE, "females": 3 * ECHELLE},
+    "moyenne": {"label": f"Modéré ({10 * ECHELLE} W : {10 * ECHELLE} F)", "nb_label": f"Moyenne ({10 * ECHELLE} W : {10 * ECHELLE} F)",
+                "wild": 10 * ECHELLE, "females": 10 * ECHELLE},
+    "forte": {"label": "Fort (pic du témoin)", "nb_label": f"Forte ({30 * ECHELLE} W : {30 * ECHELLE} F)",
+              "wild": 30 * ECHELLE, "females": 30 * ECHELLE, "by_crop": FORT_BY_CROP,
+              "description": "Population d'adultes sauvages qu'atteint le témoin sans lâcher en fin de saison, partie de "
+                             "l'inoculum modéré (moyenne de 20 répétitions), propre à chaque culture."},
 }
+
+# Immigration quotidienne proposée par Marine (extension hors notebook, désactivée par défaut)
+IMMIGRATION_DEFAULTS = {"strawberry": {"wild": 15, "females": 15}, "cherry": {"wild": 8, "females": 8}}
 
 BUDGET_PRESETS = [b * ECHELLE for b in (0, 150, 300, 600)]  # cellule 6 : BUDGETS
 
@@ -248,6 +265,7 @@ def registry() -> dict:
         "strategies": STRATEGY_META,
         "remating": REMATING_META,
         "invasions": INVASION_PRESETS,
+        "immigration_defaults": IMMIGRATION_DEFAULTS,
         "budget_presets": BUDGET_PRESETS,
         "biology": [
             {"name": k, "label": PARAM_UI[k][0], "group": PARAM_UI[k][1], "symbol": v[0], "unit": v[1], "default": v[2],
