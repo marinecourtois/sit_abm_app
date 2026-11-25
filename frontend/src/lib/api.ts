@@ -48,6 +48,8 @@ export interface Meta {
   model_constants: { eggs_poisson_mean: number; eggs_max_per_day: number; fruits_per_clutch_max: number; refractory_fertile: [number, number];
     refractory_sterile: [number, number]; larval_emergence: [number, number]; larval_mortality: { p: number; days: [number, number] }[]; sex_ratio: number; scale: number };
   limits: Record<string, [number, number]>;
+  /** Répétitions proposées par défaut dans le Studio (1.8.0). */
+  default_replicates?: number;
   versions: Record<string, string | number>; workers: number;
   reference_plan: { crops: number; invasions: string[]; budgets: number[]; remating: string[]; strategies: number; replicates: number; seasons: number; sha256: string };
 }

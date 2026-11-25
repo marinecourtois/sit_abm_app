@@ -3,7 +3,9 @@ import { useMeta } from "../lib/meta";
 import { fmtInt } from "../lib/format";
 import type { Meta } from "../lib/api";
 import { StudyHeader, StudyTabs } from "../components/layout";
-import { Panel, Tex } from "../components/ui";
+import { Button, Panel, Tex } from "../components/ui";
+import { Download } from "../icons";
+import { downloadText } from "../components/charts/exportChart";
 import { ResearchAnnotation } from "../components/science";
 
 const SECTIONS = [["hypotheses", "Hypothèses"], ["parametres", "Paramètres"], ["modele", "Modèle"], ["methodologie", "Méthodologie"], ["limites", "Limites"], ["references", "Références"]];
@@ -152,9 +154,22 @@ export function Protocol() {
         <nav aria-label="Sommaire" className="no-print lg:sticky lg:top-6 lg:self-start">
           <ol className="space-y-1 text-[13.5px]">{SECTIONS.map(([id, l], i) => <li key={id}><a href={`#${id}`} className="flex gap-2 rounded px-2 py-1 hover:bg-sage-soft"><span className="text-muted tnum">{i + 1}.</span>{l}</a></li>)}</ol>
           <div className="mt-4 rounded border border-line bg-white px-3 py-2 text-[11.5px] text-muted">Moteur {meta?.engine_version}<br />Paramètres {meta?.params_version}<br />Schéma v{meta?.schema_version}</div>
+          {meta && <Button size="sm" className="mt-3 w-full" icon={<Download size={13} />} onClick={() => downloadText(parametersJson(meta), `parametres-${meta.params_version}.json`, "application/json")}>Paramètres (JSON)</Button>}
         </nav>
         <Panel className="px-6 py-8 sm:px-10">{meta ? <ProtocolViewer meta={meta} /> : <div className="skeleton h-96" />}</Panel>
       </div>
     </>
   );
+}
+
+/** Tous les paramètres du modèle tels que le moteur les utilise : biologie (valeur du notebook,
+ *  plage admise, unité, source), constantes fixes, constantes du modèle et paramètres des cultures. */
+export function parametersJson(meta: Meta): string {
+  return JSON.stringify({
+    format: "modelly-tis-parameters", params_version: meta.params_version, engine_version: meta.engine_version,
+    biology: meta.biology.map((p) => ({ name: p.name, label: p.label, group: p.group, symbol: p.symbol, unit: p.unit, default: p.default, min: p.min, max: p.max, source: p.source, description: p.description })),
+    fixed_constants: meta.fixed_constants, model_constants: meta.model_constants,
+    crops: Object.fromEntries(Object.entries(meta.crops).map(([k, c]) => [k, { label: c.label, latin: c.latin, params: c.params }])),
+    invasions: meta.invasions, budget_presets: meta.budget_presets, limits: meta.limits,
+  }, null, 2);
 }

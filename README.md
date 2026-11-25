@@ -1,6 +1,6 @@
 # Modelly TIS Research
 
-**Version 1.7.0** · [journal des versions](CHANGELOG.md)
+**Version 1.8.0** · [journal des versions](CHANGELOG.md)
 
 Application web scientifique pour **simuler, comparer et documenter des stratégies de
 Technique de l'Insecte Stérile (TIS)** sur deux systèmes agricoles : la fraise
@@ -30,9 +30,10 @@ Au premier démarrage, l'API lance automatiquement l'**étude de référence** a
 vue d'ensemble (2 cultures × 5 stratégies + témoin, invasion Moyenne, 9 000 stériles,
 10 répétitions, graine 42). Le calcul dure quelques secondes ; la page se met à jour seule.
 
-**Minimum de l'étude : 10 répétitions par scénario** (`MIN_REPLICATES`, `backend/tis_engine/parameters.py`).
-La page Analyses utilise le plan factoriel du notebook recalculé à 10 répétitions (`make factorial`,
-environ 5 minutes) ; les 576 saisons déjà calculées par le notebook y sont identiques au bit près.
+**Minimum de l'étude : 10 répétitions par scénario** (`MIN_REPLICATES`, `backend/tis_engine/parameters.py`) ;
+le Studio en propose **20** par défaut (`DEFAULT_REPLICATES`).
+La page Analyses utilise le plan factoriel du notebook recalculé à 20 répétitions (`make factorial`,
+`REPS=20` par défaut) ; les 576 saisons déjà calculées par le notebook y sont identiques au bit près.
 
 | Commande | Effet |
 |---|---|
@@ -56,7 +57,7 @@ Arrêter le serveur : `Ctrl+C`, ou `pkill -f "uvicorn app.main:app"` s'il tourne
 | **Expériences** | Liste, recherche, filtres, regroupement par projet, métadonnées de reproductibilité, duplication, exports, **archive de reproductibilité (.zip)**, import de protocole, suppression. |
 | **Simulation** | *Studio* : configuration en Mode Essentiel ou Avancé, **plan d'expérience** (plusieurs budgets, invasions et régimes croisés dans une même expérience) (paramètres groupés par thème, curseurs avec repère de la valeur du notebook, régime de réaccouplement avec sa formule), validation scientifique, durée estimée à partir des exécutions mesurées, aperçu des calendriers de lâchers. *Live* : suivi en direct, temps écoulé et restant (débit mesuré), progression dans le titre de l'onglet, notification de fin, frise chronologique, calendrier, événements, annulation. **Analyses de l'expérience** : les graphiques de la page Analyses (heatmap, dose-réponse, Pareto, incertitude, polyandrie vs monandrie) calculés sur ses propres répétitions, et l'effet apparié vs témoin. |
 | **Comparaison** | 2 à 4 scénarios : courbes superposées ou séparées, normalisation explicite, axes synchronisés, incertitude, tableau ordonné selon un critère choisi. |
-| **Résultats** | Plan factoriel du notebook recalculé à 10 répétitions : heatmaps, dose-réponse, front de Pareto, distribution des répétitions, **polyandrie vs monandrie** ; chaque indicateur affiche sa définition exacte. |
+| **Résultats** | Plan factoriel du notebook recalculé à 20 répétitions : **synthèse décisionnelle** (stratégie en tête par culture et régime, écart au témoin), **fraise vs cerise**, heatmaps, dose-réponse, front de Pareto, distribution des répétitions, **polyandrie vs monandrie** ; chaque indicateur affiche sa définition exacte. |
 | **Publications** | Rapport scientifique structuré (12 sections) imprimable en PDF, exports CSV/JSON. |
 | **Protocole** | Hypothèses, paramètres, équations (KaTeX), méthodologie, limites, références. |
 | *Partout* | **Palette de commandes** (`Ctrl K` / `⌘ K`) pour ouvrir une page ou une expérience ; **indicateur d'activité** des calculs en cours dans la barre latérale ; version de l'application et du moteur. |

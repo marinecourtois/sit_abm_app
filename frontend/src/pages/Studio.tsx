@@ -223,7 +223,7 @@ export function SimulationConfigurator() {
     const from = sp.get("from");
     const base: ExperimentConfig = { crops: ["strawberry", "cherry"], strategies: [{ key: "every_3" }, { key: "every_7" }],
       invasion: { preset: "moyenne", wild: meta.invasions.moyenne.wild, females: meta.invasions.moyenne.females },
-      budget: 9000, remating: "preference", replicates: meta.limits.replicates[0], seed: 42, include_control: true, biology: { ...meta.biology_defaults } };
+      budget: 9000, remating: "preference", replicates: meta.default_replicates ?? meta.limits.replicates[0], seed: 42, include_control: true, biology: { ...meta.biology_defaults } };
     if (from) api.experiment(from).then((e) => { setCfg(e.config); setName(`${e.name} (variante)`); setProject(e.project); setParent(e.id); if (planSize(e.config).budgets.length > 1 || e.config.invasions?.length || e.config.rematings?.length) setPlanOpen(true); }).catch(() => setCfg(base));
     else setCfg(base);
   }, [meta]);

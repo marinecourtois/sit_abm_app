@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Experiment, ExperimentConfig, Meta, Results, Scenario } from "./api";
-import { METRIC_COLUMN, datasetFromReference, datasetFromResults, paretoFront, planSize, scenarioLabel } from "./analysis";
+import { METRIC_COLUMN, datasetFromReference, datasetFromResults, paretoFront, planSize, scenarioLabel, synthesize } from "./analysis";
 import { INDICATOR } from "./indicators";
 import metaJson from "../test/fixtures/meta.json";
 
@@ -81,5 +81,42 @@ describe("plan et libellés", () => {
   });
   it("front de Pareto : points non dominés seulement", () => {
     expect(paretoFront([{ id: "a", x: 1, y: 5 }, { id: "b", x: 2, y: 2 }, { id: "c", x: 3, y: 3 }, { id: "d", x: 5, y: 1 }])).toEqual(["a", "b", "d"]);
+  });
+});
+
+describe("synthèse décisionnelle", () => {
+  const S = (id: string, control = false) => ({ id, label: id, short: id, color: "#000", control });
+  const rows = (crop: string, remating: string, strategy: string, budget: number, vals: number[]) =>
+    vals.map((v, i) => ({ Crop: crop, Invasion: "Moyenne (300 W : 300 F)", Budget: budget, Remating: remating, Strategy: strategy, Replicate: i, "Harvested - clean (%)": v }));
+  const data = {
+    rows: [
+      ...rows("strawberry", "preference", "no_tis", 0, [50, 52]), ...rows("strawberry", "preference", "every_3", 9000, [88, 90]), ...rows("strawberry", "preference", "front_100", 9000, [70, 72]),
+      ...rows("cherry", "preference", "no_tis", 0, [30, 30]), ...rows("cherry", "preference", "every_3", 9000, [60, 61]), ...rows("cherry", "preference", "front_100", 9000, [66, 67]),
+      ...rows("strawberry", "first", "no_tis", 0, [50, 52]), ...rows("strawberry", "first", "every_3", 9000, [80, 82]), ...rows("strawberry", "first", "front_100", 9000, [81, 82]),
+      ...rows("strawberry", "preference", "every_3", 4500, [99, 99]),
+    ],
+    strategies: [S("no_tis", true), S("every_3"), S("front_100")],
+    crops: ["strawberry", "cherry"], invasions: ["Moyenne (300 W : 300 F)"], budgets: [0, 4500, 9000], regimes: ["preference", "first"], nRep: 2,
+  };
+  const syn = synthesize(data, INDICATOR.harvested_clean_pct.value, true, "Moyenne (300 W : 300 F)", 9000, (c) => c, (r) => r);
+
+  it("classe les stratégies au budget choisi et mesure l'écart au témoin", () => {
+    const fr = syn.cells.find((c) => c.crop === "strawberry" && c.remating === "preference")!;
+    expect(fr.ranking.map((r) => r.strategy.id)).toEqual(["every_3", "front_100"]);
+    expect(fr.gain).toBeCloseTo(89 - 51);
+    expect(fr.clear).toBe(true);
+    expect(fr.bestAnyBudget?.budget).toBe(4500);   // meilleure combinaison, tous budgets confondus
+  });
+  it("répond aux deux questions de l'étude à partir des données", () => {
+    expect(syn.byCrop).toBe("Stratégie en tête différente : strawberry → every_3 ; cherry → front_100.");
+    expect(syn.byRegime).toContain("strawberry : every_3 en preference, front_100 en first");
+  });
+  it("signale un écart inférieur à la variabilité entre répétitions", () => {
+    const mono = syn.cells.find((c) => c.crop === "strawberry" && c.remating === "first")!;
+    expect(mono.clear).toBe(false);   // 81,5 contre 81 : écart < somme des écarts-types
+  });
+  it("le sens de l'indicateur est respecté (plus bas = meilleur)", () => {
+    const low = synthesize(data, INDICATOR.harvested_clean_pct.value, false, "Moyenne (300 W : 300 F)", 9000, (c) => c, (r) => r);
+    expect(low.cells.find((c) => c.crop === "strawberry" && c.remating === "preference")!.ranking[0].strategy.id).toBe("front_100");
   });
 });

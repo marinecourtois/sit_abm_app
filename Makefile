@@ -33,8 +33,8 @@ test-smart:         ## Uniquement les tests affectés par les modifications non 
 test-all:           ## Tous les tests (backend + frontend) via SmartTest, avec rapport HTML
 	npx smarttest run --all
 
-factorial:          ## Recalcule le plan factoriel du notebook avec 10 répétitions (page Analyses, quelques minutes)
-	cd backend && .venv/bin/python scripts/factorial.py --reps 10
+factorial:          ## Recalcule le plan factoriel du notebook (REPS=20 par défaut ; page Analyses, une dizaine de minutes)
+	cd backend && .venv/bin/python scripts/factorial.py --reps $(REPS)
 
 fixtures:           ## Régénère l'instantané du registre utilisé par les tests du frontend
 	cd backend && .venv/bin/python -c "import json; from app.main import meta; print(json.dumps(meta(), ensure_ascii=False, indent=2))" > ../frontend/src/test/fixtures/meta.json
@@ -42,5 +42,7 @@ fixtures:           ## Régénère l'instantané du registre utilisé par les te
 modelly:            ## Réinstalle modelly depuis MODELLY_SRC (après une mise à jour du dépôt Modelly)
 	uv pip install --python $(PY) --reinstall --no-deps "$(MODELLY_SRC)"
 	$(PY) -c "import modelly; print('modelly', modelly.__version__)"
+
+REPS ?= 20
 
 .PHONY: install dev build serve test test-smart test-all factorial fixtures modelly

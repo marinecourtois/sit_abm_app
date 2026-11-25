@@ -13,6 +13,8 @@ from .model import (CHERRY, ECHELLE, EGGS_MAX_PER_DAY, EGGS_POISSON_MEAN, ENGINE
 # Répétitions par scénario : minimum de l'étude (exigence de robustesse statistique) et plafond technique
 MIN_REPLICATES = 10
 MAX_REPLICATES = 50
+# Valeur proposée par défaut dans le Studio (1.8.0) ; le minimum accepté reste MIN_REPLICATES
+DEFAULT_REPLICATES = 20
 
 PARAMS_VERSION = "nb-2025.10-echelle30"
 SCHEMA_VERSION = 1
@@ -219,5 +221,6 @@ def registry() -> dict:
         "biology_groups": [{"key": k, "label": l} for k, l in PARAM_GROUPS],
         "fixed_constants": FIXED_CONSTANTS,
         "model_constants": MODEL_CONSTANTS,
+        "default_replicates": DEFAULT_REPLICATES,
         "limits": {"replicates": [MIN_REPLICATES, MAX_REPLICATES], "budget": [0, 1_000_000], "wild": [0, 100_000], "females": [0, 100_000]},
     }

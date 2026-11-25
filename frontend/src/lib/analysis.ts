@@ -115,3 +115,73 @@ export function scenarioLabel(
   if (d.rematings.length > 1 && p.remating) parts.push(meta?.remating[p.remating]?.short ?? p.remating);
   return parts.join(" · ");
 }
+
+/* ---------------------------------------------------------------- Synthèse décisionnelle
+ * Réponses descriptives aux deux questions de l'étude, calculées sur les données affichées :
+ * la stratégie en tête diffère-t-elle entre fraise et cerise ? dépend-elle du régime de
+ * réaccouplement ? Aucun test statistique : un écart est dit « net » s'il dépasse la somme des
+ * écarts-types des deux stratégies comparées, sinon il est signalé comme inférieur à la
+ * variabilité entre répétitions. */
+export interface Ranked { strategy: AnalysisStrategy; mean: number; sd: number; n: number; budget: number }
+export interface SynthesisCell {
+  crop: string; remating: string;
+  ranking: Ranked[];               // stratégies traitées au budget choisi, la meilleure d'abord
+  control: { mean: number; sd: number; n: number } | null;
+  clear: boolean;                  // écart 1er − 2e supérieur à sd₁ + sd₂
+  gain: number | null;             // meilleure − témoin, dans l'unité de l'indicateur
+  bestAnyBudget: Ranked | null;    // meilleure combinaison stratégie × budget, tous budgets du plan
+}
+export interface Synthesis { cells: SynthesisCell[]; byCrop: string | null; byRegime: string | null }
+
+const mstat = (v: number[]) => {
+  const n = v.length, m = v.reduce((a, b) => a + b, 0) / (n || 1);
+  return { mean: m, sd: n > 1 ? Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / (n - 1)) : 0, n };
+};
+
+export function synthesize(data: AnalysisDataset, value: (r: Row) => number, higherIsBetter: boolean, invasion: string, budget: number,
+  label: (crop: string) => string, regimeLabel: (r: string) => string): Synthesis {
+  const better = (a: Ranked, b: Ranked) => (higherIsBetter ? b.mean - a.mean : a.mean - b.mean);
+  const cells: SynthesisCell[] = [];
+  for (const crop of data.crops) for (const remating of data.regimes) {
+    const rows = data.rows.filter((r) => r.Crop === crop && r.Remating === remating && r.Invasion === invasion);
+    if (!rows.length) continue;
+    const at = (s: AnalysisStrategy, b: number): Ranked | null => {
+      const v = rows.filter((r) => r.Strategy === s.id && Number(r.Budget) === b).map(value);
+      return v.length ? { strategy: s, budget: b, ...mstat(v) } : null;
+    };
+    const treated = data.strategies.filter((s) => !s.control);
+    const ranking = treated.map((s) => at(s, budget)).filter((x): x is Ranked => !!x).sort(better);
+    const ctrlS = data.strategies.find((s) => s.control);
+    const cv = ctrlS ? rows.filter((r) => r.Strategy === ctrlS.id).map(value) : [];
+    const control = cv.length ? mstat(cv) : null;
+    const all = treated.flatMap((s) => data.budgets.filter((b) => b > 0).map((b) => at(s, b))).filter((x): x is Ranked => !!x).sort(better);
+    const [a, b] = ranking;
+    cells.push({ crop, remating, ranking, control, clear: !!a && (!b || Math.abs(a.mean - b.mean) > a.sd + b.sd),
+      gain: a && control ? a.mean - control.mean : null, bestAnyBudget: all[0] ?? null });
+  }
+  const lead = (c?: SynthesisCell) => c?.ranking[0]?.strategy;
+  const main = data.regimes.includes("preference") ? "preference" : data.regimes[0];
+  let byCrop: string | null = null;
+  if (data.crops.length > 1) {
+    const cs = data.crops.map((crop) => cells.find((c) => c.crop === crop && c.remating === main));
+    if (cs.every((c) => lead(c))) {
+      const same = cs.every((c) => lead(c)!.id === lead(cs[0])!.id);
+      const unclear = cs.some((c) => !c!.clear);
+      byCrop = (same ? `Même stratégie en tête pour ${data.crops.map(label).join(" et ")} : ${lead(cs[0])!.label}.`
+        : `Stratégie en tête différente : ${cs.map((c) => `${label(c!.crop)} → ${lead(c)!.label}`).join(" ; ")}.`)
+        + (unclear ? " Attention : pour au moins une culture, l’écart entre les deux premières stratégies est inférieur à la variabilité entre répétitions." : "");
+    }
+  }
+  let byRegime: string | null = null;
+  if (data.regimes.includes("preference") && data.regimes.includes("first")) {
+    const parts = data.crops.map((crop) => {
+      const p = cells.find((c) => c.crop === crop && c.remating === "preference"), f = cells.find((c) => c.crop === crop && c.remating === "first");
+      if (!lead(p) || !lead(f)) return null;
+      return lead(p)!.id === lead(f)!.id
+        ? `${label(crop)} : même stratégie en tête (${lead(p)!.label}) en ${regimeLabel("preference").toLowerCase()} et en ${regimeLabel("first").toLowerCase()}`
+        : `${label(crop)} : ${lead(p)!.label} en ${regimeLabel("preference").toLowerCase()}, ${lead(f)!.label} en ${regimeLabel("first").toLowerCase()}`;
+    }).filter(Boolean);
+    if (parts.length) byRegime = parts.join(" ; ") + ".";
+  }
+  return { cells, byCrop, byRegime };
+}

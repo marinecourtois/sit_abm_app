@@ -1,0 +1,12 @@
+{
+  "replicates": 20,
+  "seasons": 3840,
+  "notebook_rows_identical": 576,
+  "seed_formula": "42 + rep*1000 + budget*7 + len(strategy)*13 + len(invasion)*19 (notebook, cellule 5)",
+  "engine_version": "1.2.0",
+  "modelly_version": "1.5.1",
+  "modelly_file": "/home/tkmremi/orca/projects/modelly-tis/backend/.venv/lib/python3.15t/site-packages/modelly/__init__.py",
+  "computed_at": "2026-11-25T18:57:58+00:00",
+  "duration_s": 558.7,
+  "sha256": "6dfe998f29aab43dc1226aa1ba71587c8e484a27669e808493f217b74d182cec"
+}

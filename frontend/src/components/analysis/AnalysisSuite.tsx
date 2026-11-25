@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import type { Meta } from "../../lib/api";
 import { CROP_LABEL, fmt, fmtInt } from "../../lib/format";
 import { INDICATOR, INDICATORS, diffUnit, stats, type Indicator, type Row } from "../../lib/indicators";
-import { paretoFront, type AnalysisDataset, type AnalysisStrategy } from "../../lib/analysis";
+import { paretoFront, synthesize, type AnalysisDataset, type AnalysisStrategy } from "../../lib/analysis";
+import { CROP_COLOR } from "../../lib/colors";
 import { Panel, PanelTitle, ScientificTooltip, Segmented, Select } from "../ui";
 import { Heatmap } from "../charts/Heatmap";
 import { ScatterChart, type ScatterPoint } from "../charts/ScatterChart";
@@ -109,6 +110,8 @@ export function AnalysisSuite({ data, meta, source, exportPrefix, planHint, asid
         </div>
       </Panel>
 
+      <DecisionSynthesis data={data} meta={meta} metric={metric} invasion={inv} setInvasion={setInvasion} budget={budget} setBudget={setBudget} budgets={tis} planHint={planHint} />
+
       <Panel className="mt-4 px-5 py-4">
         <PanelTitle sub={`${CROP_LABEL[crop]} · régime ${remating} · moyenne ± écart-type (n = ${nRep} répétitions par case)${control ? " · témoin : budget 0" : ""}`}
           right={<ChartExportMenu getSvg={() => hmRef.current} meta={{ title: `Matrice décisionnelle — ${m.label} (${CROP_LABEL[crop]})`, filename: `${exportPrefix}heatmap-${crop}-${metric}`, caption: `${source}, régime ${remating}, moyenne de ${nRep} répétitions. ${m.unit}.` }} />}>
@@ -121,6 +124,8 @@ export function AnalysisSuite({ data, meta, source, exportPrefix, planHint, asid
         ) : <Missing>Aucun scénario avec lâchers dans ces données.</Missing>}
         {hmRows.length === 1 && <Missing>Une seule ligne : ce plan n’a qu’une invasion et qu’un budget. {planHint}</Missing>}
       </Panel>
+
+      {crops.length > 1 && <CropComparison data={data} meta={meta} metric={metric} remating={remating} invasion={inv} budget={budget} exportPrefix={exportPrefix} source={source} />}
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
         <Panel className="px-5 py-4">
@@ -352,5 +357,132 @@ function DodgedStrip({ crop, data, ind, title, exportPrefix }: { crop: string; d
         <text transform={`translate(14,${(H - B) / 2}) rotate(-90)`} textAnchor="middle" fontSize={11.5} fill="#1B201C">{I.unit}</text>
       </svg>
     </figure>
+  );
+}
+
+/* ---------------------------------------------------------------- Synthèse décisionnelle */
+function DecisionSynthesis({ data, meta, metric, invasion, setInvasion, budget, setBudget, budgets, planHint }: {
+  data: AnalysisDataset; meta: Meta; metric: string; invasion: string; setInvasion: (v: string) => void;
+  budget: number; setBudget: (v: number) => void; budgets: number[]; planHint?: ReactNode;
+}) {
+  const ind = INDICATOR[metric];
+  const pct = ind.unit.startsWith("%");
+  const syn = useMemo(() => synthesize(data, (r) => ind.value(r), ind.higherIsBetter, invasion, budget,
+    (c) => CROP_LABEL[c] ?? c, (r) => meta.remating[r]?.short ?? r), [data, metric, invasion, budget]);
+  const v = (x: number) => fmt(x, pct ? 1 : 0);
+  const gainTxt = (g: number) => `${g > 0 ? "+" : g < 0 ? "−" : ""}${v(Math.abs(g))}${pct ? " pt" : ""}`;
+  const good = (g: number) => (ind.higherIsBetter ? g > 0 : g < 0);
+  return (
+    <Panel className="mt-4 px-5 py-4" aria-labelledby="synthese-h">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 id="synthese-h" className="font-serif text-[21px] font-semibold">Synthèse décisionnelle</h2>
+          <p className="font-serif text-[13.5px] text-muted">Stratégie en tête pour « {ind.label} » {ind.higherIsBetter ? "(plus haut = meilleur)" : "(plus bas = meilleur)"}, calculée sur ces données · {data.nRep} répétitions par scénario</p>
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          {data.invasions.length > 1 && <div className="w-64 text-[12px]"><span className="text-muted">Invasion</span>
+            <Segmented size="sm" label="Invasion (synthèse)" value={invasion} onChange={setInvasion} options={data.invasions.map((i) => ({ value: i, label: short(i) }))} /></div>}
+          {budgets.length > 1 && <div className="w-64 text-[12px]"><span className="text-muted">Budget (stériles / saison)</span>
+            <Segmented size="sm" label="Budget (synthèse)" value={String(budget)} onChange={(x) => setBudget(Number(x))} options={budgets.map((b) => ({ value: String(b), label: fmtInt(b) }))} /></div>}
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <div className="rounded-md border border-line bg-white px-3.5 py-2.5">
+          <div className="text-[11.5px] font-semibold uppercase tracking-wider text-muted">Fraise et cerise : même optimum ?</div>
+          <p className="mt-1 text-[13px] leading-snug">{syn.byCrop ?? (data.crops.length < 2 ? <>Une seule culture dans ces données. {planHint}</> : "Pas assez de données à ce budget.")}</p>
+        </div>
+        <div className="rounded-md border border-line bg-white px-3.5 py-2.5">
+          <div className="text-[11.5px] font-semibold uppercase tracking-wider text-muted">Monandrie ou polyandrie : l’optimum change-t-il ?</div>
+          <p className="mt-1 text-[13px] leading-snug">{syn.byRegime ?? <>Les deux régimes (polyandrie et monandrie) sont nécessaires dans le même plan. {planHint}</>}</p>
+        </div>
+      </div>
+
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[820px] text-[12.5px] [&_td+td]:pl-4 [&_th+th]:pl-4 [&_td.tnum]:whitespace-nowrap">
+          <caption className="sr-only">Stratégie en tête par culture et régime</caption>
+          <thead><tr className="border-b border-line text-left text-[11.5px] text-muted">
+            <th className="py-1.5 font-medium">Culture</th><th className="py-1.5 font-medium">Régime</th>
+            <th className="py-1.5 font-medium">En tête au budget {fmtInt(budget)}</th>
+            <th className="py-1.5 text-right font-medium">Valeur<div className="font-normal">moy. ± é.-t.</div></th>
+            <th className="py-1.5 text-right font-medium">Témoin<div className="font-normal">moy. ± é.-t.</div></th>
+            <th className="py-1.5 text-right font-medium">Écart au témoin<div className="font-normal">{diffUnit(ind)}</div></th>
+            <th className="py-1.5 font-medium">Écart avec la 2e</th>
+            {budgets.length > 1 && <th className="py-1.5 font-medium">Meilleure combinaison (tous budgets)</th>}
+          </tr></thead>
+          <tbody>{syn.cells.map((c) => {
+            const [a, b] = c.ranking;
+            return (
+              <tr key={c.crop + c.remating} className="border-b border-line/60 align-top">
+                <td className="whitespace-nowrap py-1.5"><span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: CROP_COLOR[c.crop] }} />{CROP_LABEL[c.crop]}</td>
+                <td className="py-1.5">{meta.remating[c.remating]?.short ?? c.remating}</td>
+                <td className="py-1.5">{a ? <><span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: a.strategy.color }} /><strong className="font-semibold">{a.strategy.label}</strong></> : "—"}</td>
+                <td className="py-1.5 text-right tnum">{a ? <>{v(a.mean)}<span className="text-muted"> ± {v(a.sd)}</span></> : "—"}</td>
+                <td className="py-1.5 text-right tnum">{c.control ? <>{v(c.control.mean)}<span className="text-muted"> ± {v(c.control.sd)}</span></> : "—"}</td>
+                <td className={`py-1.5 text-right tnum ${c.gain != null ? (good(c.gain) ? "text-forest" : "text-terracotta") : ""}`}>{c.gain != null ? gainTxt(c.gain) : "—"}</td>
+                <td className="py-1.5 text-[12px]">{a && b ? <>{b.strategy.short} à {v(Math.abs(a.mean - b.mean))}{pct ? " pt" : ""} — {c.clear ? <span className="text-forest">écart net</span> : <span className="text-[#6B4E16]">inférieur à la variabilité</span>}</> : "seule stratégie"}</td>
+                {budgets.length > 1 && <td className="py-1.5 text-[12px]">{c.bestAnyBudget ? `${c.bestAnyBudget.strategy.label} à ${fmtInt(c.bestAnyBudget.budget)} (${v(c.bestAnyBudget.mean)})` : "—"}</td>}
+              </tr>
+            );
+          })}</tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-[11.5px] leading-relaxed text-muted">
+        Invasion {short(invasion)}. Lecture descriptive, sans test statistique : un écart est « net » quand il dépasse la somme des écarts-types des deux
+        premières stratégies ; sinon, leur classement peut s’inverser d’un jeu de répétitions à l’autre. Ces résultats portent sur le modèle simulé, pas
+        sur des parcelles réelles.
+      </p>
+    </Panel>
+  );
+}
+
+/* ---------------------------------------------------------------- Fraise vs cerise */
+function CropComparison({ data, meta, metric, remating, invasion, budget, exportPrefix, source }: {
+  data: AnalysisDataset; meta: Meta; metric: string; remating: string; invasion: string; budget: number; exportPrefix: string; source: string;
+}) {
+  const ref = useRef<SVGSVGElement>(null);
+  const ind = INDICATOR[metric];
+  const cols = [...data.strategies.filter((s) => s.control), ...data.strategies.filter((s) => !s.control)];
+  const cell = (crop: string, s: AnalysisStrategy) => stats(data.rows.filter((r) => r.Crop === crop && r.Remating === remating && r.Invasion === invasion
+    && r.Strategy === s.id && (s.control || Number(r.Budget) === budget)).map((r) => ind.value(r)));
+  const groups = cols.map((s) => ({ s, crops: data.crops.map((c) => ({ c, g: cell(c, s) })) }));
+  const W = 760, H = 270, L = 58, B = 40, T = 14, R = 10;
+  const all = groups.flatMap((g) => g.crops.filter((x) => x.g.n).map((x) => x.g.mean + x.g.sd));
+  const max = Math.max(1, ...all) * 1.08;
+  const y = (v: number) => T + (H - T - B) * (1 - v / max);
+  const bw = (W - L - R) / Math.max(1, groups.length);
+  const barW = Math.min(34, (bw * 0.7) / data.crops.length);
+  const ticks = Array.from({ length: 6 }, (_, i) => (max * i) / 5);
+  const pct = ind.unit.startsWith("%");
+  return (
+    <Panel className="mt-4 px-5 py-4">
+      <PanelTitle sub={`Même stratégie, même invasion (${short(invasion)}), même budget (${fmtInt(budget)}), régime ${meta.remating[remating]?.short ?? remating} · moyenne ± écart-type, ${data.nRep} répétitions`}
+        right={<ChartExportMenu getSvg={() => ref.current} meta={{ title: `Fraise vs cerise — ${ind.label}`, filename: `${exportPrefix}fraise-vs-cerise-${metric}`, caption: `${source}. ${ind.label} (${ind.unit}), invasion ${short(invasion)}, budget ${fmtInt(budget)}, régime ${remating}. Barres : moyenne ; traits : ± écart-type.` }} />}>
+        Fraise vs cerise, par stratégie</PanelTitle>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px]">{data.crops.map((c) => <span key={c} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: CROP_COLOR[c] }} />{meta.crops[c as "strawberry"]?.label ?? c}</span>)}</div>
+      <svg ref={ref} viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`Comparaison fraise et cerise, ${ind.label}`}>
+        {ticks.map((t) => <g key={t}><line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="#E3E8E1" /><text x={L - 8} y={y(t)} dy="0.32em" textAnchor="end" fontSize={11} className="tnum" fill="#1B201C">{fmt(t, pct ? 0 : 0)}</text></g>)}
+        <line x1={L} x2={L} y1={T} y2={H - B} stroke="#1B201C" /><line x1={L} x2={W - R} y1={H - B} y2={H - B} stroke="#1B201C" />
+        {groups.map(({ s, crops }, i) => (
+          <g key={s.id}>
+            {crops.map(({ c, g }, j) => {
+              if (!g.n) return null;
+              const x = L + bw * (i + 0.5) + (j - (crops.length - 1) / 2) * (barW + 4) - barW / 2;
+              return (
+                <g key={c} className="m-pop" style={{ animationDelay: `${(i * 2 + j) * 40}ms` }}>
+                  <rect x={x} y={y(g.mean)} width={barW} height={Math.max(0, y(0) - y(g.mean))} fill={CROP_COLOR[c]} fillOpacity={0.85} rx={2}>
+                    <title>{`${meta.crops[c as "strawberry"]?.label} · ${s.label} : ${fmt(g.mean, 2)} ± ${fmt(g.sd, 2)} (n = ${g.n})`}</title></rect>
+                  <line x1={x + barW / 2} x2={x + barW / 2} y1={y(g.mean + g.sd)} y2={y(Math.max(0, g.mean - g.sd))} stroke="#1B201C" strokeWidth={1.3} />
+                  <line x1={x + barW / 2 - 4} x2={x + barW / 2 + 4} y1={y(g.mean + g.sd)} y2={y(g.mean + g.sd)} stroke="#1B201C" strokeWidth={1.3} />
+                </g>
+              );
+            })}
+            <text x={L + bw * (i + 0.5)} y={H - B + 17} textAnchor="middle" fontSize={11} fill="#1B201C">{s.control ? "Témoin" : s.short}</text>
+          </g>
+        ))}
+        <text transform={`translate(14,${(H - B) / 2}) rotate(-90)`} textAnchor="middle" fontSize={11.5} fill="#1B201C">{ind.unit}</text>
+      </svg>
+      {!pct && <p className="text-[11.5px] text-muted">Attention : valeur absolue, les deux cultures ne produisent pas le même nombre de fruits ni sur la même durée.</p>}
+    </Panel>
   );
 }

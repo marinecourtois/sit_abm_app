@@ -9,7 +9,7 @@ make test          # tout, directement : pytest (backend) puis Vitest (frontend)
 | Suite | Outil | Fichiers | Tests |
 |---|---|---|---|
 | Backend : non-régression, API, contrat | pytest (`backend/tests/`) | 3 | 54 |
-| Frontend : unitaires, composants, contrat | Vitest + Testing Library (`frontend/src/**/*.test.ts(x)`) | 12 | 90 |
+| Frontend : unitaires, composants, contrat | Vitest + Testing Library (`frontend/src/**/*.test.ts(x)`) | 13 | 95 |
 
 ## SmartTest : ne lancer que les tests affectés
 
@@ -97,7 +97,8 @@ dynamiques).
 | `lib/format.test.ts` | Format français, tiret (jamais zéro) pour une valeur absente, signes |
 | `lib/indicators.test.ts` | Chaque indicateur en % précise son dénominateur ; somme des fruits infestés ; écarts en points de % ; écart-type n − 1 |
 | `components/charts/exportChart.test.ts` | CSV : échappement et précision complète |
-| `lib/analysis.test.ts` | Jeu de données des analyses d'une expérience : une ligne par saison aux colonnes du CSV du notebook, valeurs non modifiées ; invasion et régime propres à chaque scénario d'un plan ; variantes d'une même stratégie distinctes ; noms du notebook → clés du moteur ; libellés de scénario ; front de Pareto |
+| `pages/Protocol.test.ts` | Export JSON des paramètres : chaque paramètre biologique avec sa valeur du notebook, sa plage, son unité et sa source |
+| `lib/analysis.test.ts` | Synthèse décisionnelle (classement, écart au témoin, sens de l'indicateur, écart inférieur à la variabilité, réponses aux deux questions) ; jeu de données des analyses d'une expérience : une ligne par saison aux colonnes du CSV du notebook, valeurs non modifiées ; invasion et régime propres à chaque scénario d'un plan ; variantes d'une même stratégie distinctes ; noms du notebook → clés du moteur ; libellés de scénario ; front de Pareto |
 
 Les deux tests de contrat ont été vérifiés par mutation : ajouter dans l'interface un
 indicateur que le moteur ne calcule pas fait échouer le test Vitest **et** le test pytest.
@@ -122,17 +123,19 @@ indicateur que le moteur ne calcule pas fait échouer le test Vitest **et** le t
 Les tests de l'API utilisent une base et un dossier de résultats temporaires : ils ne
 touchent pas `data/app.db`.
 
-## Plan factoriel à 10 répétitions
+## Plan factoriel à 20 répétitions
 
-Le notebook ne calcule que 3 répétitions par scénario ; l'étude en exige au moins 10.
-`make factorial` (`backend/scripts/factorial.py --reps 10`) recalcule le même plan (2 cultures ×
+Le notebook ne calcule que 3 répétitions par scénario ; l'étude en exige au moins 10, et la
+page Analyses en utilise 20 depuis la 1.8.0.
+`make factorial` (`backend/scripts/factorial.py --reps $(REPS)`, `REPS=20` par défaut) recalcule le même plan (2 cultures ×
 3 invasions × 4 budgets × 2 régimes × stratégies) avec la **même formule de graine** que le
-notebook, sur tous les cœurs (≈ 5 min, 1 920 saisons). Avant d'écrire le résultat, le script
+notebook (3 840 saisons à 20 répétitions, 9 min 19 s sur 6 processus). Avant d'écrire le résultat, le script
 vérifie que les 576 saisons déjà présentes dans le CSV du notebook (répétitions 0 à 2) sont
 **identiques au bit près** ; sinon il s'arrête sans rien écrire.
 
-Sortie : `backend/data/factorial/factorial_r10.csv` et `factorial_r10.json` (provenance : date,
-moteur, modelly, durée, sha256). La page Analyses l'utilise automatiquement.
+Sortie : `backend/data/factorial/factorial_r<N>.csv` et `factorial_r<N>.json` (provenance : date,
+moteur, modelly, durée, sha256). La page Analyses prend automatiquement le fichier qui a le plus
+de répétitions.
 
 ## Que faire si la non-régression échoue
 

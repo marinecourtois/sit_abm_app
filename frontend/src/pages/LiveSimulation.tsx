@@ -34,6 +34,7 @@ export function LiveSimulation() {
   const [group, setGroup] = useState<(typeof GROUPS)[number]["key"]>("insectes");
   const [day, setDay] = useState(0);
   const [follow, setFollow] = useState(true);
+  const [showCtrl, setShowCtrl] = useState(true);   // superposer la trajectoire du témoin sans TIS
   const chartRef = useRef<SVGSVGElement>(null);
   const seqRef = useRef(0);   // curseur du flux en direct : seules les nouvelles lignes sont demandées
   const [notify, setNotify] = useState(() => typeof Notification !== "undefined" && Notification.permission === "granted");
@@ -108,6 +109,12 @@ export function LiveSimulation() {
       : v === "Wild_adults_relative" ? (r.Wild_males + r.Females) / Math.max(1, init.Wild_males + init.Females) : r[v];
     return { id: v, label: m.label, color: m.color, dash: m.dash, x: rows.map((_, i) => i), y: rows.map(val) };
   }), [vars, sc, liveRows.length, exp, crop, meta]);
+  // Témoin sans TIS de la même cellule (culture, invasion, régime), mêmes graines
+  const ctrlSc = sc && !sc.is_control ? res?.scenarios.find((c) => c.is_control && c.crop === sc.crop && c.remating === sc.remating
+    && (c.invasion?.wild ?? -1) === (sc.invasion?.wild ?? -1) && (c.invasion?.females ?? -1) === (sc.invasion?.females ?? -1)) : undefined;
+  const ctrlSeries: ChartSeries[] = showCtrl && ctrlSc ? vars.filter((v) => ctrlSc.series[v] && v !== "Wild_adults_vs_control").map((v) => ({
+    id: `ctrl:${v}`, label: `Témoin · ${VAR[v].label}`, color: VAR[v].color, dash: "2 4", width: 1.4, opacity: 0.6,
+    x: ctrlSc.series.Time, y: ctrlSc.series[v].mean })) : [];
 
   const units = Array.from(new Set(vars.map((v) => VAR[v].unit)));
   const ratioOnly = vars.length > 0 && vars.every((v) => v === "SW_ratio");
@@ -222,7 +229,7 @@ export function LiveSimulation() {
               <ChartExportMenu getSvg={() => chartRef.current}
                 meta={{ title: planItem ? scenarioLabel(planItem, exp.config, meta) : "", filename: `${exp.short_id}-dynamique`,
                   caption: `${sc ? `Moyenne ± écart-type, ${exp.config.replicates} répétitions` : "Répétition 1 (calcul en cours)"}. Invasion ${(planItem?.invasion ?? exp.config.invasion).wild} W : ${(planItem?.invasion ?? exp.config.invasion).females} F, budget ${planItem?.budget ?? exp.config.budget} stériles, régime ${planItem?.remating ?? exp.config.remating}, graine ${exp.config.seed}. ${exp.short_id}, moteur ${exp.engine_version}.` }}
-                onCsv={() => downloadText(toCsv([["jour", ...chartSeries.flatMap((s) => [s.id + "_moyenne", s.id + "_ecart_type"])], ...chartSeries[0]?.x.map((t, i) => [t, ...chartSeries.flatMap((s) => [s.y[i], s.sd?.[i] ?? ""])]) ?? []]), `${exp.short_id}-series.csv`)} />
+                onCsv={() => downloadText(toCsv([["jour", ...[...chartSeries, ...ctrlSeries].flatMap((s) => [s.id + "_moyenne", s.id + "_ecart_type"])], ...chartSeries[0]?.x.map((t, i) => [t, ...[...chartSeries, ...ctrlSeries].flatMap((s) => [s.y[i], s.sd?.[i] ?? ""])]) ?? []]), `${exp.short_id}-series.csv`)} />
             </div>
           </div>
           <fieldset className="mt-3 rounded-md border border-line bg-[#F8F9F5] px-3 py-2.5">
@@ -251,12 +258,15 @@ export function LiveSimulation() {
                 })}
               </div>
               {vars.join() !== DEFAULT_VARS.join() && <button type="button" onClick={() => { setVars(DEFAULT_VARS); setGroup("insectes"); }} className="text-[12px] text-muted underline underline-offset-2 hover:text-ink">Réinitialiser</button>}
+              {ctrlSc && <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-[12px] text-ink" title="Trajectoire moyenne du témoin sans lâcher, même culture, invasion, régime et mêmes graines">
+                <input type="checkbox" className="h-3.5 w-3.5 accent-[#347A55]" checked={showCtrl} onChange={(e) => setShowCtrl(e.target.checked)} />
+                Superposer le témoin <svg width="18" height="6" aria-hidden><line x1="0" x2="18" y1="3" y2="3" stroke="#657068" strokeWidth="1.6" strokeDasharray="2 4" /></svg></label>}
             </div>
           </fieldset>
           {units.length > 1 && <p className="mt-2 text-[11.5px] text-terracotta">Attention : variables d’unités différentes ({units.join(", ")}) sur un même axe. Sélectionnez des variables de même unité pour une lecture quantitative.</p>}
           <div className="mt-2">
             {chartSeries.length && chartSeries[0].x.length > 0 ? (
-              <TimeSeriesChart ref={chartRef} series={chartSeries} height={360} xLabel="Jour de saison" yLabel={units.length === 1 ? cap(units[0]) : "Valeur"}
+              <TimeSeriesChart ref={chartRef} series={[...chartSeries, ...ctrlSeries]} height={360} xLabel="Jour de saison" yLabel={units.length === 1 ? cap(units[0]) : "Valeur"}
                 xDomain={[0, L]} cursorX={day} onCursor={(x) => { if (x != null) { setDay(x); setFollow(false); } }}
                 yScale={ratioOnly ? "symlog" : "linear"} referenceLines={ratioOnly ? [{ y: 1, label: "Parité S/W = 1" }] : undefined}
                 events={sc?.events.filter((e) => e.type !== "peak" && e.type !== "larvae_peak").map((e) => ({ x: e.day, label: EV_LABEL[e.type] ?? "" }))}

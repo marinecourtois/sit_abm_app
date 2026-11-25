@@ -161,6 +161,14 @@ métriques).
   `datasetFromResults` sur les répétitions de l'expérience (valeurs de `metrics[k].values`, sans
   recalcul). À côté de l'incertitude : l'effet apparié vs témoin de chaque stratégie.
 
+En tête de la suite, la **synthèse décisionnelle** (`synthesize`, `lib/analysis.ts`) classe les
+stratégies au budget et à l'invasion choisis, par culture et par régime, et répond aux deux
+questions de l'étude (même optimum pour fraise et cerise ? l'optimum change-t-il avec le régime ?).
+Un écart est « net » s'il dépasse la somme des écarts-types des deux premières, sinon il est
+signalé comme inférieur à la variabilité. Avec deux cultures, la figure **Fraise vs cerise** met
+les deux cultures côte à côte par stratégie. Sur le graphique d'une simulation, **Superposer le
+témoin** trace la trajectoire moyenne du témoin de la même cellule (tirets).
+
 Chaque graphique n'utilise que les dimensions présentes. Une dimension à une seule valeur est
 indiquée (« Fixés dans ce plan ») et le graphique qui en a besoin dit ce qui manque, avec un lien
 « Dupliquer en plan » (`/simulation?from=<id>&plan=1`). Pour tout voir dans une expérience, le

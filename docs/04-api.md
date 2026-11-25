@@ -56,7 +56,7 @@ Clés de stratégie : `no_tis`, `daily`, `every_3`, `every_7`, `front_70`, `fron
 |---|---|---|
 | GET | `/health` | État du serveur et versions : `app_version` (application), moteur, paramètres, schéma, modelly, Python |
 | GET | `/queue` | Exécutions en file ou en cours : `{workers, active: [{id, short_id, name, status, progress, done, total, elapsed_s, eta_s}]}` |
-| GET | `/meta` | Registre complet : cultures, stratégies (avec leurs paramètres), régimes de réaccouplement (libellé, formule LaTeX, description), préréglages d'invasion et de budget, paramètres biologiques (libellé, groupe, symbole, unité, défaut, plage, source), groupes, constantes fixes du modèle, limites (répétitions 10 – 50), résumé du plan factoriel servi, versions |
+| GET | `/meta` | Registre complet : cultures, stratégies (avec leurs paramètres), régimes de réaccouplement (libellé, formule LaTeX, description), préréglages d'invasion et de budget, paramètres biologiques (libellé, groupe, symbole, unité, défaut, plage, source), groupes, constantes fixes du modèle, limites (répétitions 10 – 50), répétitions proposées par défaut (`default_replicates`, 20), résumé du plan factoriel servi, versions |
 | POST | `/validate` | Corps : `ExperimentConfig`. Renvoie `{ok, errors, warnings, scenarios[], estimate}` ; `scenarios` contient le calendrier calculé de chaque culture × stratégie |
 
 ## Expériences

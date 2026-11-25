@@ -4,6 +4,42 @@ Format : une section par version de l'application (`APP_VERSION`, `backend/app/_
 Les versions du moteur (`ENGINE_VERSION`), des paramètres et du schéma sont indépendantes et
 enregistrées avec chaque expérience (voir docs/03 § 4).
 
+## 1.8.0 — 25 novembre 2026
+
+Sprint « reprise des ajouts de Marine ». Marine avait prototypé avec Gemini, dans son dépôt
+séparé `marinecourtois/tis-suzukii-app`, des vues supplémentaires. Gemini y avait aussi remplacé
+le moteur par un moteur JavaScript inventé (capacité de charge K, immigration quotidienne, stades
+de maturité vert/tournant/mûr : aucun de ces mécanismes n'existe dans le modèle du notebook),
+écrit les chiffres de la synthèse en dur et supprimé l'onglet Publications/Protocole ainsi que le
+graphique Fraise vs Cerise des analyses. Cette version reprend ce qu'elle voulait, calculé sur le
+vrai moteur. Le moteur ne change pas (`ENGINE_VERSION` 1.2.0) : les 38 tests de non-régression
+reproduisent toujours le notebook au bit près.
+
+### Nouveautés
+
+- **Synthèse décisionnelle** (page Analyses et analyses d'une simulation) : pour l'indicateur,
+  l'invasion et le budget choisis, la stratégie en tête par culture et par régime, sa valeur, le
+  témoin, l'écart au témoin, l'écart avec la deuxième (« net » ou « inférieur à la variabilité
+  entre répétitions ») et la meilleure combinaison stratégie × budget. Deux réponses calculées sur
+  les données : *fraise et cerise ont-elles le même optimum ?* et *l'optimum change-t-il entre
+  monandrie et polyandrie ?* Lecture descriptive, sans test statistique.
+- **Fraise vs cerise, par stratégie** : barres moyenne ± écart-type des deux cultures côte à côte
+  (même invasion, budget et régime), avec export.
+- **Superposer le témoin** sur le graphique d'évolution temporelle d'une simulation : trajectoire
+  moyenne du témoin sans lâcher de la même cellule, mêmes graines (activé par défaut, inclus dans
+  l'export CSV).
+- **20 répétitions** : valeur proposée par défaut dans le Studio et le lancement rapide
+  (`DEFAULT_REPLICATES`, `/api/meta`), le minimum accepté reste 10. Le plan factoriel de la page
+  Analyses est recalculé à 20 répétitions (`make factorial`, `REPS=20` par défaut).
+- **Paramètres (JSON)** sur la page Protocole : tous les paramètres du modèle (valeur du
+  notebook, plage admise, unité, source), constantes et paramètres des cultures.
+
+### Tests
+
+- Frontend : 95 tests (+5) : synthèse décisionnelle (classement, écart au témoin, sens de
+  l'indicateur, écart inférieur à la variabilité, réponses aux deux questions) et export des
+  paramètres.
+
 ## 1.7.0 — 23 novembre 2026
 
 Sprint « analyses de chaque simulation ». Le moteur ne change pas (`ENGINE_VERSION` 1.2.0) :
