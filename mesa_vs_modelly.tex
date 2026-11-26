@@ -1,0 +1,453 @@
+% ============================================================
+%  Mesa vs Modelly — Présentation Beamer (version corrigée)
+%  Compilez avec : xelatex mesa_vs_modelly.tex  (2 passes)
+% ============================================================
+\documentclass[aspectratio=169, 11pt]{beamer}
+
+% ---------- thème ------------------------------------------
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\usefonttheme{professionalfonts}
+\setbeamertemplate{navigation symbols}{}
+
+% ---------- encodage & langue ------------------------------
+\usepackage{fontspec}
+\usepackage[french]{babel}
+\usepackage{csquotes}
+\usepackage{booktabs}
+
+% ---------- code -------------------------------------------
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{codebg}{RGB}{246,246,250}
+\definecolor{keyword}{RGB}{30,100,200}
+\definecolor{comment}{RGB}{100,120,100}
+\definecolor{string}{RGB}{180,40,40}
+\definecolor{good}{RGB}{20,140,60}
+\definecolor{bad}{RGB}{190,40,30}
+\definecolor{warncolor}{RGB}{200,120,0}
+
+\lstset{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{keyword}\bfseries,
+  commentstyle=\color{comment}\itshape,
+  stringstyle=\color{string},
+  language=Python,
+  breaklines=true,
+  frame=none,
+  showstringspaces=false,
+  tabsize=2,
+  columns=flexible,
+  xleftmargin=4pt,
+  xrightmargin=4pt,
+  morekeywords={self,True,False,None,super},
+}
+
+% ---------- icônes -----------------------------------------
+\newcommand{\okmark}{\textcolor{good}{\textbf{\checkmark}}}
+\newcommand{\komark}{\textcolor{bad}{\textbf{$\boldsymbol{\times}$}}}
+\newcommand{\warnmark}{\textcolor{warncolor}{\textbf{!}}}
+
+% ---------- métadonnées ------------------------------------
+\title[Mesa \textrightarrow{} Modelly]{Pourquoi nous avons migré de Mesa vers Modelly}
+\subtitle{Modélisation individu-centrée — projet TIS}
+\author{Marine Courtois}
+\institute{Modelly-TIS-Research}
+\date{Novembre 2026}
+
+% ============================================================
+\begin{document}
+
+% ----------------------------------------------------------
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Plan}
+  \tableofcontents
+\end{frame}
+
+% ============================================================
+\section{Rappel — modèles individu-centrés}
+
+\begin{frame}{C'est quoi un modèle individu-centré ?}
+
+  \begin{block}{Principe}
+    Chaque individu est programmé avec ses propres règles de comportement.
+    Le comportement \textbf{global} du système émerge des interactions locales.
+  \end{block}
+
+  \bigskip
+
+  \begin{columns}[T]
+    \column{0.46\textwidth}
+      \textbf{Nos agents dans le modèle TIS}
+      \medskip
+      \begin{itemize}\setlength\itemsep{4pt}
+        \item Mâles sauvages (\textit{D. suzukii})
+        \item Mâles stériles lâchés (TIS)
+        \item Femelles — accouplement, ponte
+        \item Larves
+        \item Fruits — statut, ovipositions
+      \end{itemize}
+
+    \column{0.50\textwidth}
+      \textbf{Ce que simule notre modèle}
+      \medskip
+      \begin{itemize}\setlength\itemsep{4pt}
+        \item Une saison agricole jour par jour
+        \item Compétition stériles\,/\,sauvages
+        \item Dommages larvaires selon la stratégie de lâcher
+        \item 2 cultures : fraise et cerise
+      \end{itemize}
+  \end{columns}
+
+\end{frame}
+
+% ============================================================
+\section{Présentation des deux packages}
+
+\begin{frame}{Mesa — le package historique}
+
+  \textbf{Créé en 2015} — le framework ABM de référence en Python
+
+  \bigskip
+
+  \begin{columns}[T]
+    \column{0.60\textwidth}
+      \begin{itemize}\setlength\itemsep{6pt}
+        \item Open-source, licence Apache 2.0
+        \item Très utilisé en sciences sociales et écologie
+        \item Grande communauté, nombreux tutoriels
+        \item Version actuelle : 3.5.3
+      \end{itemize}
+
+    \column{0.36\textwidth}
+      \begin{alertblock}{Point de vigilance}
+        L'API a subi des \textbf{ruptures majeures} entre la v2 et la v3 qui cassent les modèles existants.
+      \end{alertblock}
+  \end{columns}
+
+\end{frame}
+
+\begin{frame}{Modelly — orienté reproductibilité scientifique}
+
+  \textbf{Package ABM plus récent} — pensé pour les simulations traçables
+
+  \bigskip
+
+  \begin{columns}[T]
+    \column{0.60\textwidth}
+      \begin{itemize}\setlength\itemsep{6pt}
+        \item Open-source, licence Apache 2.0
+        \item API très proche de Mesa — migration facile
+        \item Accent sur reproductibilité et études paramétriques
+        \item Version actuelle : 1.5.0
+      \end{itemize}
+
+    \column{0.36\textwidth}
+      \begin{block}{Même base que Mesa}
+        \texttt{numpy}, \texttt{pandas},\\
+        \texttt{scipy}, \texttt{tqdm}\\
+        \medskip
+        Aucune dépendance\\supplémentaire
+      \end{block}
+  \end{columns}
+
+\end{frame}
+
+% ============================================================
+\section{Trois raisons scientifiques de migrer}
+
+% ----------------------------------------------------------
+\begin{frame}{Raison \textnumero{}1 — Reproductibilité}
+
+  \begin{alertblock}{Le problème avec Mesa}
+    Deux sources aléatoires séparées : le modèle \textbf{et} le scheduler.\\
+    La séquence des tirages a changé entre Mesa 2.x et 3.x.
+  \end{alertblock}
+
+  \bigskip
+
+  \begin{block}{La solution Modelly : \texttt{FastRandom}}
+    Un seul générateur — \texttt{model.random} — Mersenne Twister stable entre versions.\\[6pt]
+    Deux runs avec la même graine produisent des résultats \textbf{identiques bit-à-bit}.
+  \end{block}
+
+  \bigskip
+
+  \okmark\; Vérifié automatiquement par \texttt{tests/test\_regression.py} à chaque commit.
+
+\end{frame}
+
+\begin{frame}[fragile]{Raison \textnumero{}1 — Reproductibilité (code)}
+
+  \begin{columns}[T]
+    \column{0.46\textwidth}
+      \textbf{Mesa — graine instable}
+      \begin{lstlisting}
+# API deprecated en v3
+model.reset_randomizer(42)
+# FutureWarning !
+# Sequence peut changer
+# selon la version de Mesa
+      \end{lstlisting}
+
+    \column{0.50\textwidth}
+      \textbf{Modelly — graine intégrée}
+      \begin{lstlisting}
+# Graine dans le constructeur
+model = RematingModel(seed=42)
+
+# Bit-identique garanti
+# entre toutes les versions
+      \end{lstlisting}
+  \end{columns}
+
+\end{frame}
+
+% ----------------------------------------------------------
+\begin{frame}{Raison \textnumero{}2 — Contrôle de l'activation}
+
+  Dans un ABM, \textbf{l'ordre dans lequel les agents agissent change les résultats}.
+
+  \bigskip
+
+  \begin{columns}[T]
+    \column{0.46\textwidth}
+      \begin{alertblock}{Mesa — boîte noire}
+        Le scheduler \texttt{RandomActivation} cache l'ordre d'activation.\\[4pt]
+        \komark\; \textbf{Supprimé} dans Mesa 3.0 !
+      \end{alertblock}
+
+    \column{0.50\textwidth}
+      \begin{block}{Modelly — activation explicite}
+        L'ordre est écrit \textbf{directement dans le code} du modèle : lisible, auditable, reproductible.\\[4pt]
+        \okmark\; N'importe quel collaborateur peut le lire.
+      \end{block}
+  \end{columns}
+
+\end{frame}
+
+\begin{frame}[fragile]{Raison \textnumero{}2 — Contrôle de l'activation (code)}
+
+  \begin{columns}[T]
+    \column{0.46\textwidth}
+      \textbf{Mesa 2.x}
+      \begin{lstlisting}
+# Scheduler opaque
+self.schedule = \
+  RandomActivation(self)
+
+def step(self):
+    self.schedule.step()
+# Supprime en Mesa 3 !
+      \end{lstlisting}
+
+    \column{0.50\textwidth}
+      \textbf{Modelly — notre advance\_day()}
+      \begin{lstlisting}
+agents = [a for b in
+  self.agents_by_type.values()
+  for a in b]
+self.random.shuffle(agents)
+for a in agents:
+    if a in self.agents:
+        a.step()
+      \end{lstlisting}
+  \end{columns}
+
+\end{frame}
+
+% ----------------------------------------------------------
+\begin{frame}{Raison \textnumero{}3 — Stabilité de l'API}
+
+  \textbf{Mesa a cassé l'API de façon répétée entre v2 et v3 :}
+
+  \bigskip
+
+  \begin{center}
+  \begin{tabular}{lcc}
+    \toprule
+    Ce qui a changé & Version & Impact \\
+    \midrule
+    Signature de \texttt{Agent.\_\_init\_\_} & 2 $\to$ 3 & \komark\; Cassant \\
+    \texttt{RandomActivation} supprimé & 2 $\to$ 3 & \komark\; Cassant \\
+    \texttt{mesa.time.*} remplacé & 2 $\to$ 3 & \komark\; Cassant \\
+    \texttt{reset\_randomizer()} déprécié & 3.x & \warnmark\; Warning \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+
+  \bigskip
+
+  \begin{block}{Modelly}
+    API rétrocompatible depuis la v1.0, avec un cycle de dépréciation annoncé.
+  \end{block}
+
+\end{frame}
+
+% ============================================================
+\section{Impact concret sur notre modèle}
+
+\begin{frame}{Qu'est-ce qui a changé dans le code ?}
+
+  \begin{center}
+  \textbf{Uniquement la plomberie du framework — pas les équations}
+  \end{center}
+
+  \medskip
+
+  \begin{center}
+  \begin{tabular}{lll}
+    \toprule
+    Élément & Mesa (avant) & Modelly (après) \\
+    \midrule
+    Import & \texttt{import mesa} & \texttt{import modelly} \\
+    Constructeur agent & \texttt{\_\_init\_\_(self, uid, model)} & \texttt{\_\_init\_\_(self, model)} \\
+    Supprimer un agent & \texttt{schedule.remove(self)} & \texttt{self.remove()} \\
+    Graine RNG & \texttt{reset\_randomizer(42)} & \texttt{Model(rng=42)} \\
+    Scheduler & \texttt{RandomActivation} & Boucle explicite \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}{Ce qui n'a \textbf{pas} changé}
+
+  \begin{columns}[T]
+    \column{0.46\textwidth}
+      \begin{block}{\okmark\; Inchangé}
+        \begin{itemize}\setlength\itemsep{5pt}
+          \item Toutes les \textbf{équations biologiques}
+          \item Tous les \textbf{tirages aléatoires}
+          \item Mortalité, ponte, accouplement
+          \item Calendriers de lâcher
+          \item Métriques de fin de saison
+        \end{itemize}
+      \end{block}
+
+    \column{0.50\textwidth}
+      \begin{alertblock}{La preuve : tests de non-régression}
+        \texttt{make test} compare les sorties\\du moteur Modelly\\
+        aux CSV du \textbf{notebook original}.\\[8pt]
+        Résultat : \textcolor{good}{\textbf{égalité bit-à-bit \okmark}}
+      \end{alertblock}
+
+      \bigskip
+      {\small\itshape « La migration n'est pas une réécriture du modèle. C'est un remplacement de plomberie, vérifié automatiquement. »}
+  \end{columns}
+
+\end{frame}
+
+% ============================================================
+\section{Performances et fonctionnalités bonus}
+
+\begin{frame}{Modelly est aussi plus rapide}
+
+  \textbf{Benchmark mesuré sur la machine de développement (macOS, Python 3.13) :}
+
+  \bigskip
+
+  \begin{center}
+  \begin{tabular}{lccc}
+    \toprule
+    Configuration & Mesa & Modelly & Gain \\
+    \midrule
+    500 agents $\times$ 30 jours & 3,0 ms & 1,1 ms & \textcolor{good}{\textbf{$\times$2,7}} \\
+    9\,500 agents $\times$ 100 jours & 60 ms & 46 ms & \textcolor{good}{\textbf{$\times$1,3}} \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+
+  \bigskip
+
+  Sur nos études paramétriques (centaines de réplicats), le gain $\times$1,3 se cumule significativement.
+
+\end{frame}
+
+\begin{frame}{Fonctionnalités supplémentaires dans Modelly}
+
+  \begin{columns}[T]
+    \column{0.46\textwidth}
+      \textbf{DataCollector enrichi}
+      \begin{itemize}\setlength\itemsep{5pt}
+        \item Export \texttt{Arrow} / \texttt{Parquet}
+        \item Export \texttt{xarray}
+        \item \texttt{get\_agenttype\_vars\_dataframe()}
+      \end{itemize}
+
+    \column{0.50\textwidth}
+      \textbf{Infrastructure}
+      \begin{itemize}\setlength\itemsep{5pt}
+        \item \texttt{model.save()} / \texttt{model.load()} — checkpoint
+        \item \texttt{run\_batch()} — parallélisation native
+        \item \texttt{run\_grid()} $\to$ \texttt{DataFrame} directement
+      \end{itemize}
+  \end{columns}
+
+\end{frame}
+
+% ============================================================
+\section{Conclusion}
+
+\begin{frame}{Conclusion — Pourquoi Modelly ?}
+
+  \begin{columns}[T]
+    \column{0.30\textwidth}
+      \begin{block}{\textnumero{}1 Reproductibilité}
+        Un seul RNG (\texttt{FastRandom}), stable entre versions. Tests automatiques.
+      \end{block}
+
+    \column{0.30\textwidth}
+      \begin{block}{\textnumero{}2 Auditabilité}
+        L'ordre d'activation des agents est explicite dans le code.
+      \end{block}
+
+    \column{0.30\textwidth}
+      \begin{block}{\textnumero{}3 Stabilité}
+        API rétrocompatible. Pas de rupture forcée à chaque mise à jour.
+      \end{block}
+  \end{columns}
+
+  \bigskip\bigskip
+
+  \begin{center}
+    \large La migration a changé \textbf{la plomberie}, pas le modèle.\\[6pt]
+    \normalsize
+    Équations et résultats : \textbf{identiques} \okmark\\
+    Reproductibilité et stabilité : \textbf{améliorées} \okmark
+  \end{center}
+
+\end{frame}
+
+\begin{frame}{Merci — Questions ?}
+
+  \begin{center}
+    \Large\textbf{Merci pour votre attention}
+  \end{center}
+
+  \bigskip\bigskip
+
+  \begin{columns}[T]
+    \column{0.46\textwidth}
+      \textbf{Dans le dépôt}
+      \begin{itemize}
+        \item \texttt{backend/tis\_engine/model.py}
+        \item \texttt{tests/test\_regression.py}
+      \end{itemize}
+
+    \column{0.50\textwidth}
+      \textbf{Documentation}
+      \begin{itemize}
+        \item \texttt{remipelloux.github.io}
+        \item \texttt{mesa.readthedocs.io}
+      \end{itemize}
+  \end{columns}
+
+\end{frame}
+
+\end{document}
