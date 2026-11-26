@@ -1,0 +1,82 @@
+{
+  "format": "modelly-tis-protocol",
+  "schema_version": 4,
+  "name": "Fraise · J+3 / J+7 · avec et sans immigration (15 + 15 tous les 3 jours)",
+  "config": {
+    "crops": [
+      "strawberry"
+    ],
+    "strategies": [
+      {
+        "key": "every_3",
+        "interval": null,
+        "first_day": null,
+        "initial_fraction": null,
+        "maintenance_interval": null,
+        "label": null
+      },
+      {
+        "key": "every_7",
+        "interval": null,
+        "first_day": null,
+        "initial_fraction": null,
+        "maintenance_interval": null,
+        "label": null
+      }
+    ],
+    "invasion": {
+      "preset": "moyenne",
+      "wild": 300,
+      "females": 300,
+      "by_crop": null
+    },
+    "budget": 9000,
+    "remating": "preference",
+    "replicates": 20,
+    "seed": 42,
+    "include_control": true,
+    "biology": {
+      "eta": 0.8,
+      "eta_sperm_choice": 0.59,
+      "lifespan_sterile": 7.0,
+      "lifespan_wild": 25.0,
+      "lifespan_female": 25.0,
+      "lifespan_cv": 0.3,
+      "fruit_capacity": 20,
+      "young_puncture_probability": 0.3,
+      "rotten_puncture_probability": 0.1,
+      "rotten_threshold": 5.0,
+      "larva_age_weight": 0.5,
+      "rot_hazard_sterile": 0.231,
+      "rot_hazard_fertile": 0.3054,
+      "harvest_fraction": 0.9,
+      "prophylaxis_fraction": 0.6,
+      "immigration_wild_males": 0,
+      "immigration_females": 0,
+      "carrying_capacity": 0,
+      "turning_days": 0,
+      "turning_puncture_probability": 0.3
+    },
+    "budgets": null,
+    "invasions": null,
+    "rematings": null,
+    "immigration": {
+      "strawberry": {
+        "wild": 15,
+        "females": 15,
+        "every": 3
+      }
+    },
+    "immigration_compare": true
+  },
+  "source_experiment": "TIS-9DA0B293",
+  "versions": {
+    "app_version": "1.11.0",
+    "engine_version": "1.3.0",
+    "params_version": "nb-2025.10-echelle30-ext3",
+    "schema_version": 4,
+    "modelly_version": "1.5.1",
+    "modelly_source": "source locale /home/tkmremi/Desktop/work/Modelly",
+    "python": "3.15.0"
+  }
+}
